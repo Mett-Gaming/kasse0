@@ -72,13 +72,14 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
 - Mitarbeiter tragen kräftig blaue Dienstkleidung und leuchten im Dunkeln leicht, damit man sie von der Kundschaft unterscheiden kann.
 - Fata Morganen tauchen auf: eine Kundin, ein Mitarbeiter, ein voller Wagen, ein Ausgangsschild. Sie wirken echt, bis du auf etwa 3 m heran bist, dann flackern sie als Hologramm auf und sind weg.
+- Jumpscares: selten und mit Ruhepausen dazwischen. Ein Verfolger steht plötzlich hinter dir, die Kassiererin steht auf, dein abgestellter Wagen verschwindet und rollt von selbst heran, aus Deckenlöchern stürzen Kabel, und auf dem Überwachungsmonitor an der Kasse steht jemand hinter dir, der nicht da ist, wenn du dich umdrehst.
 
 Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen).
 
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 
 ## Optionen
-Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert.
+Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
 
 ## Entwicklung
 ```powershell

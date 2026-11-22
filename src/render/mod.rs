@@ -32,6 +32,9 @@ const MAX_MESH_DRAWS: usize = 4096;
 const MAX_UI_VERTS: usize = 60_000;
 /// Knochen-Matrizen pro Frame (animierte Figuren)
 const MAX_BONES: usize = 16_384;
+/// Aufloesung des Ueberwachungsmonitors (zweite Kamera)
+pub const MONITOR_WIDTH: u32 = 160;
+pub const MONITOR_HEIGHT: u32 = 90;
 
 macro_rules! spv {
     ($name:literal) => {
@@ -110,6 +113,8 @@ pub struct FrameParams {
     pub decay: f32,
     /// Live-Verbiegen der Gaenge (siehe world::sway)
     pub sway: Vec4,
+    /// Kamera des Ueberwachungsmonitors (view_proj, Position); None = Bild bleibt schwarz
+    pub monitor: Option<(Mat4, Vec3)>,
 }
 
 #[derive(Clone, Copy)]
@@ -138,6 +143,9 @@ pub struct Renderer {
     depth: Image,
     font: Image,
     ui_target: Image,
+    /// Bild der Ueberwachungskamera und seine Tiefe
+    monitor: Image,
+    monitor_depth: Image,
     sampler: vk::Sampler,
     /// Schild-Atlas (Schriftzuege im Markt), linear gefiltert
     signs: Image,
@@ -146,6 +154,8 @@ pub struct Renderer {
     tex_set_layout: vk::DescriptorSetLayout,
     descriptor_pool: vk::DescriptorPool,
     world_set: vk::DescriptorSet,
+    /// wie world_set, aber ohne Monitor-Bild (fuer den Kamera-Pass, der es gerade beschreibt)
+    world_set_cam: vk::DescriptorSet,
     mesh_sets: Vec<vk::DescriptorSet>,
     /// statische Mesh-Instanzen (Waren in den Regalen), nach Modell sortiert
     static_set: vk::DescriptorSet,
@@ -252,6 +262,22 @@ impl Renderer {
             vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
             vk::ImageAspectFlags::COLOR,
         )?;
+        let monitor = Image::new(
+            &ctx,
+            MONITOR_WIDTH,
+            MONITOR_HEIGHT,
+            COLOR_FORMAT,
+            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+            vk::ImageAspectFlags::COLOR,
+        )?;
+        let monitor_depth = Image::new(
+            &ctx,
+            MONITOR_WIDTH,
+            MONITOR_HEIGHT,
+            DEPTH_FORMAT,
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+            vk::ImageAspectFlags::DEPTH,
+        )?;
 
         unsafe {
             let d = &ctx.device;
@@ -305,6 +331,12 @@ impl Renderer {
                     vk::DescriptorType::STORAGE_BUFFER,
                     vk::ShaderStageFlags::VERTEX,
                 ),
+                // 5 = Bild der Ueberwachungskamera (Monitor-Material)
+                binding(
+                    5,
+                    vk::DescriptorType::SAMPLED_IMAGE,
+                    vk::ShaderStageFlags::FRAGMENT,
+                ),
             ];
             let scene_set_layout = d.create_descriptor_set_layout(
                 &vk::DescriptorSetLayoutCreateInfo::default().bindings(&scene_bindings),
@@ -334,7 +366,7 @@ impl Renderer {
             )?;
 
             // Welt + statische Waren + je Frame ein Set fuer dynamische Meshes
-            let scene_sets = 2 + FRAMES_IN_FLIGHT as u32;
+            let scene_sets = 3 + FRAMES_IN_FLIGHT as u32;
             let pool_sizes = [
                 vk::DescriptorPoolSize {
                     ty: vk::DescriptorType::STORAGE_BUFFER,
@@ -342,7 +374,7 @@ impl Renderer {
                 },
                 vk::DescriptorPoolSize {
                     ty: vk::DescriptorType::SAMPLED_IMAGE,
-                    descriptor_count: 4 + scene_sets,
+                    descriptor_count: 4 + 2 * scene_sets,
                 },
                 vk::DescriptorPoolSize {
                     ty: vk::DescriptorType::SAMPLER,
@@ -365,7 +397,8 @@ impl Renderer {
             )?;
             let world_set = sets[0];
             let static_set = sets[1];
-            let mesh_sets = sets[2..scene_sets as usize].to_vec();
+            let world_set_cam = sets[2];
+            let mesh_sets = sets[3..scene_sets as usize].to_vec();
             let post_set = sets[scene_sets as usize];
             let ui_set = sets[scene_sets as usize + 1];
 
@@ -655,6 +688,8 @@ impl Renderer {
                 depth,
                 font: font_img,
                 ui_target,
+                monitor,
+                monitor_depth,
                 sampler,
                 signs: sign_img,
                 sign_sampler,
@@ -662,6 +697,7 @@ impl Renderer {
                 tex_set_layout,
                 descriptor_pool,
                 world_set,
+                world_set_cam,
                 mesh_sets,
                 static_set,
                 static_buf,
@@ -784,27 +820,47 @@ impl Renderer {
         let light = [vk::DescriptorBufferInfo::default()
             .buffer(self.light_buf.buffer)
             .range(vk::WHOLE_SIZE)];
-        // (Set, Instanzen, Knochen)
+        // (Set, Instanzen, Knochen, Monitor-Bild an binding 5)
         let mut targets = vec![
             (
                 self.world_set,
                 self.instance_buf.buffer,
                 self.bone_bufs[0].buffer,
+                true,
+            ),
+            (
+                self.world_set_cam,
+                self.instance_buf.buffer,
+                self.bone_bufs[0].buffer,
+                false,
             ),
             (
                 self.static_set,
                 self.static_buf.buffer,
                 self.bone_bufs[0].buffer,
+                true,
             ),
         ];
         for (i, &s) in self.mesh_sets.iter().enumerate() {
-            targets.push((s, self.mesh_inst_bufs[i].buffer, self.bone_bufs[i].buffer));
+            targets.push((
+                s,
+                self.mesh_inst_bufs[i].buffer,
+                self.bone_bufs[i].buffer,
+                true,
+            ));
         }
         let sign_info = [vk::DescriptorImageInfo::default()
             .image_view(self.signs.view)
             .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
         let sign_sampler = [vk::DescriptorImageInfo::default().sampler(self.sign_sampler)];
-        for (set, buf, bones) in targets {
+        let monitor_info = [vk::DescriptorImageInfo::default()
+            .image_view(self.monitor.view)
+            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
+        // Platzhalter fuer den Kamera-Pass: der Schild-Atlas (wird dort nie abgetastet)
+        let no_monitor = [vk::DescriptorImageInfo::default()
+            .image_view(self.signs.view)
+            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)];
+        for (set, buf, bones, with_monitor) in targets {
             let inst = [vk::DescriptorBufferInfo::default()
                 .buffer(buf)
                 .range(vk::WHOLE_SIZE)];
@@ -839,6 +895,15 @@ impl Renderer {
                             .dst_binding(4)
                             .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                             .buffer_info(&bone_info),
+                        vk::WriteDescriptorSet::default()
+                            .dst_set(set)
+                            .dst_binding(5)
+                            .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                            .image_info(if with_monitor {
+                                &monitor_info
+                            } else {
+                                &no_monitor
+                            }),
                     ],
                     &[],
                 );
@@ -859,12 +924,15 @@ impl Renderer {
     }
 
     /// `ghosts` werden halbtransparent ueber die Szene gelegt (Hologramme).
+    /// `monitor_skins` erscheinen nur auf dem Ueberwachungsmonitor.
+    #[allow(clippy::too_many_arguments)]
     pub fn draw(
         &mut self,
         p: &FrameParams,
         meshes: &[MeshDraw],
         ghosts: &[MeshDraw],
         skins: &[SkinDraw],
+        monitor_skins: &[SkinDraw],
         bones: &[Mat4],
         ui: &[UiVertex],
     ) -> Result<()> {
@@ -915,7 +983,13 @@ impl Renderer {
                 skins.iter().filter(|s| s.ghost).copied().collect();
             solid_skins.truncate(room);
             ghost_skins.truncate(room - solid_skins.len());
-            for s in solid_skins.iter().chain(ghost_skins.iter()) {
+            let mut mon_skins: Vec<SkinDraw> = monitor_skins.to_vec();
+            mon_skins.truncate(room - solid_skins.len() - ghost_skins.len());
+            for s in solid_skins
+                .iter()
+                .chain(ghost_skins.iter())
+                .chain(mon_skins.iter())
+            {
                 insts.push(GpuMeshInst {
                     model: s.model.to_cols_array_2d(),
                     tint: [s.tint.x, s.tint.y, s.tint.z, 1.0],
@@ -964,6 +1038,7 @@ impl Renderer {
                 &ghosts[..ghost_count],
                 &solid_skins,
                 &ghost_skins,
+                &mon_skins,
                 ui_count as u32,
                 cap_target,
             )?;
@@ -1058,6 +1133,8 @@ impl Drop for Renderer {
             self.depth.destroy(d);
             self.font.destroy(d);
             self.ui_target.destroy(d);
+            self.monitor.destroy(d);
+            self.monitor_depth.destroy(d);
             self.swapchain.destroy(&self.ctx);
         }
     }

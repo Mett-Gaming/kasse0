@@ -202,6 +202,10 @@ impl Game {
             }
         }
         if self.belt.is_empty() && !self.unloading {
+            if self.scanned_complete() {
+                // Schreck: die Kassiererin steht auf und beugt sich vor ("Kundenkarte?")
+                self.start_cashier_scare();
+            }
             let s = if self.scanned_complete() {
                 "Alles gescannt. Bezahl am Kartenterminal [E]."
             } else {
@@ -229,7 +233,7 @@ impl Game {
                 tint: Vec4::new(0.55, 0.55, 0.6, 0.0),
             });
             // Kassierer:in nur an der offenen Kasse
-            if Some(lane.seat) == open {
+            if Some(lane.seat) == open && !self.cashier_standing() {
                 // Dienstkleidung: Mannequin in Uniform-Blau (sitzende Pose gibt es nur fuer das Mannequin)
                 let uniform = vec3(0.3, 0.6, 0.92);
                 let tint = if self.tipped {

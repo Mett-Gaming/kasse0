@@ -183,6 +183,8 @@ pub struct PersonDraw {
     pub tint: Vec4,
     /// halbtransparentes Hologramm
     pub ghost: bool,
+    /// kopfueber (Fuesse oben an `pos`)
+    pub flip: bool,
 }
 
 #[cfg(test)]

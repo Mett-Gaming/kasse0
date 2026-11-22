@@ -28,6 +28,8 @@ pub mod material {
     pub const POSTER: f32 = 4.0;
     /// Schild mit Schriftzug aus dem Atlas (extra.y = Zeile, color.a = Textfarbe)
     pub const SIGN: f32 = 5.0;
+    /// Ueberwachungsmonitor: zeigt das Bild der Kassenkamera (extra.z = Helligkeit)
+    pub const MONITOR: f32 = 6.0;
 }
 
 #[repr(C)]
@@ -228,6 +230,8 @@ pub struct Lane {
     pub shutter: Vec3,
     /// Ueberwachungskamera an der Decke
     pub camera: Vec3,
+    /// Mitte des Monitorbilds (haengt hinter dem Scanner, Bild nach -z)
+    pub monitor: Vec3,
 }
 
 /// Ein Kundenplatz vor einem Tomatensaft-Regal.
@@ -337,6 +341,8 @@ pub struct World {
     pub drips: Vec<Vec3>,
     /// Kabelenden, die Funken spruehen
     pub sparks: Vec<Vec3>,
+    /// Mitten der Deckenloecher (fuer Schrecken)
+    pub ceiling_holes: Vec<Vec3>,
     /// Wagenbox am Eingang
     pub corral: Vec3,
 }

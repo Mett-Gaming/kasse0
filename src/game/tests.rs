@@ -871,3 +871,259 @@ fn escalation_tables_are_monotonic() {
     assert_eq!(escalation::tier_for_time(0.0), Tier::Calm);
     assert_eq!(escalation::tier_for_time(600.0), Tier::Collapse);
 }
+
+/// Gekippter Markt auf Stufe `tier`, ohne Abklingzeit fuer Schrecken.
+fn scary_game(seed: u64, tier: Tier) -> Game {
+    let mut g = Game::new(seed);
+    g.tip();
+    g.employees.clear();
+    g.tier = tier;
+    g.scare_cd = 0.0;
+    g
+}
+
+fn scared(g: &Game) -> bool {
+    g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Scare))
+}
+
+#[test]
+fn stalker_appears_behind_you_when_distracted() {
+    let mut g = scary_game(42, Tier::Wrong);
+    g.customers.truncate(1);
+    let p = g.player.pos;
+    g.customers[0].stalker = true;
+    // weit weg und ausser Sicht (Spieler schaut nach Norden, Verfolger steht im Sueden)
+    g.customers[0].pos = g.world.collide(vec3(p.x, 0.0, p.z + 12.0), 0.25);
+    g.player.yaw = 0.0;
+    g.player.pitch = 0.0;
+    let inp = Input {
+        list_open: true,
+        ..Default::default()
+    };
+    for _ in 0..(40 * 60) {
+        g.player.pos = p;
+        g.player.yaw = 0.0;
+        let mut i = inp;
+        g.update(1.0 / 60.0, &mut i);
+        if g.behind.is_some() {
+            break;
+        }
+    }
+    assert!(g.behind.is_some(), "kein Verfolger hinter dem Spieler");
+    let c = &g.customers[0];
+    assert!(
+        (c.pos - g.player.pos).length() < 2.0,
+        "steht nicht dicht dahinter"
+    );
+    assert!(g.hush() > 0.0, "keine Stille davor");
+    // umdrehen: Schreck, aber kein Fang
+    g.sfx.clear();
+    g.player.yaw = std::f32::consts::PI;
+    step(&mut g, 0.5, Input::default());
+    assert!(scared(&g), "kein Schreck beim Umdrehen");
+    assert_eq!(g.outcome, Outcome::Running);
+    assert_eq!(g.deaths, 0, "beim Umdrehen gleich erwischt");
+}
+
+#[test]
+fn cashier_stands_up_after_the_last_item() {
+    let mut g = Game::new(12);
+    g.tip();
+    g.customers.clear();
+    g.employees.clear();
+    for e in g.list.clone() {
+        if !g.list_done(e) {
+            let i = shelf_item(&g, e, false).unwrap();
+            g.take(i);
+        }
+    }
+    g.customers.clear();
+    g.employees.clear();
+    let lane = g.open_lane().unwrap();
+    g.trolley.pushing = false;
+    g.trolley.pos = lane.scan_point + vec3(0.0, 0.0, -1.0);
+    look_at_belt(&mut g);
+    press_e(&mut g);
+    g.sfx.clear();
+    for _ in 0..60 {
+        if g.cashier_standing() {
+            break;
+        }
+        step(&mut g, 1.0, Input::default());
+    }
+    assert!(g.cashier_standing(), "Kassiererin steht nicht auf");
+    assert!(scared(&g));
+    let mut people = Vec::new();
+    g.collect_scare_people(&mut people);
+    assert!(
+        !people.is_empty(),
+        "stehende Kassiererin wird nicht gezeichnet"
+    );
+}
+
+#[test]
+fn parked_cart_vanishes_and_rolls_back_towards_you() {
+    let mut g = scary_game(31, Tier::Uneasy);
+    g.customers.clear();
+    g.trolley.pushing = false;
+    let p = g.player.pos;
+    // Wagen weit weg und ausser Sicht (hinter dem Spieler)
+    g.trolley.pos = g.world.collide(vec3(p.x, 0.0, p.z - 9.0), 0.4);
+    g.player.yaw = std::f32::consts::PI;
+    let mut moved = false;
+    for _ in 0..(20 * 60) {
+        g.player.pos = p;
+        g.update(1.0 / 60.0, &mut Input::default());
+        if g.cart_ghost != scares::CartGhost::Idle {
+            moved = true;
+            break;
+        }
+    }
+    assert!(moved, "Wagen verschwindet nicht");
+    let far = (g.trolley.pos - p).length();
+    assert!(far > 10.0, "Wagen nicht weit weg: {far}");
+    // rollt heran und bleibt in Reichweite stehen
+    for _ in 0..(90 * 60) {
+        g.player.pos = p;
+        g.update(1.0 / 60.0, &mut Input::default());
+        if g.cart_ghost == scares::CartGhost::Idle {
+            break;
+        }
+    }
+    let d = (g.trolley.pos - p).length();
+    assert!(d < 3.5, "Wagen rollt nicht heran: {d}");
+}
+
+#[test]
+fn ceiling_hole_drops_cables_when_you_pass_under_it() {
+    let mut g = scary_game(5, Tier::Wrong);
+    g.customers.clear();
+    let mut p = WorldParams::normal(5);
+    p.tipped = true;
+    p.stretch = 2.0;
+    p.ceiling_holes = 4;
+    p.decay = 2;
+    g.world = world::generate(&p);
+    let h = *g.world.ceiling_holes.first().expect("keine Deckenloecher");
+    g.player.pos = g.world.collide(vec3(h.x, 0.0, h.z), 0.3);
+    g.sfx.clear();
+    g.update(1.0 / 60.0, &mut Input::default());
+    assert!(!g.cable_drops.is_empty(), "keine Kabel gefallen");
+    assert!(scared(&g));
+    let mut draws = Vec::new();
+    g.collect_scare_draws(&mut draws);
+    assert!(!draws.is_empty());
+}
+
+#[test]
+fn death_shows_the_face_up_close() {
+    let mut g = scary_game(5, Tier::Calm);
+    g.customers.truncate(1);
+    let p = g.player.pos;
+    g.customers[0].pos = vec3(p.x, 0.0, p.z - 1.5);
+    g.customers[0].stalker = true;
+    g.player.yaw = std::f32::consts::PI;
+    for _ in 0..(6 * 60) {
+        g.update(1.0 / 60.0, &mut Input::default());
+        if g.dying.is_some() {
+            break;
+        }
+    }
+    assert!(g.dying.is_some(), "nicht erwischt");
+    let mut people = Vec::new();
+    g.collect_scare_people(&mut people);
+    assert_eq!(people.len(), 1, "kein Gesicht in Grossaufnahme");
+    assert!((people[0].pos - g.eye()).length() < 2.0);
+}
+
+/// Spieler in den Kassengang stellen, Blick auf den Ueberwachungsmonitor.
+fn watch_monitor(g: &mut Game) -> world::Lane {
+    let lane = g.open_lane().unwrap();
+    g.player.pos = vec3(lane.scan_point.x, 0.0, lane.monitor.z - 2.5);
+    let to = lane.monitor - (g.player.pos + vec3(0.0, EYE_HEIGHT, 0.0));
+    g.player.yaw = to.x.atan2(-to.z);
+    g.player.pitch = (to.y / to.length()).asin();
+    lane
+}
+
+#[test]
+fn surveillance_camera_shows_the_player() {
+    let mut g = scary_game(5, Tier::Uneasy);
+    g.customers.clear();
+    watch_monitor(&mut g);
+    let (vp, cam) = g.monitor_view(16.0 / 9.0).expect("kein Monitor");
+    let clip = vp * (g.player.pos + vec3(0.0, 1.0, 0.0)).extend(1.0);
+    assert!(clip.w > 0.0, "Spieler hinter der Kamera");
+    let ndc = clip.truncate() / clip.w;
+    assert!(
+        ndc.x.abs() < 1.0 && ndc.y.abs() < 1.0,
+        "Spieler nicht im Bild: {ndc}"
+    );
+    assert!(cam.y > 3.0, "Kamera haengt nicht an der Decke");
+    // auf dem Monitor sieht man sich selbst, in der Welt nicht
+    let mut mon = Vec::new();
+    g.collect_monitor_people(&mut mon);
+    assert_eq!(mon.len(), 1);
+    assert!((mon[0].pos - g.player.pos).length() < 1e-3);
+}
+
+#[test]
+fn figure_behind_you_only_on_the_monitor() {
+    let mut g = scary_game(5, Tier::Uneasy);
+    g.customers.clear();
+    watch_monitor(&mut g);
+    g.sfx.clear();
+    for _ in 0..90 {
+        if g.monitor_ghost_visible() {
+            break;
+        }
+        step(&mut g, 1.0 / 30.0, Input::default());
+        watch_monitor(&mut g);
+    }
+    assert!(
+        g.monitor_ghost_visible(),
+        "niemand erscheint auf dem Monitor"
+    );
+    let mut mon = Vec::new();
+    g.collect_monitor_people(&mut mon);
+    assert_eq!(mon.len(), 2, "Gestalt fehlt auf dem Monitor");
+    let behind = mon[1].pos - g.player.pos;
+    assert!(behind.length() < 1.3, "Gestalt steht nicht hinter einem");
+    assert!(
+        behind.dot(g.view_dir()) < 0.0,
+        "Gestalt steht nicht hinter einem"
+    );
+    // in der echten Welt ist da nichts
+    let mut world_people = Vec::new();
+    g.collect_people(&mut world_people);
+    assert!(world_people
+        .iter()
+        .all(|p| (p.pos - g.player.pos).length() > 1.5));
+    // weiter hinschauen: Schreck
+    for _ in 0..60 {
+        step(&mut g, 1.0 / 30.0, Input::default());
+        watch_monitor(&mut g);
+        if scared(&g) {
+            break;
+        }
+    }
+    assert!(scared(&g), "kein Schreck auf dem Monitor");
+    // umdrehen: niemand da, und auch vom Monitor verschwunden
+    g.player.yaw += std::f32::consts::PI;
+    step(&mut g, 1.0 / 30.0, Input::default());
+    assert!(!g.monitor_ghost_visible());
+}
+
+#[test]
+fn monitor_stays_calm_before_the_market_tips() {
+    let mut g = Game::new(5);
+    g.customers.clear();
+    g.employees.clear();
+    watch_monitor(&mut g);
+    for _ in 0..120 {
+        step(&mut g, 1.0 / 30.0, Input::default());
+        watch_monitor(&mut g);
+    }
+    assert!(!g.monitor_ghost_visible());
+    assert!(g.monitor_view(16.0 / 9.0).is_some());
+}

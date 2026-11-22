@@ -54,6 +54,7 @@ impl Game {
         }
         self.collect_vermin_draws(out);
         self.collect_mirage_draws(out);
+        self.collect_scare_draws(out);
         // Warnschilder
         for &(pos, yaw) in &self.world.signs {
             out.push(MeshDraw {
@@ -76,6 +77,7 @@ impl Game {
             yaw,
             tint,
             ghost: false,
+            flip: false,
         };
 
         // Gangart -> Clip: Gehen/Rennen laufen mit der Strecke mit, sonst Stehen (oder Greifen)
@@ -132,10 +134,14 @@ impl Game {
             ));
         }
 
+        // Schrecken: aufgestandene Kassiererin, Gestalt im Deckenloch, Gesicht beim Tod
+        self.collect_scare_people(out);
+
         // Fata Morgana: wirkt echt, bis man auf 3 m heran ist - dann flackert sie als Hologramm
         for (i, h) in self.holograms.iter().enumerate() {
             let Some(v) = h.person else { continue };
-            let ghost = h.revealed >= 0.0;
+            // die unheimliche dreht sich erst um (noch echt), dann zerfaellt sie
+            let ghost = h.revealed >= 0.0 && !(h.scary && h.revealed < super::mirage::SCARY_HOLD);
             if ghost && !self.hologram_visible(i) {
                 continue;
             }
@@ -151,6 +157,7 @@ impl Game {
                     h.real_tint
                 },
                 ghost,
+                flip: false,
             });
         }
     }

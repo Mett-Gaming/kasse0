@@ -204,6 +204,7 @@ pub(super) struct Gen<'a> {
     pub(super) rat_runs: Vec<(Vec3, Vec3)>,
     pub(super) drips: Vec<Vec3>,
     pub(super) sparks: Vec<Vec3>,
+    pub(super) ceiling_holes: Vec<Vec3>,
 }
 
 impl Gen<'_> {

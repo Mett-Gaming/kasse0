@@ -26,6 +26,8 @@ pub enum Sfx {
     Spark,
     /// Kunden fluestern miteinander
     Whisper,
+    /// Jumpscare: greller, schiefer Akkord mit Rauschstoss
+    Scare,
 }
 
 /// Was die Musik gerade tun soll.
@@ -36,6 +38,8 @@ pub struct Mood {
     pub tier: u8,
     pub time: f32,
     pub paused: bool,
+    /// 0..1: Stille vor einem Schreck (Musik und Brummen weg)
+    pub hush: f32,
 }
 
 pub struct Audio {
@@ -154,12 +158,29 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 (phase.sin() + 0.3 * (phase * 2.0).sin()) * 0.18 * env
             })
         }
+        Sfx::Scare => {
+            // schiefer Saegezahn-Cluster (Halbtonreibung) plus Rauschstoss, hart einsetzend
+            let freqs = [233.0f32, 247.0, 349.0, 370.0, 523.0, 554.0];
+            let mut ph = [0.0f32; 6];
+            gen(1.2, &mut |t| {
+                let mut s = 0.0;
+                for (k, f) in freqs.iter().enumerate() {
+                    let bend = 1.0 - 0.18 * (t / 1.2);
+                    ph[k] = (ph[k] + f * bend / RATE as f32).fract();
+                    s += ph[k] * 2.0 - 1.0;
+                }
+                let noise = rng.next() * (1.0 - t / 0.25).max(0.0);
+                let env = (t * 200.0).min(1.0) * (1.0 - t / 1.2).max(0.0).powf(1.6);
+                ((s / 6.0) * 0.8 + noise * 0.6) * 0.75 * env
+            })
+        }
         Sfx::Spark => {
             // Knistern: dichte, kurze Knacker mit hellem Rauschen, schnell abklingend
             gen(0.35, &mut |t| {
-                let crack = (rng.next() > 0.82) as i32 as f32;
-                let hiss = rng.next() - 0.5;
-                (crack * (rng.next() - 0.5) * 1.4 + hiss * 0.25) * 0.3 * (1.0 - t / 0.35).powi(2)
+                // Zufall liegt schon zwischen -1 und 1
+                let crack = (rng.next() > 0.64) as i32 as f32;
+                let hiss = rng.next() * 0.5;
+                (crack * rng.next() * 0.7 + hiss * 0.25) * 0.3 * (1.0 - t / 0.35).powi(2)
             })
         }
         Sfx::Whisper => {
@@ -167,7 +188,7 @@ fn synth(sfx: Sfx) -> Vec<f32> {
             let mut lp = 0.0;
             let mut hp_prev = 0.0;
             gen(1.1, &mut |t| {
-                let n = rng.next() - 0.5;
+                let n = rng.next() * 0.5;
                 lp += (n - lp) * 0.35;
                 let hiss = n - hp_prev;
                 hp_prev = n;
@@ -257,6 +278,7 @@ impl Audio {
             Sfx::Rattle,
             Sfx::Spark,
             Sfx::Whisper,
+            Sfx::Scare,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -313,9 +335,10 @@ impl Audio {
         };
         let pause = if m.paused { 0.35 } else { 1.0 };
         self.music.set_speed(speed.max(0.5));
+        let quiet = 1.0 - m.hush.clamp(0.0, 1.0);
         self.music
-            .set_volume(self.master * music_vol.max(0.1) * pause);
-        self.hum.set_volume(self.master * hum_vol * pause);
+            .set_volume(self.master * music_vol.max(0.1) * pause * quiet);
+        self.hum.set_volume(self.master * hum_vol * pause * quiet);
     }
 }
 
@@ -339,6 +362,7 @@ mod tests {
             Sfx::Rattle,
             Sfx::Spark,
             Sfx::Whisper,
+            Sfx::Scare,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

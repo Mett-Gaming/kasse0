@@ -25,7 +25,7 @@ pub const PAUSE_ITEMS: &[&str] = &[
     "Beenden",
 ];
 pub const END_ITEMS: &[&str] = &["Nochmal (gleicher Seed)", "Neuer Einkauf", "Hauptmenü"];
-pub const OPTION_COUNT: usize = 7;
+pub const OPTION_COUNT: usize = 8;
 
 pub fn option_rows(s: &Settings) -> Vec<String> {
     vec![
@@ -41,6 +41,8 @@ pub fn option_rows(s: &Settings) -> Vec<String> {
             "Tutorial              < {:<4} >",
             if s.tutorial { "An" } else { "Aus" }
         ),
+        // laesst sich nicht abschalten (siehe main.rs: menu_scare)
+        "Jumpscares            < An   >".to_string(),
         "Zurück".to_string(),
     ]
 }
@@ -554,6 +556,19 @@ mod tests {
         assert!(u.verts.len() > 100);
         assert_eq!(u.verts.len() % 6, 0);
     }
+
+    #[test]
+    fn jumpscares_cannot_be_switched_off() {
+        let rows = option_rows(&Settings::default());
+        assert_eq!(rows.len(), OPTION_COUNT);
+        assert!(rows[6].starts_with("Jumpscares") && rows[6].contains("An"));
+        // alle Zeilen passen auf den Bildschirm
+        let (y0, step) = menu_layout(Screen::Options { from_pause: false });
+        assert!(y0 + step * (OPTION_COUNT as f32) < ui::H);
+        let mut u = Ui::default();
+        draw_menu_scare(&mut u, 1.0);
+        assert!(!u.verts.is_empty());
+    }
 }
 
 /// Auffaelligkeits-Meter: schmaler Balken unten links, blinkt bei 100 %.
@@ -584,4 +599,16 @@ fn stamina_meter(u: &mut Ui, s: f32, exhausted: bool) {
     u.text_s(x, y - 11.0, "AUSDAUER", DIM, 1.0);
     u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.0, 0.0, 0.0, 0.6]);
     u.rect(x, y, w * s.clamp(0.0, 1.0), h, color);
+}
+
+/// Wer versucht, Jumpscares abzuschalten, bekommt einen.
+pub fn draw_menu_scare(u: &mut Ui, left: f32) {
+    let a = (left / 0.4).min(1.0);
+    u.rect(0.0, 118.0, ui::W, 26.0, [0.0, 0.0, 0.0, 0.75 * a]);
+    u.text_center(
+        127.0,
+        "Peasant, did you really think...",
+        [0.95, 0.1, 0.08, a],
+        1.0,
+    );
 }

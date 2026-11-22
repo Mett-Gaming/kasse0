@@ -15,7 +15,8 @@ const RESET_RADIUS: f32 = 8.0;
 
 impl Game {
     /// Ein Verfolger hat einen erreicht: verletzt (Todesanimation) oder Run vorbei.
-    pub(super) fn caught_by(&mut self, catcher: Vec3) {
+    pub(super) fn caught_by(&mut self, catcher: Vec3, variant: usize) {
+        self.catcher_variant = Some(variant);
         if self.deaths >= SURVIVABLE_HITS {
             self.outcome = Outcome::Caught;
             self.outcome_timer = 0.0;
@@ -27,6 +28,8 @@ impl Game {
         }
         self.deaths += 1;
         self.dying = Some(0.0);
+        // Schreck: das leere Gesicht kurz in Grossaufnahme (scares.rs)
+        self.sfx.push((Sfx::Scare, 1.0));
         self.catcher = Some(catcher);
         self.dialog = None;
         self.red = 1.0;

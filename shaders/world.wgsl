@@ -15,6 +15,8 @@ struct Instance {
 // Schild-Atlas: je Zeile (32 px hoch, 512 px breit) ein Schriftzug
 @group(0) @binding(2) var sign_tex: texture_2d<f32>;
 @group(0) @binding(3) var sign_samp: sampler;
+// Bild der Ueberwachungskamera (Monitor-Material 6)
+@group(0) @binding(5) var monitor_tex: texture_2d<f32>;
 
 struct VsOut {
     @builtin(position) clip: vec4<f32>,
@@ -200,6 +202,38 @@ fn sign_face(in: VsOut) -> vec3<f32> {
     return mix(bg, ink, cov);
 }
 
+// Bildschirm des Ueberwachungsmonitors. In der Kamera selbst bleibt er dunkel.
+fn monitor_face(in: VsOut) -> vec3<f32> {
+    let dark = vec3<f32>(0.03, 0.035, 0.03);
+    if (pc.cam_pos.w > 1.5) {
+        return dark;
+    }
+    let c = cos(in.yaw);
+    let s = sin(in.yaw);
+    let d = in.world_pos - in.center;
+    let l = vec3<f32>(d.x * c - d.z * s, d.y, d.x * s + d.z * c);
+    let n = vec3<f32>(in.normal.x * c - in.normal.z * s, in.normal.y, in.normal.x * s + in.normal.z * c);
+    if (n.z > -0.5) {
+        return dark;
+    }
+    let h = in.half_ext;
+    let u = 0.5 - l.x / (2.0 * h.x);
+    let v = 0.5 - l.y / (2.0 * h.y);
+    let t = pc.params.x;
+    // Bildzittern und laufender Stoerbalken
+    let roll = fract(t * 0.13);
+    let bar = 1.0 - smoothstep(0.0, 0.05, abs(v - roll)) * 0.5;
+    let jitter = (hash11(floor(v * 90.0) + floor(t * 12.0)) - 0.5) * 0.004;
+    let src = textureSampleLevel(monitor_tex, sign_samp, vec2<f32>(clamp(u + jitter, 0.0, 1.0), clamp(v, 0.0, 1.0)), 0.0).rgb;
+    let lum = dot(src, vec3<f32>(0.3, 0.55, 0.15));
+    var col = vec3<f32>(lum) * vec3<f32>(0.85, 1.0, 0.9) * 1.6 + vec3<f32>(0.03);
+    col = col * (0.82 + 0.18 * sin(v * 3.14159 * 90.0)) * bar;
+    col = col + (hash11(floor(u * 160.0) * 1.7 + floor(v * 90.0) * 13.1 + floor(t * 24.0)) - 0.5) * 0.06;
+    let edge = min(min(u, 1.0 - u), min(v, 1.0 - v));
+    col = col * smoothstep(0.0, 0.08, edge);
+    return max(col, vec3<f32>(0.0)) * in.extra.z;
+}
+
 fn grid_line(v: f32, cell: f32, width: f32) -> f32 {
     let f = fract(v / cell);
     return select(0.0, 1.0, min(f, 1.0 - f) < width);
@@ -211,6 +245,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let p = in.world_pos;
     var base = in.color.rgb;
 
+    // Ueberwachungsmonitor (Material 6): Bild der Deckenkamera, grau, mit Zeilen und Rauschen
+    if (material > 5.5) {
+        return vec4<f32>(monitor_face(in), 1.0);
+    }
     // Schilder mit Schriftzug (Material 5)
     if (material > 4.5) {
         let col = sign_face(in);
