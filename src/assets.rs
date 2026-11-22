@@ -1,23 +1,8 @@
 //! Modelle im .k0m-Format (erzeugt von tools/prepare_assets.py) - fest ins Spiel eingebaut.
 
-use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
-pub struct MeshVertex {
-    pub pos: [f32; 3],
-    pub normal: [f32; 3],
-    pub color: [f32; 3],
-}
-
-pub struct MeshData {
-    pub vertices: Vec<MeshVertex>,
-    #[allow(dead_code)]
-    pub min: Vec3,
-    #[allow(dead_code)]
-    pub max: Vec3,
-}
+pub use mettgine::gpu::{MeshData, MeshVertex};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]

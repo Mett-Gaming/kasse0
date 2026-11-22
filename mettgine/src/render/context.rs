@@ -20,6 +20,8 @@ pub struct Context {
     pub device: ash::Device,
     pub queue: vk::Queue,
     pub swapchain_loader: ash::khr::swapchain::Device,
+    /// Name der Grafikkarte (fuer Absturzberichte)
+    pub gpu_name: String,
 }
 
 unsafe extern "system" fn debug_callback(
@@ -33,7 +35,7 @@ unsafe extern "system" fn debug_callback(
     } else {
         CStr::from_ptr((*data).p_message).to_string_lossy()
     };
-    eprintln!("[vulkan {severity:?} {ty:?}] {msg}");
+    crate::crash::log(&format!("[vulkan {severity:?} {ty:?}] {msg}"));
     vk::FALSE
 }
 
@@ -50,8 +52,8 @@ impl Context {
                     .iter()
                     .any(|l| l.layer_name_as_c_str().ok() == Some(VALIDATION_LAYER));
             if cfg!(debug_assertions) && !validation {
-                eprintln!(
-                    "Hinweis: Validation-Layer nicht gefunden (Vulkan SDK nicht installiert)."
+                crate::crash::log(
+                    "Hinweis: Validation-Layer nicht gefunden (Vulkan SDK nicht installiert).",
                 );
             }
 
@@ -123,12 +125,15 @@ impl Context {
             let (physical, queue_family, _) =
                 best.ok_or("Keine Vulkan-1.3-GPU mit Grafik- und Present-Queue gefunden")?;
             let props = instance.get_physical_device_properties(physical);
-            println!(
-                "GPU: {}",
+            let gpu_name = format!(
+                "{} (Treiber {}, Vulkan {}.{})",
                 props
                     .device_name_as_c_str()
                     .map(|s| s.to_string_lossy())
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
+                props.driver_version,
+                vk::api_version_major(props.api_version),
+                vk::api_version_minor(props.api_version)
             );
 
             let priorities = [1.0f32];
@@ -162,6 +167,7 @@ impl Context {
                 device,
                 queue,
                 swapchain_loader,
+                gpu_name,
             })
         }
     }

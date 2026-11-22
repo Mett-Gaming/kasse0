@@ -9,8 +9,7 @@ mod pipeline;
 mod swapchain;
 mod util;
 
-use crate::assets::MeshData;
-use crate::world::{GpuInstance, GpuLight};
+use crate::gpu::{GpuInstance, GpuLight, MeshData};
 use ash::vk;
 use bytemuck::{Pod, Zeroable};
 use context::Context;
@@ -219,7 +218,7 @@ impl Renderer {
     pub fn new(
         window: &Window,
         meshes: &[MeshData],
-        skins: &[crate::people::SkinData],
+        skins: &[crate::gpu::SkinData],
         font: &[u8],
         signs: (&[u8], u32, u32),
     ) -> Result<Self> {
@@ -537,7 +536,7 @@ impl Renderer {
             // Animierte Figuren: Skinning im Vertex-Shader
             let skin_bindings = [vk::VertexInputBindingDescription {
                 binding: 0,
-                stride: size_of::<crate::people::SkinVertex>() as u32,
+                stride: size_of::<crate::gpu::SkinVertex>() as u32,
                 input_rate: vk::VertexInputRate::VERTEX,
             }];
             let skin_attrs = [
@@ -652,7 +651,7 @@ impl Renderer {
             mesh_vertex_buf.write(vbytes);
 
             // Figuren-Vertices: alle Figuren hintereinander
-            let mut skin_all: Vec<crate::people::SkinVertex> = Vec::new();
+            let mut skin_all: Vec<crate::gpu::SkinVertex> = Vec::new();
             let mut skin_ranges = Vec::new();
             for s in skins {
                 skin_ranges.push((skin_all.len() as u32, s.vertices.len() as u32));
@@ -742,6 +741,11 @@ impl Renderer {
             renderer.write_scene_descriptors();
             Ok(renderer)
         }
+    }
+
+    /// Name der Grafikkarte samt Treiber.
+    pub fn gpu_name(&self) -> &str {
+        &self.ctx.gpu_name
     }
 
     /// Speichert das naechste fertige Bild (nach VHS-Pass) als BMP.
@@ -1081,7 +1085,7 @@ impl Renderer {
                     let px = buf.read(cap_bytes as usize);
                     let rgba = self.swapchain.format == vk::Format::R8G8B8A8_UNORM;
                     if let Err(e) = write_bmp(&path, ext.width, ext.height, &px, rgba) {
-                        eprintln!("Screenshot fehlgeschlagen: {e}");
+                        crate::crash::log(&format!("Screenshot fehlgeschlagen: {e}"));
                     }
                 }
             }

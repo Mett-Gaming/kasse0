@@ -148,17 +148,23 @@ D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_assets.py -- F
 ```
 
 ## Aufbau
+Das Repository ist ein Cargo-Workspace aus zwei Teilen: **Mettgine** (`mettgine/`, die Engine der Mett-Gaming-Spiele) und dem Spiel KASSE 0 (`src/`). `cargo test` prüft beide.
+
 | Pfad | Inhalt |
 |---|---|
-| `src/render/` | Vulkan: Kontext, Swapchain, Pipelines (Boxen, Meshes, UI, VHS-Post), Screenshots |
+| `mettgine/src/render/` | Vulkan: Kontext, Swapchain, Pipelines (Boxen, Meshes, Figuren, Hologramme, Überwachungskamera, UI, VHS-Post), Screenshots |
+| `mettgine/src/anim.rs` | Knochen-Animation (`.k0a` v2): Überblenden, Kopf-Blickziel, Zucken, Strecken, Stop-Motion; die Clip-Liste legt das Spiel fest (`src/people/clips.rs`) |
+| `mettgine/src/gpu.rs` | Datenformate zwischen Spiel und Renderer (Welt-Boxen, Lichter, Modelle, Figuren `.k0s`) |
+| `mettgine/src/crash.rs`, `crash_window.rs` | Protokoll, Absturzberichte, Absturzfenster |
+| `mettgine/src/ui.rs` | Bitmap-Text und Formen für Menüs und HUD |
+| `mettgine/shaders/` | WGSL (`_common.wgsl` wird per `#include` eingebunden); die Welt-Materialien (Poster, Schilder, Monitor) stammen noch aus KASSE 0 |
 | `src/world/` | Seedbarer Markt-Generator (`gen.rs`, Einrichtungen in `gen/fixtures.rs`), Abteilungs-Layout (`layout.rs`), Kollision, Sichtlinien, Navigationsraster |
 | `src/catalog.rs`, `tools/catalog.json` | Warenkatalog: Unterabteilungen, Modelle, Preise, Zettel-Einträge |
 | `src/signs.rs` | Schild-Atlas: alle Schriftzüge (Archivo Black) werden beim Start gerendert |
 | `src/game/` | Run-Logik, Hände und Wagen (`hands.rs`), Kasse mit Band (`checkout.rs`), Kassen-Minispiel (`till.rs`, Barzahlung `till/cash.rs`, HUD in `src/hud/till.rs`), Flucht nach dem Bezahlen (`escape.rs`), NPCs (`crowd.rs`), Dialoge und Ereignisse (`tension.rs`), Eskalation |
-| `src/people.rs`, `shaders/skin.wgsl` | Animierte Figuren: Knochen-Gewichte, Animationen abtasten, Skinning |
-| `src/hud.rs`, `src/ui.rs` | Menüs, HUD, Bitmap-Text |
+| `src/people.rs`, `src/people/clips.rs` | Figuren von KASSE 0: Varianten, Clip-Liste, Gangart |
+| `src/hud.rs` | Menüs und HUD |
 | `src/audio.rs` | Synthetisierte Musik und Effekte (rodio) |
-| `shaders/` | WGSL (`_common.wgsl` wird per `#include` eingebunden) |
 | `assets/` | Konvertierte Modelle (`.k0m`, Waren in `assets/products/`) und die Schrift, fest ins Spiel eingebaut |
 
 ## Builds und Releases
@@ -169,4 +175,7 @@ Ein Release entsteht durch einen Tag:
 git tag v0.2.0
 git push origin v0.2.0
 ```
-Danach liegt `KASSE0-v0.2.0.zip` unter *Releases* im Repository. Die Original-Packs (`assets_src/`) sind nicht im Repository; gebaut wird aus den konvertierten Dateien in `assets/`.
+Danach liegt `KASSE0-v0.2.0.zip` unter *Releases* im Repository.
+
+### Absturzberichte
+Stürzt das Spiel ab (auch im Grafiktreiber), schreibt es einen Bericht nach `%APPDATA%\kasse0\crashes\` (Version, Fehler, Aufrufliste, Grafikkarte, Spielzustand, letzte Protokollzeilen) und öffnet ein Absturzfenster mit „Bericht kopieren“, „Ordner öffnen“, „Neu starten“. Das laufende Protokoll steht in `%APPDATA%\kasse0\logs\latest.log`, auch im Release-Build ohne Konsole. Mit `kasse0.pdb` neben der exe enthält die Aufrufliste Funktionsnamen und Zeilen. Die Original-Packs (`assets_src/`) sind nicht im Repository; gebaut wird aus den konvertierten Dateien in `assets/`.

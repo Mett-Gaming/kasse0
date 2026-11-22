@@ -7,13 +7,13 @@ mod assets;
 mod audio;
 mod autoshot;
 mod catalog;
+// Engine-Teile aus Mettgine unter den gewohnten Namen
+pub use mettgine::{crash, crash_window, render, ui};
 mod game;
 mod hud;
 mod people;
-mod render;
 mod settings;
 mod signs;
-mod ui;
 mod world;
 
 use audio::{Audio, Mood, Sfx};
@@ -71,6 +71,8 @@ struct App {
     shot_request: Option<std::path::PathBuf>,
     /// Sekunden, die der Troll-Jumpscare im Optionsmenue noch laeuft
     menu_scare: f32,
+    /// bis zur naechsten Momentaufnahme fuer Absturzberichte
+    crash_ctx_t: f32,
     /// Frame-Zeit-Log (KASSE0_PERF=1 oder im Autoshot): (Frames, Summe, schlechtester Frame)
     perf: Option<(u32, f32, f32)>,
 }
@@ -118,6 +120,7 @@ impl App {
                 .map(|d| (std::path::PathBuf::from(d), 0.0, 0)),
             shot_request: None,
             menu_scare: 0.0,
+            crash_ctx_t: 0.0,
             perf: (std::env::var_os("KASSE0_PERF").is_some()
                 || std::env::var_os("KASSE0_AUTOSHOT").is_some())
             .then_some((0, 0.0, 0.0)),
@@ -342,19 +345,45 @@ impl App {
         let now = Instant::now();
         let dt = (now - self.last_frame).as_secs_f32().min(0.1);
         self.last_frame = now;
+        // Zustand fuer Absturzberichte (einmal pro Sekunde)
+        self.crash_ctx_t -= dt;
+        if self.crash_ctx_t <= 0.0 {
+            self.crash_ctx_t = 1.0;
+            let g = &self.game;
+            crash::context("Bildschirm", format!("{:?}", self.screen));
+            crash::context("Seed", g.seed.to_string());
+            crash::context(
+                "Markt",
+                format!(
+                    "{} (Stufe: {})",
+                    if g.tipped { "gekippt" } else { "normal" },
+                    g.tier.name()
+                ),
+            );
+            crash::context("Spieler", format!("{:.1?}", g.player.pos));
+            crash::context(
+                "NPCs",
+                format!(
+                    "{} Kunden, {} Personal",
+                    g.customers.len(),
+                    g.employees.len()
+                ),
+            );
+            crash::context("Bild", format!("{:.1} ms", dt * 1000.0));
+        }
         if let Some((n, sum, worst)) = &mut self.perf {
             let raw = dt;
             *n += 1;
             *sum += raw;
             *worst = worst.max(raw);
             if *sum > 5.0 {
-                eprintln!(
+                crash::log(&format!(
                     "PERF {:.2} ms/Frame ({:.0} fps), schlechtester {:.1} ms, {} Waren im Regal",
                     *sum / *n as f32 * 1000.0,
                     *n as f32 / *sum,
                     *worst * 1000.0,
                     self.game.world.items.len()
-                );
+                ));
                 *n = 0;
                 *sum = 0.0;
                 *worst = 0.0;
@@ -409,10 +438,10 @@ impl App {
                     let t_upd = Instant::now();
                     self.game.update(FIXED_STEP, &mut self.input);
                     if self.perf.is_some() && t_upd.elapsed().as_secs_f32() > 0.008 {
-                        eprintln!(
+                        crash::log(&format!(
                             "PERF Update {:.1} ms",
                             t_upd.elapsed().as_secs_f32() * 1000.0
-                        );
+                        ));
                     }
                     self.accumulator -= FIXED_STEP;
                 }
@@ -534,7 +563,11 @@ impl App {
                 .renderer
                 .upload_world(&self.game.world.instances, &self.game.world.lights)
             {
-                eprintln!("Fehler beim Hochladen der Welt: {e}");
+                crash::fatal(
+                    "Grafikspeicher",
+                    &format!("Fehler beim Hochladen der Welt: {e}"),
+                    "Der Markt passte nicht in den Grafikspeicher.",
+                );
                 event_loop.exit();
                 return;
             }
@@ -543,16 +576,20 @@ impl App {
             let mut statics = Vec::new();
             self.game.world.item_draws(&mut statics);
             if let Err(e) = r.renderer.upload_statics(&statics) {
-                eprintln!("Fehler beim Hochladen der Waren: {e}");
+                crash::fatal(
+                    "Grafikspeicher",
+                    &format!("Fehler beim Hochladen der Waren: {e}"),
+                    "Die Waren passten nicht in den Grafikspeicher.",
+                );
                 event_loop.exit();
                 return;
             }
         }
         if self.perf.is_some() && t_up.elapsed().as_secs_f32() > 0.005 {
-            eprintln!(
+            crash::log(&format!(
                 "PERF Upload {:.1} ms",
                 t_up.elapsed().as_secs_f32() * 1000.0
-            );
+            ));
         }
         self.draws.clear();
         self.game.collect_draws(&mut self.draws);
@@ -641,7 +678,12 @@ impl App {
             &self.bones,
             &self.ui.verts,
         ) {
-            eprintln!("Renderfehler: {e}");
+            crash::fatal(
+                "Renderfehler",
+                &format!("{e}"),
+                "Beim Zeichnen ist ein Grafikfehler aufgetreten. Ein Neustart hilft oft, sonst \
+                 den Grafiktreiber aktualisieren.",
+            );
             event_loop.exit();
         }
     }
@@ -774,7 +816,11 @@ impl ApplicationHandler for App {
         let window = match event_loop.create_window(attrs) {
             Ok(w) => w,
             Err(e) => {
-                eprintln!("Fenster konnte nicht erstellt werden: {e}");
+                crash::fatal(
+                    "Fenster",
+                    &format!("Fenster konnte nicht erstellt werden: {e}"),
+                    "Das Spielfenster konnte nicht geöffnet werden.",
+                );
                 event_loop.exit();
                 return;
             }
@@ -787,11 +833,18 @@ impl ApplicationHandler for App {
         }) {
             Ok(r) => r,
             Err(e) => {
-                eprintln!("Vulkan-Initialisierung fehlgeschlagen: {e}");
+                crash::fatal(
+                    "Vulkan",
+                    &format!("Vulkan-Initialisierung fehlgeschlagen: {e}"),
+                    "Die Grafik konnte nicht gestartet werden. KASSE 0 braucht eine Grafikkarte \
+                     mit Vulkan 1.3. Bitte den Grafiktreiber aktualisieren.",
+                );
                 event_loop.exit();
                 return;
             }
         };
+        crash::context("GPU", renderer.gpu_name());
+        crash::log(&format!("GPU: {}", renderer.gpu_name()));
         self.running = Some(Running { renderer, window });
         self.apply_settings();
         self.last_frame = Instant::now();
@@ -928,8 +981,18 @@ fn digit_key(code: KeyCode) -> Option<u8> {
     })
 }
 
+/// Version aus dem Git-Tag (build.rs), fuer Absturzberichte
+pub const VERSION: &str = env!("KASSE0_VERSION");
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let fixed_seed = std::env::args().nth(1).and_then(|s| s.parse().ok());
+    let args: Vec<String> = std::env::args().collect();
+    // Absturzfenster: eigener Prozess nach einem Absturz
+    if let Some(c) = crash_window::parse_args(&args) {
+        crash_window::run(&c, "KASSE 0");
+        return Ok(());
+    }
+    crash::init("kasse0", "KASSE 0", VERSION);
+    let fixed_seed = args.get(1).and_then(|s| s.parse().ok());
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Poll);
     let mut app = App::new(fixed_seed);

@@ -2,12 +2,18 @@
 //! Animationen mit Knochen-Hierarchie (.k0a v2), erzeugt von tools/prepare_people.py.
 //! Die CPU rechnet die Pose (anim.rs), die GPU verformt die Figur (Skinning im Vertex-Shader).
 
-use bytemuck::{Pod, Zeroable};
 use glam::{Vec3, Vec4};
 use std::sync::OnceLock;
 
-mod anim;
-pub use anim::{AnimSet, Animator, Clip, PoseFx, SIT_BACK, SIT_UP};
+mod clips;
+pub use clips::{Clip, SIT_BACK, SIT_UP};
+pub use mettgine::anim::AnimSet;
+/// Eingriffe in die Pose und Clip-Wechsel, fuer die KASSE-0-Clips
+pub type PoseFx = mettgine::anim::PoseFx<Clip>;
+pub type Animator = mettgine::anim::Animator<Clip>;
+
+#[cfg(test)]
+mod anim_tests;
 
 mod gen {
     include!(concat!(env!("OUT_DIR"), "/people_gen.rs"));
@@ -22,56 +28,16 @@ pub fn people_of(staff: bool) -> Vec<usize> {
         .collect()
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Pod, Zeroable)]
-pub struct SkinVertex {
-    pub pos: [f32; 3],
-    pub normal: [f32; 3],
-    pub color: [f32; 3],
-    /// Knochen-Indizes (als Gleitkommazahl)
-    pub joints: [f32; 4],
-    pub weights: [f32; 4],
-}
-
-pub struct SkinData {
-    pub vertices: Vec<SkinVertex>,
-}
-
-fn f32_at(b: &[u8], o: usize) -> f32 {
-    f32::from_le_bytes(b[o..o + 4].try_into().unwrap())
-}
-fn u32_at(b: &[u8], o: usize) -> u32 {
-    u32::from_le_bytes(b[o..o + 4].try_into().unwrap())
-}
-
-pub fn parse_skin(b: &[u8]) -> SkinData {
-    assert_eq!(&b[0..4], b"K0S1", "keine K0S1-Figur");
-    let n = u32_at(b, 4) as usize;
-    let data = &b[32..32 + n * 68];
-    let vertices = data
-        .chunks_exact(68)
-        .map(|v| {
-            let f = |i: usize| f32_at(v, i * 4);
-            SkinVertex {
-                pos: [f(0), f(1), f(2)],
-                normal: [f(3), f(4), f(5)],
-                color: [f(6), f(7), f(8)],
-                joints: [f(9), f(10), f(11), f(12)],
-                weights: [f(13), f(14), f(15), f(16)],
-            }
-        })
-        .collect();
-    SkinData { vertices }
-}
+pub use mettgine::gpu::{parse_skin, SkinData};
 
 /// Animationen fuer Maenner- bzw. Frauen-Skelett.
 pub fn anims(female: bool) -> &'static AnimSet {
     static M: OnceLock<AnimSet> = OnceLock::new();
     static F: OnceLock<AnimSet> = OnceLock::new();
     if female {
-        F.get_or_init(|| anim::parse_anim(gen::ANIM_F_BYTES))
+        F.get_or_init(|| mettgine::anim::parse_anim(gen::ANIM_F_BYTES))
     } else {
-        M.get_or_init(|| anim::parse_anim(gen::ANIM_M_BYTES))
+        M.get_or_init(|| mettgine::anim::parse_anim(gen::ANIM_M_BYTES))
     }
 }
 

@@ -502,7 +502,7 @@ fn synth(sfx: Sfx) -> Vec<f32> {
 impl Audio {
     pub fn new(volume: f32) -> Option<Self> {
         let (stream, handle) = OutputStream::try_default()
-            .map_err(|e| eprintln!("Kein Audio: {e}"))
+            .map_err(|e| crate::crash::log(&format!("Kein Audio: {e}")))
             .ok()?;
         let music = Sink::try_new(&handle).ok()?;
         music.append(SamplesBuffer::new(1, RATE, muzak()).repeat_infinite());

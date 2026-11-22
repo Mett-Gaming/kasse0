@@ -86,5 +86,8 @@ Das Tutorial beim ersten Einkauf überspringst du mit dem Haken "Tutorial
 Jumpscares lassen sich in den Optionen nicht abschalten. Probier es ruhig.
 
 Einstellungen werden unter %APPDATA%\kasse0\settings.txt gespeichert.
+Stürzt das Spiel ab, erscheint ein Fenster mit einem Absturzbericht. Den kannst du
+kopieren und den Entwicklern schicken. Alle Berichte liegen unter %APPDATA%\kasse0\crashes,
+das Protokoll unter %APPDATA%\kasse0\logs\latest.log.
 
 Modelle, Schrift und Lizenzen: siehe Credits.md und den Ordner Lizenzen.

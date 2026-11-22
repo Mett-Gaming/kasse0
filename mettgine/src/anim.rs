@@ -1,63 +1,21 @@
-//! Knochen-Animation mit Hierarchie (.k0a v2): lokale Transformationen je Bild, zwischen
+//! Knochen-Animation mit Hierarchie (.k0a v2, Knochennamen wie bei den Quaternius-Figuren): lokale Transformationen je Bild, zwischen
 //! Bildern und Clips per slerp gemischt, danach Eingriffe pro Knochen (Kopf dreht sich zu
 //! einem Ziel, Zucken, gestreckte Glieder, Stop-Motion). Ergebnis: Skinning-Matrizen.
 
 use glam::{Mat4, Quat, Vec3, Vec4};
 
-/// Animation einer Figur (Reihenfolge wie CLIPS in tools/prepare_people.py)
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum Clip {
-    #[default]
-    Idle = 0,
-    Walk,
-    Reach,
-    Run,
-    /// zupacken (Ausfallschritt mit ausgestrecktem Arm)
-    Grab,
-    Wave,
-    Hit,
-    Death,
-    CrouchWalk,
-    CrouchIdle,
-    ZombieWalk,
-    ZombieIdle,
-    Scratch,
-    /// vom Boden aufstehen
-    GetUp,
-    FoldArms,
-    Phone,
-    Talk,
-    PickUp,
-    /// Wagen schieben
-    Push,
-    Carry,
-    /// kniend ins Regal einraeumen
-    Kneel,
-    No,
-    WalkFormal,
-    /// Sitzen (Kassiererin auf dem Buerostuhl)
-    Sit,
-}
-
-/// Sitzpose: so weit liegt das Gesaess hinter dem Figur-Ursprung (Meter, gegen die
-/// Blickrichtung) - so stellt man die Figur, damit sie auf einem Stuhl landet
-pub const SIT_BACK: f32 = 0.25;
-/// und so viel hoeher, damit es auf der Sitzflaeche aufliegt
-pub const SIT_UP: f32 = 0.03;
-
-impl Clip {
-    /// Laeuft die Figur mit diesem Clip vorwaerts (Zeit an die Strecke gekoppelt)?
-    pub fn locomotion(self) -> bool {
-        matches!(
-            self,
-            Clip::Walk
-                | Clip::Run
-                | Clip::CrouchWalk
-                | Clip::ZombieWalk
-                | Clip::Push
-                | Clip::Carry
-                | Clip::WalkFormal
-        )
+/// Kennung eines Clips. Das Spiel legt seine Clips als Aufzaehlung fest (Reihenfolge wie in
+/// der .k0a-Datei) und sagt, welche davon Fortbewegung sind und welche im Stand weiterlaufen.
+pub trait ClipId: Copy + PartialEq + Default + std::fmt::Debug {
+    /// Position in der .k0a-Datei
+    fn index(self) -> usize;
+    /// Fortbewegung: die Zeit ist an die zurueckgelegte Strecke gekoppelt
+    fn locomotion(self) -> bool {
+        false
+    }
+    /// laeuft im Stand als Schleife (sonst Einmal-Clip, zaehlt ab seinem Start)
+    fn looping(self) -> bool {
+        true
     }
 }
 
@@ -92,9 +50,9 @@ struct ClipData {
 
 /// Eingriffe in die Pose (alles optional, Standard = nichts).
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PoseFx {
+pub struct PoseFx<C> {
     /// Ueberblenden: vorheriger Clip, dessen Zeit, Gewicht (1 = nur der alte, 0 = nur der neue)
-    pub blend: Option<(Clip, f32, f32)>,
+    pub blend: Option<(C, f32, f32)>,
     /// Blickziel des Kopfes in Figuren-Koordinaten (vorne = +z, Fuesse bei y = 0)
     pub look: Option<Vec3>,
     /// wie weit sich der Kopf zur Seite drehen darf (Radiant; ueber 1.6 = unmenschlich)
@@ -218,24 +176,24 @@ impl AnimSet {
         self.names.iter().position(|x| x == name)
     }
 
-    pub fn has_clip(&self, clip: Clip) -> bool {
-        (clip as usize) < self.clips.len()
+    pub fn has_clip<C: ClipId>(&self, clip: C) -> bool {
+        clip.index() < self.clips.len()
     }
 
     /// Name eines Clips in der Datei (zum Pruefen der Reihenfolge).
-    pub fn clip_name(&self, clip: Clip) -> &str {
-        &self.clip_names[clip as usize]
+    pub fn clip_name<C: ClipId>(&self, clip: C) -> &str {
+        &self.clip_names[clip.index()]
     }
 
     /// Dauer eines Clips in Sekunden.
-    pub fn duration(&self, clip: Clip) -> f32 {
-        let c = &self.clips[(clip as usize).min(self.clips.len() - 1)];
+    pub fn duration<C: ClipId>(&self, clip: C) -> f32 {
+        let c = &self.clips[clip.index().min(self.clips.len() - 1)];
         c.frames as f32 / c.fps
     }
 
     /// Lokale Pose eines Clips zur Zeit `t` (Schleife oder am Ende stehen bleiben).
-    fn sample_locals(&self, clip: Clip, t: f32, out: &mut Vec<Local>) {
-        let c = &self.clips[(clip as usize).min(self.clips.len() - 1)];
+    fn sample_locals(&self, clip: usize, t: f32, out: &mut Vec<Local>) {
+        let c = &self.clips[clip.min(self.clips.len() - 1)];
         let n = self.bones();
         let pos = if c.looped {
             (t * c.fps).rem_euclid(c.frames as f32)
@@ -256,12 +214,12 @@ impl AnimSet {
     }
 
     /// Skinning-Matrizen ohne Eingriffe (fuer Tests und einfache Figuren).
-    pub fn sample(&self, clip: Clip, t: f32, out: &mut Vec<Mat4>) {
+    pub fn sample<C: ClipId>(&self, clip: C, t: f32, out: &mut Vec<Mat4>) {
         self.pose(clip, t, &PoseFx::default(), out);
     }
 
     /// Skinning-Matrizen fuer Clip `clip` zur Zeit `t` mit allen Eingriffen aus `fx`.
-    pub fn pose(&self, clip: Clip, t: f32, fx: &PoseFx, out: &mut Vec<Mat4>) {
+    pub fn pose<C: ClipId>(&self, clip: C, t: f32, fx: &PoseFx<C>, out: &mut Vec<Mat4>) {
         let n = self.bones();
         let step = |t: f32| {
             if fx.step_fps > 0.0 {
@@ -271,11 +229,11 @@ impl AnimSet {
             }
         };
         let mut locals = Vec::with_capacity(n);
-        self.sample_locals(clip, step(t), &mut locals);
+        self.sample_locals(clip.index(), step(t), &mut locals);
         if let Some((prev, pt, w)) = fx.blend {
             if w > 0.0 {
                 let mut other = Vec::with_capacity(n);
-                self.sample_locals(prev, step(pt), &mut other);
+                self.sample_locals(prev.index(), step(pt), &mut other);
                 for (l, o) in locals.iter_mut().zip(&other) {
                     *l = l.mix(*o, w.min(1.0));
                 }
@@ -379,20 +337,20 @@ fn look_towards(g: Mat4, rest_inv: &Mat4, target: Vec3, limit: f32, share: f32) 
 /// Clip-Wechsel mit Ueberblenden, pro Figur. Die Zeit liefert der Aufrufer (bei Laufclips an
 /// die Strecke gekoppelt, sonst normale Zeit); Einmal-Clips zaehlen ab ihrem Start.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Animator {
-    pub clip: Clip,
+pub struct Animator<C> {
+    pub clip: C,
     /// Zeit beim Start des aktuellen Clips
     start: f32,
     /// zuletzt gemeldete Zeit
     now: f32,
-    prev: Option<(Clip, f32)>,
+    prev: Option<(C, f32)>,
     fade: f32,
     fade_len: f32,
 }
 
-impl Animator {
+impl<C: ClipId> Animator<C> {
     /// Gewuenschten Clip melden. `time` laeuft stetig (Sekunden), `fade` = Ueberblendzeit.
-    pub fn update(&mut self, clip: Clip, time: f32, dt: f32, fade: f32) {
+    pub fn update(&mut self, clip: C, time: f32, dt: f32, fade: f32) {
         if clip != self.clip {
             self.prev = Some((self.clip, self.clip_time()));
             self.clip = clip;
@@ -411,7 +369,7 @@ impl Animator {
 
     /// Zeit im aktuellen Clip (Schleifen: stetige Zeit, Einmal-Clips: ab Start).
     pub fn clip_time(&self) -> f32 {
-        if self.clip.locomotion() || is_loop_idle(self.clip) {
+        if self.clip.locomotion() || self.clip.looping() {
             self.now
         } else {
             self.now - self.start
@@ -419,7 +377,7 @@ impl Animator {
     }
 
     /// Ueberblend-Angabe fuer PoseFx.
-    pub fn blend(&self) -> Option<(Clip, f32, f32)> {
+    pub fn blend(&self) -> Option<(C, f32, f32)> {
         self.prev
             .map(|(c, t)| (c, t, (1.0 - self.fade / self.fade_len).clamp(0.0, 1.0)))
             .filter(|b| b.2 > 0.0)
@@ -432,265 +390,47 @@ impl Animator {
 
     /// Ist ein Einmal-Clip durchgelaufen?
     pub fn finished(&self, duration: f32) -> bool {
-        !is_loop_idle(self.clip) && !self.clip.locomotion() && self.now - self.start >= duration
+        !self.clip.looping() && !self.clip.locomotion() && self.now - self.start >= duration
     }
-}
-
-/// Clips, die als Schleife im Stand laufen (stetige Zeit)
-fn is_loop_idle(c: Clip) -> bool {
-    !matches!(
-        c,
-        Clip::Grab | Clip::Hit | Clip::Death | Clip::GetUp | Clip::PickUp
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::people::{anims, load_skins, PEOPLE};
 
-    const ALL: [Clip; 23] = [
-        Clip::Idle,
-        Clip::Walk,
-        Clip::Reach,
-        Clip::Run,
-        Clip::Grab,
-        Clip::Wave,
-        Clip::Hit,
-        Clip::Death,
-        Clip::CrouchWalk,
-        Clip::CrouchIdle,
-        Clip::ZombieWalk,
-        Clip::ZombieIdle,
-        Clip::Scratch,
-        Clip::GetUp,
-        Clip::FoldArms,
-        Clip::Phone,
-        Clip::Talk,
-        Clip::PickUp,
-        Clip::Push,
-        Clip::Carry,
-        Clip::Kneel,
-        Clip::No,
-        Clip::WalkFormal,
-    ];
+    #[derive(Clone, Copy, Debug, Default, PartialEq)]
+    enum TestClip {
+        #[default]
+        Stand,
+        Walk,
+        Grab,
+    }
 
-    #[test]
-    fn clip_order_matches_the_file() {
-        let names = [
-            "idle",
-            "walk",
-            "reach",
-            "run",
-            "grab",
-            "wave",
-            "hit",
-            "death",
-            "crouch_walk",
-            "crouch_idle",
-            "zombie_walk",
-            "zombie_idle",
-            "scratch",
-            "get_up",
-            "fold_arms",
-            "phone",
-            "talk",
-            "pick_up",
-            "push",
-            "carry",
-            "kneel",
-            "no",
-            "walk_formal",
-        ];
-        for female in [false, true] {
-            let a = anims(female);
-            for (c, n) in ALL.iter().zip(names) {
-                assert!(a.has_clip(*c));
-                assert_eq!(a.clip_name(*c), n);
-            }
+    impl ClipId for TestClip {
+        fn index(self) -> usize {
+            self as usize
         }
-    }
-
-    /// Tiefster und hoechster Punkt einer Figur in einer Pose.
-    fn extent(skin: &crate::people::SkinData, m: &[Mat4]) -> (f32, f32) {
-        let (mut lo, mut hi) = (f32::MAX, f32::MIN);
-        for vx in skin.vertices.iter().step_by(5) {
-            let p = Vec3::from(vx.pos).extend(1.0);
-            let mut r = Vec4::ZERO;
-            for k in 0..4 {
-                r += m[vx.joints[k] as usize] * p * vx.weights[k];
-            }
-            lo = lo.min(r.y);
-            hi = hi.max(r.y);
+        fn locomotion(self) -> bool {
+            self == TestClip::Walk
         }
-        (lo, hi)
-    }
-
-    #[test]
-    fn every_clip_keeps_the_figure_on_the_ground() {
-        let skins = load_skins();
-        for v in [0usize, PEOPLE.len() - 1] {
-            let a = anims(PEOPLE[v].1);
-            for c in ALL {
-                let dur = a.duration(c);
-                let mut worst = (f32::MAX, f32::MIN);
-                for k in 0..8 {
-                    let mut m = Vec::new();
-                    a.sample(c, dur * k as f32 / 8.0, &mut m);
-                    let (lo, hi) = extent(&skins[v], &m);
-                    worst = (worst.0.min(lo), worst.1.max(hi));
-                }
-                assert!(
-                    worst.0 > -0.09 && worst.0 < 0.15,
-                    "{} {:?}: tiefster Punkt {}",
-                    PEOPLE[v].0,
-                    c,
-                    worst.0
-                );
-                assert!(worst.1 < 2.1, "{} {:?}: {} m hoch", PEOPLE[v].0, c, worst.1);
-                if !matches!(c, Clip::GetUp | Clip::Death) {
-                    assert!(
-                        worst.1 > 0.9,
-                        "{} {:?}: nur {} m hoch",
-                        PEOPLE[v].0,
-                        c,
-                        worst.1
-                    );
-                }
-            }
+        fn looping(self) -> bool {
+            self != TestClip::Grab
         }
-    }
-
-    #[test]
-    fn blending_goes_smoothly_from_old_to_new_clip() {
-        let a = anims(false);
-        let pose = |w: f32| {
-            let mut m = Vec::new();
-            let fx = PoseFx {
-                blend: Some((Clip::Walk, 0.3, w)),
-                ..Default::default()
-            };
-            a.pose(Clip::Idle, 0.5, &fx, &mut m);
-            m
-        };
-        let (mut walk, mut idle) = (Vec::new(), Vec::new());
-        a.sample(Clip::Walk, 0.3, &mut walk);
-        a.sample(Clip::Idle, 0.5, &mut idle);
-        let diff = |x: &[Mat4], y: &[Mat4]| {
-            x.iter()
-                .zip(y)
-                .map(|(p, q)| (p.w_axis - q.w_axis).length())
-                .fold(0.0f32, f32::max)
-        };
-        assert!(diff(&pose(1.0), &walk) < 1e-3);
-        assert!(diff(&pose(0.0), &idle) < 1e-3);
-        // kleine Gewichtsschritte = kleine Posen-Spruenge (kein Umweg ueber die falsche Seite)
-        let total = diff(&pose(0.0), &pose(1.0));
-        for k in 0..10 {
-            let (w0, w1) = (k as f32 / 10.0, (k + 1) as f32 / 10.0);
-            let d = diff(&pose(w0), &pose(w1));
-            assert!(d < total * 0.25 + 0.005, "Sprung bei {w0}: {d} von {total}");
-        }
-    }
-
-    /// Blickrichtung des Kopfes (Figuren-Koordinaten) in einer Pose.
-    fn head_dir(a: &AnimSet, fx: &PoseFx) -> Vec3 {
-        let mut m = Vec::new();
-        a.pose(Clip::Idle, 0.0, fx, &mut m);
-        let h = a.bone("Head").unwrap();
-        m[h].transform_vector3(Vec3::Z).normalize()
-    }
-
-    #[test]
-    fn head_turns_to_the_target_within_its_limit() {
-        let a = anims(false);
-        let side = Vec3::new(5.0, 1.6, 0.0); // rechts neben der Figur (+x)
-        let free = head_dir(
-            a,
-            &PoseFx {
-                look: Some(side),
-                look_limit: 2.0,
-                ..Default::default()
-            },
-        );
-        let yaw = free.x.atan2(free.z);
-        assert!(
-            (yaw - std::f32::consts::FRAC_PI_2).abs() < 0.2,
-            "Kopf schaut nach {yaw}"
-        );
-        let limited = head_dir(
-            a,
-            &PoseFx {
-                look: Some(side),
-                look_limit: 0.5,
-                ..Default::default()
-            },
-        );
-        let yaw = limited.x.atan2(limited.z);
-        assert!((yaw - 0.5).abs() < 0.15, "Grenze nicht eingehalten: {yaw}");
-        // ganz nach hinten (unmenschlich), wenn die Grenze es erlaubt
-        let back = head_dir(
-            a,
-            &PoseFx {
-                look: Some(Vec3::new(0.01, 1.6, -5.0)),
-                look_limit: 3.2,
-                ..Default::default()
-            },
-        );
-        assert!(back.z < -0.8, "Kopf dreht sich nicht nach hinten: {back}");
-    }
-
-    #[test]
-    fn head_can_be_turned_upside_down() {
-        let a = anims(false);
-        let mut m = Vec::new();
-        a.pose(
-            Clip::Idle,
-            0.0,
-            &PoseFx {
-                head_roll: std::f32::consts::PI,
-                ..Default::default()
-            },
-            &mut m,
-        );
-        let h = a.bone("Head").unwrap();
-        let up = m[h].transform_vector3(Vec3::Y).normalize();
-        assert!(up.y < -0.8, "Kopf nicht kopfueber: {up}");
-    }
-
-    #[test]
-    fn stretching_makes_the_neck_longer() {
-        let skins = load_skins();
-        let a = anims(PEOPLE[0].1);
-        let mut plain = Vec::new();
-        let mut long = Vec::new();
-        a.sample(Clip::Idle, 0.0, &mut plain);
-        a.pose(
-            Clip::Idle,
-            0.0,
-            &PoseFx {
-                stretch: 1.0,
-                ..Default::default()
-            },
-            &mut long,
-        );
-        let h0 = extent(&skins[0], &plain).1;
-        let h1 = extent(&skins[0], &long).1;
-        assert!(h1 > h0 + 0.08, "Hals nicht laenger: {h0} -> {h1}");
     }
 
     #[test]
     fn animator_crossfades_and_counts_one_shots_from_their_start() {
         let mut an = Animator::default();
-        an.update(Clip::Walk, 5.0, 0.1, 0.2);
-        an.update(Clip::Walk, 5.1, 0.1, 0.2);
-        an.update(Clip::Grab, 5.2, 0.1, 0.2);
+        an.update(TestClip::Walk, 5.0, 0.1, 0.2);
+        an.update(TestClip::Walk, 5.1, 0.1, 0.2);
+        an.update(TestClip::Grab, 5.2, 0.1, 0.2);
         assert!(an.blend().is_some(), "kein Ueberblenden");
         assert!(an.clip_time() < 1e-4, "Einmal-Clip startet nicht bei 0");
         for k in 0..5 {
-            an.update(Clip::Grab, 5.3 + k as f32 * 0.1, 0.1, 0.2);
+            an.update(TestClip::Grab, 5.3 + k as f32 * 0.1, 0.1, 0.2);
         }
         assert!(an.blend().is_none(), "Ueberblenden endet nicht");
         assert!(an.finished(0.4));
+        let _ = TestClip::Stand;
     }
 }

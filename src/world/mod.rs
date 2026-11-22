@@ -11,7 +11,7 @@ pub use gen::POSTER_TEXTS;
 
 use crate::catalog::catalog;
 use crate::render::MeshDraw;
-use bytemuck::{Pod, Zeroable};
+
 use glam::{vec3, Mat4, Quat, Vec3, Vec4};
 use std::collections::HashMap;
 
@@ -35,24 +35,7 @@ pub mod material {
     pub const MIRROR: f32 = 7.0;
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
-pub struct GpuInstance {
-    /// xyz, w = Drehung um die Hochachse
-    pub center: [f32; 4],
-    pub half: [f32; 4],
-    pub color: [f32; 4],
-    /// x = Material, y = Seed, z = Leuchtstaerke, w = Flackern
-    pub extra: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
-pub struct GpuLight {
-    pub pos: [f32; 4],
-    pub color: [f32; 4],
-    pub extra: [f32; 4],
-}
+pub use mettgine::gpu::{GpuInstance, GpuLight};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Aabb {

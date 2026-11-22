@@ -74,7 +74,9 @@ impl Settings {
                 let _ = std::fs::create_dir_all(dir);
             }
             if let Err(e) = std::fs::write(&p, self.to_text()) {
-                eprintln!("Einstellungen konnten nicht gespeichert werden: {e}");
+                crate::crash::log(&format!(
+                    "Einstellungen konnten nicht gespeichert werden: {e}"
+                ));
             }
         }
     }
