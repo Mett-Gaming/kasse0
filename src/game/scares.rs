@@ -349,6 +349,9 @@ impl Game {
                 };
             }
             CartGhost::Rolling => {
+                if self.dialog.is_some() {
+                    return; // pausiert, solange man redet
+                }
                 if self.trolley.pushing || carried {
                     self.cart_ghost = CartGhost::Idle;
                     return;

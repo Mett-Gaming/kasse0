@@ -72,7 +72,7 @@ Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Übers
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
 ### Gespräche
-- Während eines Gesprächs (und 2,5 s danach) können dich die Kunden nicht erwischen.
+- Während eines Gesprächs bewegt sich kein Kunde (alle frieren in ihrer Pose ein und schauen nur langsam zu dir), auch der Geisterwagen hält an. Danach hast du noch 2,5 s Schonfrist.
 - Rennst du an einem Mitarbeiter vorbei, kann er dich nicht ansprechen. Das fällt aber auf (+20 %), und er folgt dir.
 
 ### Der Markt verändert sich

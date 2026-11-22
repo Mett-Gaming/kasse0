@@ -1309,3 +1309,31 @@ fn subliminal_flashes_only_late() {
     }
     assert!(seen, "keine unterschwelligen Blitze ab falsch");
 }
+
+#[test]
+fn customers_freeze_during_dialog() {
+    let mut g = Game::new(16);
+    g.tip();
+    g.customers.clear();
+    g.employees.truncate(1);
+    g.employees[0].ignore = 0.0;
+    g.employees[0].pos = g.player.pos + vec3(0.0, 0.0, -1.4);
+    step(&mut g, 0.2, Input::default());
+    assert!(g.dialog.is_some());
+    // unbeobachteter Verfolger hinter dem Spieler
+    let p = g.player.pos;
+    g.spawn_customer_at(g.world.collide(p + vec3(0.0, 0.0, 4.0), 0.25));
+    let c = g.customers.len() - 1;
+    g.customers[c].stalker = true;
+    let start = g.customers[c].pos;
+    let anim = g.customers[c].gait.t;
+    for _ in 0..(9 * 60) {
+        if g.dialog.is_none() {
+            break;
+        }
+        g.update(1.0 / 60.0, &mut Input::default());
+    }
+    let moved = (g.customers[c].pos - start).length();
+    assert!(moved < 0.01, "Kunde rueckt im Gespraech {moved} m naeher");
+    assert_eq!(g.customers[c].gait.t, anim, "Pose nicht eingefroren");
+}
