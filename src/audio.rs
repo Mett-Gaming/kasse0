@@ -22,6 +22,10 @@ pub enum Sfx {
     SqueakSoft,
     /// Einkaufswagen in der Kurve: klappernde Raeder
     Rattle,
+    /// elektrische Funken an einem Kabelende
+    Spark,
+    /// Kunden fluestern miteinander
+    Whisper,
 }
 
 /// Was die Musik gerade tun soll.
@@ -150,6 +154,33 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 (phase.sin() + 0.3 * (phase * 2.0).sin()) * 0.18 * env
             })
         }
+        Sfx::Spark => {
+            // Knistern: dichte, kurze Knacker mit hellem Rauschen, schnell abklingend
+            gen(0.35, &mut |t| {
+                let crack = (rng.next() > 0.82) as i32 as f32;
+                let hiss = rng.next() - 0.5;
+                (crack * (rng.next() - 0.5) * 1.4 + hiss * 0.25) * 0.3 * (1.0 - t / 0.35).powi(2)
+            })
+        }
+        Sfx::Whisper => {
+            // Fluestern: gefiltertes Rauschen mit Silbenrhythmus und "s"-Lauten
+            let mut lp = 0.0;
+            let mut hp_prev = 0.0;
+            gen(1.1, &mut |t| {
+                let n = rng.next() - 0.5;
+                lp += (n - lp) * 0.35;
+                let hiss = n - hp_prev;
+                hp_prev = n;
+                let syll = ((t * 7.5).sin() * 0.5 + 0.5).powi(2) * ((t * 2.3).sin() * 0.4 + 0.6);
+                let s_sound = if (t * 3.1).fract() < 0.12 {
+                    hiss * 0.6
+                } else {
+                    0.0
+                };
+                let env = (t * 6.0).min(1.0) * (1.0 - t / 1.1).max(0.0);
+                (lp * syll * 0.9 + s_sound) * 0.22 * env
+            })
+        }
         Sfx::SqueakSoft => {
             // leises, tieferes Rad-Quietschen mit langsamem Eiern
             let mut phase = 0.0f32;
@@ -224,6 +255,8 @@ impl Audio {
             Sfx::Squeak,
             Sfx::SqueakSoft,
             Sfx::Rattle,
+            Sfx::Spark,
+            Sfx::Whisper,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -304,6 +337,8 @@ mod tests {
             Sfx::Squeak,
             Sfx::SqueakSoft,
             Sfx::Rattle,
+            Sfx::Spark,
+            Sfx::Whisper,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

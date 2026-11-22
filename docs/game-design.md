@@ -117,3 +117,13 @@ Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `ce
 - **Auffälligkeits-Meter** unten links (nur gekippt).
 - **Kasse abgesperrt** (Flatterband, beide Seiten der Gassen), bis der Zettel komplett ist (Wagen, Band, Gescanntes zählen).
 - **Verfall in Reihenfolge:** Stufe 1 fehlende/gesprungene Fliesen und Ameisenstraßen; Stufe 2 dazu Fliesenstapel, Bodenlöcher, Ratten, Deckenlöcher mit Kabeln; Stufe 3 Blut tropft von der Decke in Lachen. Bodennahes trägt die Markierung `seed = -1` und folgt beim Verbiegen nur der Höhenwelle.
+
+## Feinschliff v0.4
+- **Tempo:** Spieler rennt 2,56 m/s (−20 %), Ausdauer 5 s Rennen, 4 s bis voll, erschöpft bis ein Drittel. Verfolger beim Rennen ×1,6.
+- **HUD:** Ausdauer- und Auffälligkeitsleiste nur, wenn etwas fehlt bzw. anliegt.
+- **Drei Leben** (`game/death.rs`): zweimal erwischt = Todesanimation (2,2 s: herumreißen, zusammensacken, Abblende), Aufwachen am Eingang mit 5 s Schonfrist; Wagen bleibt am Todespunkt; Verfolger im Umkreis von 8 m gehen an ihr Regal zurück; rote Vignette +0,25 je Tod. Dritter Fang = Game Over.
+- **Fata Morgana:** wirkt echt (undurchsichtig, normale Farben), entpuppt sich ab 3 m, flackert 0,8 s, ist weg.
+- **Live-Verbiegen** nur auf hohen Stufen: falsch 0,04/0,08 m, Kollaps 0,25/0,55 m.
+- **Bereiche wandern** beim Umbau: ab unruhig tauschen Kühlabschnitte die Plätze, ab falsch wandert die Tiefkühlreihe in einen anderen Gang und die Obst-Insel rückt.
+- **Blut** rund (vier gedrehte Rechtecke), Tropfnasen, mehrere Tropfstellen je Fleck, alle 0,7–1,5 s ein Tropfen; ab falsch etwas, im Kollaps viel. **Kabel** bunt, teils geknickt, mit Kupferenden; manche sprühen Funken (Knistern bis 14 m).
+- **Wagen:** Waren liegen auf dem Korbboden (0,57 m). **Flüstern**, wenn sich zwei Kunden begegnen (1,4 m), danach 9–18 s Ruhe.

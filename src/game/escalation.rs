@@ -23,7 +23,8 @@ impl Tier {
     }
     /// Live-Verbiegen der Gaenge: (seitlich, Hoehenwelle) in Metern
     pub fn sway(self) -> (f32, f32) {
-        [(0.0, 0.0), (0.06, 0.18), (0.15, 0.35), (0.25, 0.55)][self as usize]
+        // nur auf hohen Stufen spuerbar: "falsch" kaum, im Kollaps richtig
+        [(0.0, 0.0), (0.0, 0.0), (0.04, 0.08), (0.25, 0.55)][self as usize]
     }
     /// Loecher im Boden (Hindernisse) und in der Decke
     pub fn holes(self) -> u32 {

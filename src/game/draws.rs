@@ -53,6 +53,7 @@ impl Game {
             }
         }
         self.collect_vermin_draws(out);
+        self.collect_mirage_draws(out);
         // Warnschilder
         for &(pos, yaw) in &self.world.signs {
             out.push(MeshDraw {
@@ -133,20 +134,25 @@ impl Game {
             ));
         }
 
-        // Fata Morgana: halbtransparente Figuren
+        // Fata Morgana: wirkt echt, bis man auf 3 m heran ist - dann flackert sie als Hologramm
         for (i, h) in self.holograms.iter().enumerate() {
             let Some(v) = h.person else { continue };
-            if !self.hologram_visible(i) {
+            let ghost = h.revealed >= 0.0;
+            if ghost && !self.hologram_visible(i) {
                 continue;
             }
             out.push(PersonDraw {
                 variant: v,
                 clip: Clip::Idle,
                 time: t + phase(i, 4.0),
-                pos: h.pos,
+                pos: h.pos + vec3(0.0, self.sway_at(h.pos).y, 0.0),
                 yaw: h.yaw,
-                tint: h.tint.extend(2.2),
-                ghost: true,
+                tint: if ghost {
+                    h.tint.extend(2.2)
+                } else {
+                    h.real_tint
+                },
+                ghost,
             });
         }
     }
@@ -211,7 +217,7 @@ impl Game {
         }
         // Blut: Tropfen fallen von der Decke, kleiner Spritzer auf der Lache
         for (i, &d) in w.drips.iter().enumerate() {
-            let period = 1.4 + crate::world::hash01(d) * 1.4;
+            let period = 0.7 + crate::world::hash01(d) * 0.8;
             let c = (t + i as f32 * 0.53).rem_euclid(period);
             let fall = (2.0 * d.y / 9.81).sqrt();
             let red = Vec4::new(0.35, 0.01, 0.01, 0.05);
@@ -228,15 +234,44 @@ impl Game {
                     tint: red,
                 });
             } else if c < fall + 0.15 {
+                // Spritzer: zwei gedrehte flache Scheiben (rund)
                 let k = (c - fall) / 0.15;
+                for a in [0.0f32, std::f32::consts::FRAC_PI_4] {
+                    out.push(MeshDraw {
+                        mesh: cube,
+                        model: Mat4::from_scale_rotation_translation(
+                            vec3(0.05 + k * 0.08, 0.006 * (1.0 - k), 0.05 + k * 0.08),
+                            Quat::from_rotation_y(a),
+                            on_floor(vec3(d.x, 0.01, d.z)),
+                        ),
+                        tint: red,
+                    });
+                }
+            }
+        }
+        // Funken an blanken Kabelenden: kurze Schauer gluehender Teilchen
+        for (i, &s) in w.sparks.iter().enumerate() {
+            if (s - self.player.pos).length() > 18.0 {
+                continue;
+            }
+            let period = spark_period(s);
+            let c = (t + i as f32 * 0.77).rem_euclid(period);
+            if c > 0.35 {
+                continue;
+            }
+            for k in 0..12 {
+                let h = crate::world::hash01(s + vec3(k as f32 * 1.37, (t / period).floor(), 0.0));
+                let a = h * std::f32::consts::TAU;
+                let v = vec3(a.cos() * (0.6 + h), 0.4 + h * 1.2, a.sin() * (0.6 + h));
+                let p = s + v * c - vec3(0.0, 0.5 * 9.81 * c * c, 0.0);
                 out.push(MeshDraw {
                     mesh: cube,
                     model: Mat4::from_scale_rotation_translation(
-                        vec3(0.05 + k * 0.08, 0.006 * (1.0 - k), 0.05 + k * 0.08),
+                        Vec3::splat(0.007),
                         Quat::IDENTITY,
-                        on_floor(vec3(d.x, 0.01, d.z)),
+                        p,
                     ),
-                    tint: red,
+                    tint: Vec4::new(1.0, 0.85, 0.45, 4.0 * (1.0 - c / 0.35)),
                 });
             }
         }
@@ -246,3 +281,30 @@ impl Game {
 /// Ratten: Tempo (m/s) und Pause an den Enden (s)
 const RAT_SPEED: f32 = 1.6;
 const RAT_PAUSE: f32 = 1.3;
+
+/// Abstand der Funkenschauer an einem Kabelende (Sekunden).
+pub(super) fn spark_period(s: Vec3) -> f32 {
+    1.6 + crate::world::hash01(s) * 2.6
+}
+
+impl Game {
+    /// Knistern, wenn in der Naehe ein Funkenschauer beginnt.
+    pub(super) fn update_spark_sounds(&mut self) {
+        let n = self.world.sparks.len();
+        if self.spark_bursts.len() != n {
+            self.spark_bursts = vec![i64::MIN; n];
+        }
+        for i in 0..n {
+            let s = self.world.sparks[i];
+            let burst = ((self.time + i as f32 * 0.77) / spark_period(s)).floor() as i64;
+            if burst != self.spark_bursts[i] {
+                let first = self.spark_bursts[i] == i64::MIN;
+                self.spark_bursts[i] = burst;
+                let d = (s - self.player.pos).length();
+                if !first && d < 14.0 {
+                    self.sfx.push((Sfx::Spark, (1.0 - d / 14.0) * 0.5));
+                }
+            }
+        }
+    }
+}

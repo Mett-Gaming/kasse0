@@ -8,7 +8,7 @@ const BROWSE_SPEED: f32 = 0.75;
 /// Ab dieser Entfernung starren unbeobachtete Kunden herueber
 const STARE_RANGE: f32 = 16.0;
 /// So viel schneller kommen Verfolger, wenn man rennt
-const RUN_CHASE: f32 = 2.2;
+const RUN_CHASE: f32 = 1.6;
 
 impl Game {
     // --------------------------------------------------------------- Spawns
@@ -53,6 +53,7 @@ impl Game {
                 tint,
                 variant,
                 wait: 0.0,
+                whisper_cd: 0.0,
             });
         }
     }
@@ -93,6 +94,7 @@ impl Game {
                 pose: Pose::Reach,
                 angry: 0.0,
                 bump_cd: 0.0,
+                whisper_cd: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
                 field: Vec::new(),
@@ -131,6 +133,7 @@ impl Game {
                 pose: Pose::Idle,
                 angry: 0.0,
                 bump_cd: 0.0,
+                whisper_cd: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
                 field: Vec::new(),
@@ -165,6 +168,7 @@ impl Game {
             pose: Pose::Idle,
             angry: 1.0,
             bump_cd: 0.0,
+            whisper_cd: 0.0,
             stalker: true,
             target: pos,
             field: Vec::new(),
@@ -185,6 +189,7 @@ impl Game {
         self.update_shoppers(dt);
         self.update_customers(dt);
         self.update_employees(dt, input);
+        self.update_whispers(dt);
     }
 
     pub(super) fn update_shoppers(&mut self, dt: f32) {
@@ -269,12 +274,8 @@ impl Game {
             // Waehrend eines Gespraechs (und kurz danach) ist man sicher
             let safe = self.god || self.dialog.is_some() || self.grace > 0.0;
             if dist < CATCH_DIST && !self.paid_and_outside() && !safe {
-                self.outcome = Outcome::Caught;
-                self.outcome_timer = 0.0;
-                self.catcher = Some(self.customers[i].pos);
-                self.red = 1.0;
-                self.glitch = 1.0;
-                self.sfx.push((Sfx::Sting, 1.0));
+                let at = self.customers[i].pos;
+                self.caught_by(at);
                 return;
             }
         }
@@ -400,7 +401,7 @@ impl Game {
     pub(super) fn update_employees(&mut self, dt: f32, _input: &Input) {
         let player = self.player.pos;
         let eye = self.eye();
-        let sprinting = self.player.vel.length() > 2.4;
+        let sprinting = self.player.vel.length() > 2.2;
         // Ein unbeaufsichtigter Wagen im gekippten Markt wird "aufgeraeumt"
         let unattended =
             self.tipped && !self.paid && !self.trolley.pushing && self.cart_distance() > 6.0;
@@ -507,6 +508,59 @@ impl Game {
                 if e.moving {
                     e.yaw = npc::yaw_towards(old, e.pos);
                 }
+            }
+        }
+    }
+}
+
+/// Fluestern: so nah muessen sich zwei begegnen, so lange danach Ruhe, so weit hoert man es
+const WHISPER_DIST: f32 = 1.4;
+const WHISPER_PAUSE: (f32, f32) = (9.0, 18.0);
+const WHISPER_HEAR: f32 = 14.0;
+
+impl Game {
+    /// Kunden (bzw. normale Einkaufende) fluestern miteinander, wenn sie sich begegnen.
+    pub(super) fn update_whispers(&mut self, dt: f32) {
+        let mut people: Vec<(Vec3, f32)> = if self.tipped {
+            self.customers
+                .iter()
+                .map(|c| (c.pos, c.whisper_cd))
+                .collect()
+        } else {
+            self.shoppers
+                .iter()
+                .map(|s| (s.pos, s.whisper_cd))
+                .collect()
+        };
+        for p in &mut people {
+            p.1 -= dt;
+        }
+        let player = self.player.pos;
+        for i in 0..people.len() {
+            for j in (i + 1)..people.len() {
+                if people[i].1 > 0.0 || people[j].1 > 0.0 {
+                    continue;
+                }
+                let d = people[i].0 - people[j].0;
+                if vec3(d.x, 0.0, d.z).length() > WHISPER_DIST {
+                    continue;
+                }
+                let mid = (people[i].0 + people[j].0) * 0.5;
+                let hear = 1.0 - (mid - player).length() / WHISPER_HEAR;
+                if hear > 0.0 {
+                    self.sfx.push((Sfx::Whisper, hear * 0.4));
+                }
+                people[i].1 = self.rng.gen_range(WHISPER_PAUSE.0..WHISPER_PAUSE.1);
+                people[j].1 = self.rng.gen_range(WHISPER_PAUSE.0..WHISPER_PAUSE.1);
+            }
+        }
+        if self.tipped {
+            for (c, p) in self.customers.iter_mut().zip(&people) {
+                c.whisper_cd = p.1;
+            }
+        } else {
+            for (s, p) in self.shoppers.iter_mut().zip(&people) {
+                s.whisper_cd = p.1;
             }
         }
     }

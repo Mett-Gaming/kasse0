@@ -72,6 +72,7 @@ impl App {
                 // Erwischt werden
                 self.go(Screen::Playing);
                 self.game.tip();
+                self.game.deaths = 2; // letztes Leben: direkt Game Over
                 let p = self.game.player.pos;
                 self.game.spawn_customer_at(p + vec3(0.6, 0.0, 1.2));
                 self.game.player.yaw = 0.0;

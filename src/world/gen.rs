@@ -10,6 +10,7 @@ use crate::catalog::{catalog, Catalog};
 use crate::signs::{BRAND, SLOGANS};
 use decay::DecayArea;
 use fixtures::*;
+use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::f32::consts::{FRAC_PI_2, PI};
@@ -118,6 +119,7 @@ pub fn generate(params: &WorldParams) -> World {
         ant_trails: Vec::new(),
         rat_runs: Vec::new(),
         drips: Vec::new(),
+        sparks: Vec::new(),
     };
 
     // --- Huelle ---
@@ -386,9 +388,17 @@ pub fn generate(params: &WorldParams) -> World {
             + amps[i] * (curve_phase + (z - aisle_z0) / aisle_len * curve_waves * PI).sin()
     };
     let mut passages: Vec<(Vec3, Vec3)> = Vec::new();
+    // Bereiche wandern (ab Stufe "falsch"): die Tiefkuehlreihe steht in einem anderen Gang
+    let freezer_aisle = if tipped && params.mix >= 2 {
+        g.weird.gen_range(0..aisle_count) as usize
+    } else {
+        0
+    };
+    // Index der Regalgondel ohne die Tiefkuehlreihe (fuer die Seitenbelegung im Layout)
+    let gondola = |iu: usize| if iu < freezer_aisle { iu + 1 } else { iu };
     for i in 0..aisle_count {
         let iu = i as usize;
-        let freezer_row = i == 0;
+        let freezer_row = iu == freezer_aisle;
         let n = if params.warp > 0.0 {
             (aisle_len / PASSAGE_WIDTH).ceil() as usize
         } else {
@@ -558,7 +568,8 @@ pub fn generate(params: &WorldParams) -> World {
             );
             for side in [-1i8, 1] {
                 let facing = side as f32;
-                let side_idx = (aisle_count as usize - 1 - iu) * 2 + if side == 1 { 0 } else { 1 };
+                let side_idx =
+                    (aisle_count as usize - 1 - gondola(iu)) * 2 + if side == 1 { 0 } else { 1 };
                 // Die Seite nach Abteilungsgrenzen aufteilen (ein gerades Segment kann mehrere Abteilungen tragen)
                 let (ts, te) = ((p0.z - aisle_z0) / aisle_len, (p1.z - aisle_z0) / aisle_len);
                 let parts: Vec<(usize, f32, f32)> = g.layout.shelf_sides[side_idx]
@@ -641,7 +652,7 @@ pub fn generate(params: &WorldParams) -> World {
         );
         // Haengeschild ueber dem Gang: Unterabteilung (im Chaos luegt es)
         let zs = aisle_z0 + 1.2;
-        if i == 0 {
+        if freezer_row {
             g.b.label(
                 vec3(center_x(iu, zs), 2.6, zs),
                 0.0,
@@ -655,7 +666,8 @@ pub fn generate(params: &WorldParams) -> World {
             );
         } else {
             for side in [-1i8, 1] {
-                let side_idx = (aisle_count as usize - 1 - iu) * 2 + if side == 1 { 0 } else { 1 };
+                let side_idx =
+                    (aisle_count as usize - 1 - gondola(iu)) * 2 + if side == 1 { 0 } else { 1 };
                 let sub = g.layout.sign_shelf[side_idx];
                 let x = center_x(iu, zs) + side as f32 * (GONDOLA_HALF_W + 0.55);
                 g.b.add(
@@ -696,7 +708,13 @@ pub fn generate(params: &WorldParams) -> World {
     } else {
         vec3(0.8, 0.9, 1.0)
     };
-    for (k, &x) in cooler_xs.iter().enumerate() {
+    // Bereiche wandern (ab Stufe "unruhig"): die Kuehlabschnitte tauschen ihre Plaetze an der Wand
+    let mut cooler_slots = cooler_xs.clone();
+    if tipped && params.mix >= 1 {
+        cooler_slots.shuffle(&mut *g.weird);
+    }
+    for k in 0..cooler_xs.len() {
+        let x = cooler_slots[k];
         let xm = x + 1.2;
         g.b.add(
             vec3(xm, 1.15, 0.2),
@@ -786,9 +804,19 @@ pub fn generate(params: &WorldParams) -> World {
         }
         g.b.solid(f.pos(len * 0.5, -0.65, 0.55), f.half(len * 0.5, 0.65, 0.55));
         // Insel (beidseitig), Abstand zur Gondelreihe und zum Wandregal
-        let ix = aisles_x1 + 4.7;
-        let iz0 = pz0 + 0.8;
-        let ilen = len - 1.6;
+        // Obst-Insel rueckt ab Stufe "falsch" an eine andere Stelle
+        let (shift_x, shift_z, shorter): (f32, f32, f32) = if tipped && params.mix >= 2 {
+            (
+                g.weird.gen_range(-0.35..0.35),
+                g.weird.gen_range(0.0..1.8),
+                g.weird.gen_range(0.6..2.0),
+            )
+        } else {
+            (0.0, 0.0, 0.0)
+        };
+        let ix = aisles_x1 + 4.7 + shift_x;
+        let iz0 = pz0 + 0.8 + shift_z;
+        let ilen = len - 1.6 - shorter.max(shift_z);
         if ilen > 2.0 {
             let fi = Frame::new(vec3(ix, 0.0, iz0), 0.0);
             for side in [-1.0f32, 1.0] {
@@ -1280,6 +1308,7 @@ pub fn generate(params: &WorldParams) -> World {
         ant_trails,
         rat_runs,
         drips,
+        sparks,
         ..
     } = g;
     let nav = build_nav(&b.solids, &b.obbs, width, depth);
@@ -1316,6 +1345,7 @@ pub fn generate(params: &WorldParams) -> World {
         ant_trails,
         rat_runs,
         drips,
+        sparks,
         corral,
     };
     world.index_items();

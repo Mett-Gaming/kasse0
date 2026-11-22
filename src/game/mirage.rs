@@ -13,9 +13,15 @@ pub struct Hologram {
     pub tint: Vec3,
     pub scale: Vec3,
     pub life: f32,
+    /// So sieht es aus, solange man es fuer echt haelt (rgb, w = Eigenleuchten)
+    pub real_tint: Vec4,
+    /// < 0: noch nicht entlarvt; sonst Sekunden seit dem Entlarven
+    pub revealed: f32,
 }
 
-const VANISH_DIST: f32 = 5.0;
+/// Erst so nah entpuppt sich eine Fata Morgana, dann flackert sie kurz und ist weg
+const REVEAL_DIST: f32 = 3.0;
+const REVEAL_TIME: f32 = 0.8;
 
 impl Game {
     pub(super) fn update_mirages(&mut self, dt: f32) {
@@ -24,16 +30,23 @@ impl Game {
             return;
         }
         self.tipped_time += dt;
-        // Verschwinden: Zeit abgelaufen oder zu nah dran
+        // Aus der Naehe entpuppt sie sich: flackert kurz als Hologramm und ist weg
         let player = self.player.pos;
-        let before = self.holograms.len();
+        let mut revealed_now = false;
         self.holograms.retain_mut(|h| {
             h.life -= dt;
-            h.life > 0.0 && vec3(h.pos.x - player.x, 0.0, h.pos.z - player.z).length() > VANISH_DIST
+            let d = vec3(h.pos.x - player.x, 0.0, h.pos.z - player.z).length();
+            if h.revealed < 0.0 && d < REVEAL_DIST {
+                h.revealed = 0.0;
+                revealed_now = true;
+            } else if h.revealed >= 0.0 {
+                h.revealed += dt;
+            }
+            h.life > 0.0 && h.revealed < REVEAL_TIME
         });
-        if self.holograms.len() < before {
+        if revealed_now {
             self.glitch = self.glitch.max(0.35);
-            self.sfx.push((Sfx::Blip, 0.25));
+            self.sfx.push((Sfx::Blip, 0.3));
         }
 
         self.mirage_timer -= dt;
@@ -71,6 +84,8 @@ impl Game {
                 tint: vec3(1.0, 0.55, 0.5),
                 scale: Vec3::ONE,
                 life: 18.0,
+                real_tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+                revealed: -1.0,
             },
             1 => Hologram {
                 pos,
@@ -80,6 +95,8 @@ impl Game {
                 tint: vec3(0.5, 0.9, 1.0),
                 scale: Vec3::ONE,
                 life: 18.0,
+                real_tint: Vec4::new(1.0, 1.0, 1.0, 0.22),
+                revealed: -1.0,
             },
             2 => Hologram {
                 pos,
@@ -89,6 +106,8 @@ impl Game {
                 tint: vec3(0.6, 1.0, 0.7),
                 scale: Vec3::ONE,
                 life: 18.0,
+                real_tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+                revealed: -1.0,
             },
             3 => Hologram {
                 pos,
@@ -98,6 +117,8 @@ impl Game {
                 tint: vec3(0.5, 0.8, 1.0),
                 scale: Vec3::splat(7.0),
                 life: 14.0,
+                real_tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+                revealed: -1.0,
             },
             _ => Hologram {
                 pos: pos + vec3(0.0, 2.4, 0.0),
@@ -107,6 +128,8 @@ impl Game {
                 tint: vec3(0.2, 1.0, 0.35),
                 scale: vec3(1.3, 0.4, 0.12),
                 life: 16.0,
+                real_tint: Vec4::new(0.2, 1.0, 0.35, 1.2),
+                revealed: -1.0,
             },
         };
         self.holograms.push(h);
@@ -140,9 +163,28 @@ impl Game {
         !(flick > 0.88 || fading)
     }
 
+    /// Noch nicht entlarvte Fata Morganen sehen aus wie echte Dinge (undurchsichtig).
+    pub(super) fn collect_mirage_draws(&self, out: &mut Vec<MeshDraw>) {
+        for h in self
+            .holograms
+            .iter()
+            .filter(|h| h.person.is_none() && h.revealed < 0.0)
+        {
+            out.push(MeshDraw {
+                mesh: h.mesh,
+                model: Mat4::from_scale_rotation_translation(
+                    h.scale,
+                    Quat::from_rotation_y(h.yaw),
+                    h.pos,
+                ),
+                tint: h.real_tint,
+            });
+        }
+    }
+
     pub fn collect_ghosts(&self, out: &mut Vec<MeshDraw>) {
         for (i, h) in self.holograms.iter().enumerate() {
-            if h.person.is_some() || !self.hologram_visible(i) {
+            if h.person.is_some() || h.revealed < 0.0 || !self.hologram_visible(i) {
                 continue;
             }
             let model =
@@ -179,12 +221,21 @@ mod tests {
         let h = &g.holograms[0];
         let d = (h.pos - g.player.pos).length();
         assert!((9.0..=21.0).contains(&d), "Abstand {d}");
-        // hinlaufen (teleportieren) -> weg
+        assert!(
+            g.holograms[0].revealed < 0.0,
+            "schon von weitem als Hologramm erkennbar"
+        );
+        // hinlaufen (teleportieren) -> entpuppt sich, flackert kurz, ist weg
         g.player.pos = g
             .world
             .collide(vec3(h.pos.x, 0.0, h.pos.z) + vec3(1.0, 0.0, 0.0), 0.3);
         g.mirage_timer = 100.0;
         g.update(1.0 / 60.0, &mut inp);
+        assert!(g.holograms[0].revealed >= 0.0, "nicht entlarvt");
+        for _ in 0..60 {
+            g.player.pos = g.world.collide(g.player.pos, 0.3);
+            g.update(1.0 / 60.0, &mut inp);
+        }
         assert!(g.holograms.is_empty());
     }
 

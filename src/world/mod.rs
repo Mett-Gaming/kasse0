@@ -335,6 +335,8 @@ pub struct World {
     pub ant_trails: Vec<(Vec3, Vec3)>,
     pub rat_runs: Vec<(Vec3, Vec3)>,
     pub drips: Vec<Vec3>,
+    /// Kabelenden, die Funken spruehen
+    pub sparks: Vec<Vec3>,
     /// Wagenbox am Eingang
     pub corral: Vec3,
 }

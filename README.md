@@ -22,13 +22,15 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
 7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und räum ihn mit **E aufs Band** (oder leg einzelne Ware aus der Hand aufs Band). Die Kassiererin scannt Stück für Stück, falsche Ware sortiert sie als "ARTIKEL UNBEKANNT" aus. Bezahl mit **E am Kartenterminal** und verlass den Laden durch die Tür.
 
-Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (grün → gelb → rot, blinkt bei 100 %).
+Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (grün → gelb → rot, blinkt bei 100 %), sobald sie über null liegt.
+
+**Drei Leben:** Zweimal kannst du erwischt werden. Du sackst zusammen und wachst am Eingang auf, dein Wagen bleibt, wo es passiert ist. Jedes Mal bleibt eine stärkere rote Vignette. Beim dritten Mal ist der Einkauf vorbei.
 
 ## Steuerung
 | Taste | Aktion |
 |---|---|
 | WASD / Pfeile | Gehen |
-| Shift | Rennen (fällt auf!) |
+| Shift | Rennen (fällt auf, kostet Ausdauer; die Leiste erscheint, wenn sie nicht voll ist) |
 | Maus | Umsehen |
 | E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: Wagen ausräumen; am Kartenterminal: bezahlen |
 | Q (oder E auf den Wagen) | Wagen stehen lassen / wieder schieben |
@@ -64,11 +66,12 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Röhren wechseln zufällig ihr Flacker-Muster: Stroboskop, Pulsieren, fast aus, Unterspannung.
 - Die Gänge biegen sich zu echten S-Kurven, die Regale folgen dem Bogen. Mittendrin öffnen sich Durchgänge, wo vorher keine waren, und es stehen Wände, wo vorher keine standen.
 - Werbeposter verrotten immer weiter.
-- Die Gänge biegen sich live: Regale schwanken, der Boden hebt und senkt sich (Steigung).
+- Auf den hohen Stufen biegen sich die Gänge live: Regale schwanken, der Boden hebt und senkt sich (Steigung). Bereiche wandern beim Umbau: Kühlabschnitte tauschen die Plätze, die Tiefkühlreihe steht in einem anderen Gang, die Obst-Insel rückt.
+- Kunden flüstern miteinander, wenn sie sich begegnen.
 - Der Boden verfällt: erst fehlende und gesprungene Fliesen und Ameisenstraßen, dann Fliesenstapel, Löcher (Hindernisse, hineinfallen kann man nicht) und Ratten. In der Decke klaffen Löcher mit Kabeln, am Ende tropft Blut von der Decke und sammelt sich am Boden.
 - Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
 - Mitarbeiter tragen kräftig blaue Dienstkleidung und leuchten im Dunkeln leicht, damit man sie von der Kundschaft unterscheiden kann.
-- Fata Morganen tauchen auf: Hologramme einer fröhlichen Kundin, eines winkenden Kassierers, eines Ausgangsschilds. Kommst du näher, verschwinden sie.
+- Fata Morganen tauchen auf: eine Kundin, ein Mitarbeiter, ein voller Wagen, ein Ausgangsschild. Sie wirken echt, bis du auf etwa 3 m heran bist, dann flackern sie als Hologramm auf und sind weg.
 
 Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen).
 

@@ -203,6 +203,7 @@ pub(super) struct Gen<'a> {
     pub(super) ant_trails: Vec<(Vec3, Vec3)>,
     pub(super) rat_runs: Vec<(Vec3, Vec3)>,
     pub(super) drips: Vec<Vec3>,
+    pub(super) sparks: Vec<Vec3>,
 }
 
 impl Gen<'_> {

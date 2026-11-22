@@ -237,8 +237,12 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     );
 
     // Auffaelligkeit (nur im gekippten Markt): Balken unten links, gruen -> gelb -> rot
-    if g.tipped {
+    // Leisten nur, wenn etwas fehlt bzw. anliegt
+    if g.tipped && g.suspicion > 0.01 {
         suspicion_meter(u, g.suspicion, time);
+    }
+    if g.player.stamina < 0.999 {
+        stamina_meter(u, g.player.stamina, g.player.exhausted);
     }
 
     // Fadenkreuz
@@ -567,4 +571,17 @@ fn suspicion_meter(u: &mut Ui, s: f32, time: f32) {
     u.text_s(x, y - 11.0, "AUFFÄLLIG", if blink { RED } else { DIM }, 1.0);
     u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.0, 0.0, 0.0, 0.6]);
     u.rect(x, y, w * s, h, if blink { RED } else { color });
+}
+
+/// Ausdauer: schmaler Balken ueber der Auffaelligkeit, nur sichtbar, wenn sie nicht voll ist.
+fn stamina_meter(u: &mut Ui, s: f32, exhausted: bool) {
+    let (x, y, w, h) = (12.0, 226.0, 72.0, 4.0);
+    let color = if exhausted {
+        [0.85, 0.25, 0.2, 0.9]
+    } else {
+        [0.85, 0.85, 0.8, 0.85]
+    };
+    u.text_s(x, y - 11.0, "AUSDAUER", DIM, 1.0);
+    u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.0, 0.0, 0.0, 0.6]);
+    u.rect(x, y, w * s.clamp(0.0, 1.0), h, color);
 }

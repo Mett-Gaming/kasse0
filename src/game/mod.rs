@@ -3,6 +3,7 @@
 mod cheats;
 mod checkout;
 mod crowd;
+mod death;
 mod draws;
 mod tension;
 pub use cheats::CHEATS;
@@ -29,7 +30,10 @@ use rand_pcg::Pcg64;
 pub const EYE_HEIGHT: f32 = 1.62;
 const PLAYER_RADIUS: f32 = 0.3;
 const WALK_SPEED: f32 = 1.5;
-const RUN_SPEED: f32 = 3.2;
+const RUN_SPEED: f32 = 2.56;
+/// Ausdauer: so viele Sekunden Rennen am Stueck, so viele Sekunden bis wieder voll
+const STAMINA_RUN: f32 = 5.0;
+const STAMINA_REGEN: f32 = 4.0;
 const BASE_SENSITIVITY: f32 = 0.0022;
 const REACH: f32 = 2.3;
 const CATCH_DIST: f32 = 0.8;
@@ -60,6 +64,12 @@ pub struct Player {
     pub pitch: f32,
     bob_phase: f32,
     step_acc: f32,
+    /// Ausdauer 0..1 (Rennen kostet, Gehen und Stehen erholt)
+    pub stamina: f32,
+    /// Ausdauer leer: Rennen erst wieder ab einem Drittel
+    pub exhausted: bool,
+    /// rennt gerade wirklich (Taste, in Bewegung, Ausdauer da)
+    pub running: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -215,6 +225,11 @@ pub struct Game {
     pub god: bool,
     /// Schonfrist nach einem Gespraech
     pub grace: f32,
+    /// Wie oft man schon erwischt wurde (Vignette), laufende Todesanimation
+    pub deaths: u32,
+    pub dying: Option<f32>,
+    /// letzter Funkenschauer je Kabelende (fuer das Knistern)
+    spark_bursts: Vec<i64>,
     pub holograms: Vec<mirage::Hologram>,
     mirage_timer: f32,
     tipped_time: f32,
@@ -327,6 +342,9 @@ impl Game {
             pitch: -0.32,
             bob_phase: 0.0,
             step_acc: 0.0,
+            stamina: 1.0,
+            exhausted: false,
+            running: false,
         };
         let trolley = Trolley {
             pos: world.spawn + vec3(0.0, 0.0, -hands::CART_OFFSET),
@@ -353,6 +371,9 @@ impl Game {
             suspicion: 0.0,
             god: false,
             grace: 0.0,
+            deaths: 0,
+            dying: None,
+            spark_bursts: Vec::new(),
             holograms: Vec::new(),
             mirage_timer: 12.0,
             tipped_time: 0.0,
@@ -598,7 +619,16 @@ impl Game {
     pub fn eye(&self) -> Vec3 {
         let p = &self.player;
         let bob = p.bob_phase.sin() * 0.025 * (p.vel.length() / WALK_SPEED).min(1.0);
-        p.pos + vec3(0.0, EYE_HEIGHT + bob + self.sway_at(p.pos).y, 0.0)
+        // Todesanimation: man sackt zusammen
+        let fall = self
+            .dying_progress()
+            .map_or(0.0, |k| ((k - 0.3) / 0.4).clamp(0.0, 1.0));
+        p.pos
+            + vec3(
+                0.0,
+                EYE_HEIGHT * (1.0 - 0.8 * fall) + bob + self.sway_at(p.pos).y,
+                0.0,
+            )
     }
 
     /// Parameter fuer das Live-Verbiegen der Gaenge (Shader und Spiel).
@@ -704,6 +734,16 @@ impl Game {
             input.choice = None;
             return;
         }
+        // Todesanimation: keine Eingaben, keine NPCs
+        if self.dying.is_some() {
+            self.update_dying(dt);
+            input.interact = false;
+            input.cart_toggle = false;
+            input.take_out = false;
+            input.choice = None;
+            input.wheel = 0;
+            return;
+        }
         self.run_time += dt;
 
         if self.dialog.is_some() {
@@ -744,6 +784,7 @@ impl Game {
 
         self.update_loose(dt);
         self.update_mirages(dt);
+        self.update_spark_sounds();
         self.update_belt(dt);
         self.update_npcs(dt, input);
         self.update_suspicion(dt, input);

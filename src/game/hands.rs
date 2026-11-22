@@ -4,6 +4,8 @@
 use super::*;
 
 pub(super) const CART_OFFSET: f32 = 0.85;
+/// Hoehe des Korbbodens im Wagenmodell (gemessen am Modell)
+const CART_FLOOR: f32 = 0.57;
 /// Kollisionsradius des geschobenen Wagens (breiter als ein Durchgang)
 const CART_PUSH_RADIUS: f32 = 0.42;
 /// Radius des abgestellten Wagens fuer die Spielerkollision
@@ -34,8 +36,24 @@ impl Game {
         if input.left {
             wish -= right;
         }
+        // Ausdauer: Rennen kostet, Gehen und Stehen erholen
+        let p = &mut self.player;
+        p.running = input.run && !p.exhausted && wish.length_squared() > 0.0;
+        if p.running {
+            p.stamina -= dt / STAMINA_RUN;
+            if p.stamina <= 0.0 {
+                p.stamina = 0.0;
+                p.exhausted = true;
+            }
+        } else {
+            p.stamina = (p.stamina + dt / STAMINA_REGEN).min(1.0);
+            if p.exhausted && p.stamina > 0.35 {
+                p.exhausted = false;
+            }
+        }
+        let running = p.running;
         if wish.length_squared() > 0.0 {
-            wish = wish.normalize() * if input.run { RUN_SPEED } else { WALK_SPEED };
+            wish = wish.normalize() * if running { RUN_SPEED } else { WALK_SPEED };
         }
         let old = self.player.pos;
         self.player.vel = self.player.vel.lerp(wish, (dt * 10.0).min(1.0));
@@ -69,14 +87,14 @@ impl Game {
             self.squeak_acc += moved;
             self.cart_turn += turned;
             if self.squeak_acc > self.squeak_next {
-                let (sfx, vol, radius) = if input.run {
+                let (sfx, vol, radius) = if running {
                     (Sfx::Squeak, 0.5, 18.0)
                 } else if self.cart_turn > RATTLE_TURN {
                     (Sfx::Rattle, 0.4, 10.0)
                 } else {
                     (Sfx::SqueakSoft, 0.3, 8.0)
                 };
-                let (lo, hi) = if input.run {
+                let (lo, hi) = if running {
                     SQUEAK_EVERY_RUN
                 } else {
                     SQUEAK_EVERY
@@ -114,8 +132,7 @@ impl Game {
         p.step_acc += moved;
         if p.step_acc > 0.7 {
             p.step_acc = 0.0;
-            self.sfx
-                .push((Sfx::Step, if input.run { 0.5 } else { 0.25 }));
+            self.sfx.push((Sfx::Step, if running { 0.5 } else { 0.25 }));
         }
         if let Some(t) = &mut self.tutorial {
             t.walked += moved;
@@ -136,7 +153,8 @@ impl Game {
         let col = (i % 3) as f32 - 1.0;
         let row = ((i / 3) % 4) as f32 - 1.5;
         let layer = (i / 12) as f32;
-        let local = vec3(col * 0.13, 0.42 + layer * 0.15, row * 0.17);
+        // auf dem Korbboden (Wagenmodell: Boden bei ~0,56 m), in Lagen uebereinander
+        let local = vec3(col * 0.13, CART_FLOOR + layer * 0.15, row * 0.17);
         let spin = Quat::from_rotation_y(i as f32 * 1.7);
         m * Mat4::from_rotation_translation(spin, local)
     }

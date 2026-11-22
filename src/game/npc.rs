@@ -142,6 +142,8 @@ pub struct Customer {
     /// Zusatzgeschwindigkeit, wenn man ihren Tomatensaft genommen hat
     pub angry: f32,
     pub bump_cd: f32,
+    /// Pause bis zum naechsten Fluestern
+    pub whisper_cd: f32,
     /// Verfolger: schleicht sich an, sobald man wegsieht. Alle anderen kaufen nur ein.
     pub stalker: bool,
     /// Einkaufsbummel: Ziel, Wegfeld dorthin, Wartezeit am Ziel
@@ -217,6 +219,7 @@ pub struct Shopper {
     /// Figur (Index in assets::PEOPLE)
     pub variant: usize,
     pub wait: f32,
+    pub whisper_cd: f32,
 }
 
 #[cfg(test)]

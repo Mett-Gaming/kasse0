@@ -28,10 +28,14 @@ STEUERUNG
   Maus               Umsehen          TAB     Einkaufszettel
   E / Linksklick     Ware greifen, in den Wagen / aufs Band legen, bezahlen
   Q                  Wagen stehen lassen / schieben
+  Shift halten       Rennen (kostet Ausdauer)
   F                  Ware aus dem Wagen nehmen (die anvisierte leuchtet auf)
   Mausrad            am Wagen: andere Ware anwählen
   1 / 2 / 3          Antwort im Gespräch
   Esc                Pause            F12     Screenshot (Ordner "Bilder")
+
+Du hast drei Leben: zweimal erwischt wachst du am Eingang auf (der Wagen bleibt,
+wo es passiert ist), beim dritten Mal ist Schluss.
 
 Einstellungen werden unter %APPDATA%\kasse0\settings.txt gespeichert.
 

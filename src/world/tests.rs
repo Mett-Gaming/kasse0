@@ -366,6 +366,7 @@ fn decay_comes_in_a_sensible_order() {
         p.stretch = 2.0;
         p.warp = 1.0;
         p.decay = level;
+        p.ceiling_holes = [0, 0, 3, 6][level as usize];
         generate(&p)
     };
     for seed in 0..6 {
@@ -377,16 +378,51 @@ fn decay_comes_in_a_sensible_order() {
             w1.instances.iter().any(|i| i.extra[1] < -0.5),
             "seed {seed}: kein Bodenverfall"
         );
-        // Stufe 2: Ratten dazu, noch kein Blut
+        // Stufe 2: Ratten dazu, erst wenig Blut
         let w2 = at(2, seed);
-        assert!(!w2.rat_runs.is_empty() && w2.drips.is_empty());
+        assert!(!w2.rat_runs.is_empty());
         // Stufe 3: Blut tropft von der Decke
         let w3 = at(3, seed);
-        assert!(!w3.drips.is_empty(), "seed {seed}: kein Blut");
+        assert!(
+            w3.drips.len() > w2.drips.len(),
+            "seed {seed}: kaum Blut im Kollaps"
+        );
+        assert!(!w3.sparks.is_empty(), "seed {seed}: keine Funken");
         assert!(w3.drips.iter().all(|d| d.y > 3.5));
         assert!(w3.all_reachable());
     }
     // normaler Markt: nichts davon
     let n = gen(1, false);
     assert!(n.ant_trails.is_empty() && n.rat_runs.is_empty() && n.drips.is_empty());
+}
+
+#[test]
+fn departments_move_physically_at_high_escalation() {
+    let cat = catalog();
+    let freezer_x = |w: &World| {
+        let xs: Vec<f32> = w
+            .items
+            .iter()
+            .filter(|it| {
+                (it.pos.y - 0.55).abs() < 0.01
+                    && it.pos.z > w.aisle_z0
+                    && it.pos.z < w.aisle_z1
+                    && cat.subs[cat.products[it.product as usize].sub].fixture
+                        == FixtureKind::Freezer
+            })
+            .map(|it| it.pos.x)
+            .collect();
+        xs.iter().sum::<f32>() / xs.len().max(1) as f32
+    };
+    let mut moved = 0;
+    for seed in 0..12 {
+        let w = escalated(seed, 2, 1.0, 0);
+        assert!(w.all_reachable(), "seed {seed}: unerreichbar");
+        if freezer_x(&w) > 7.0 {
+            moved += 1;
+        }
+    }
+    assert!(moved >= 3, "Tiefkuehlreihe wandert nie: {moved}");
+    // im normalen Markt bleibt sie im ersten Gang
+    assert!(freezer_x(&gen(3, false)) < 7.0);
 }

@@ -146,16 +146,41 @@ fn stalker_acts_normal_when_watched_and_creeps_when_not() {
 
 #[test]
 fn caught_when_stalker_reaches_player() {
+    // Die ersten beiden Male ueberlebt man, beim dritten Mal ist Schluss
     let mut g = Game::new(5);
     g.tip();
     g.employees.clear();
     g.customers.truncate(1);
-    let p = g.player.pos;
-    g.customers[0].pos = vec3(p.x, 0.0, p.z - 1.5);
     g.customers[0].stalker = true;
-    g.player.yaw = std::f32::consts::PI; // wegsehen
-    step(&mut g, 6.0, Input::default());
-    assert_eq!(g.outcome, Outcome::Caught);
+    g.trolley.pushing = false;
+    for hit in 1..=3 {
+        let p = g.player.pos;
+        g.customers[0].pos = vec3(p.x, 0.0, p.z - 1.5);
+        g.customers[0].home = g.customers[0].pos + vec3(0.0, 0.0, -30.0);
+        g.player.yaw = std::f32::consts::PI; // wegsehen
+        g.grace = 0.0;
+        let cart = g.trolley.pos;
+        step(&mut g, 6.0, Input::default());
+        if hit < 3 {
+            assert_eq!(
+                g.outcome,
+                Outcome::Running,
+                "Treffer {hit}: Run schon vorbei"
+            );
+            assert_eq!(g.deaths, hit);
+            assert!(g.dying.is_none(), "Todesanimation laeuft noch");
+            assert!(
+                (g.player.pos - g.world.spawn).length() < 0.5,
+                "nicht am Eingang aufgewacht"
+            );
+            assert_eq!(g.trolley.pos, cart, "Wagen hat sich bewegt");
+            assert!(g.death_vignette() > 0.0);
+            // Schonfrist abwarten
+            step(&mut g, 5.5, Input::default());
+        } else {
+            assert_eq!(g.outcome, Outcome::Caught);
+        }
+    }
 }
 
 #[test]
@@ -723,9 +748,10 @@ fn stalkers_catch_up_faster_when_you_run() {
     };
     let (walk, run) = (travelled(false), travelled(true));
     assert!(
-        run > walk * 1.8,
+        run > walk * 1.3,
         "beim Rennen nicht schneller: {walk} vs {run}"
     );
+    assert!(run < walk * 1.8, "beim Rennen zu schnell: {walk} vs {run}");
 }
 
 #[test]
@@ -767,4 +793,28 @@ fn checkout_is_closed_until_the_list_is_complete() {
         "kommt nicht in die Kasse: {:?}",
         g.player.pos
     );
+}
+
+#[test]
+fn customers_whisper_when_they_meet() {
+    let mut g = Game::new(7);
+    g.tip();
+    g.employees.clear();
+    g.customers.truncate(2);
+    let p = g.player.pos;
+    for (k, c) in g.customers.iter_mut().enumerate() {
+        c.pos = vec3(p.x + k as f32 * 0.8, 0.0, p.z - 3.0);
+        c.stalker = false;
+        c.whisper_cd = 0.0;
+    }
+    g.sfx.clear();
+    g.update(1.0 / 60.0, &mut Input::default());
+    assert!(
+        g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Whisper)),
+        "kein Fluestern"
+    );
+    // danach eine Weile Ruhe
+    g.sfx.clear();
+    step(&mut g, 2.0, Input::default());
+    assert!(!g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Whisper)));
 }

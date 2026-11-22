@@ -460,8 +460,8 @@ impl App {
                 0.0
             },
             vhs: self.settings.vhs,
-            fade: self.fade,
-            red: g.red,
+            fade: self.fade.max(g.death_fade()),
+            red: g.red.max(g.death_vignette()),
             decay: g.poster_decay(),
             sway: g.sway_params(),
         };

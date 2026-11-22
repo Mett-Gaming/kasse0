@@ -6,6 +6,18 @@ use super::*;
 
 const VOID: Vec3 = Vec3::new(0.004, 0.004, 0.005);
 const MAGGOT: Vec3 = Vec3::new(0.9, 0.87, 0.74);
+/// Kabelfarben (Strom, Daten, Erdung ...)
+const CABLE_COLORS: [Vec3; 7] = [
+    Vec3::new(0.75, 0.08, 0.06),
+    Vec3::new(0.08, 0.25, 0.75),
+    Vec3::new(0.9, 0.75, 0.1),
+    Vec3::new(0.1, 0.55, 0.2),
+    Vec3::new(0.05, 0.05, 0.05),
+    Vec3::new(0.55, 0.55, 0.55),
+    Vec3::new(0.85, 0.4, 0.05),
+];
+/// Blut (getrocknet etwas dunkler)
+const BLOOD: Vec3 = Vec3::new(0.26, 0.01, 0.01);
 
 /// Bereich, in dem Verfall entstehen darf, und Stellen, die frei bleiben muessen.
 pub(super) struct DecayArea {
@@ -149,19 +161,48 @@ impl Gen<'_> {
                 0.0,
             );
         }
-        for _ in 0..self.weird.gen_range(2..5) {
-            let len = self.weird.gen_range(0.4..1.4);
-            let p = vec3(
+        // bunte Kabelbuendel, teils geknickt; manche Enden spruehen Funken
+        for _ in 0..self.weird.gen_range(3..7) {
+            let color = CABLE_COLORS[self.weird.gen_range(0..CABLE_COLORS.len())];
+            let top = vec3(
                 c.x + self.weird.gen_range(-r..r) * 0.6,
-                h - len * 0.5,
+                h,
                 c.z + self.weird.gen_range(-r..r) * 0.6,
             );
+            let len = self.weird.gen_range(0.4..1.5);
+            let kink = self.weird.gen_bool(0.5);
+            let upper = if kink {
+                len * self.weird.gen_range(0.4..0.7)
+            } else {
+                len
+            };
             self.b.add(
-                p,
-                vec3(0.008, len * 0.5, 0.008),
-                vec3(0.05, 0.05, 0.06),
+                top - vec3(0.0, upper * 0.5, 0.0),
+                vec3(0.009, upper * 0.5, 0.009),
+                color,
                 PLAIN,
             );
+            let mut end = top - vec3(0.0, upper, 0.0);
+            if kink {
+                // abgeknicktes Stueck haengt schraeg weg
+                let lower = len - upper;
+                let yaw = self.weird.gen_range(0.0..std::f32::consts::TAU);
+                let off = vec3(yaw.sin(), 0.0, yaw.cos()) * lower * 0.35;
+                self.b.add_rot(
+                    end + off * 0.5 - vec3(0.0, lower * 0.45, 0.0),
+                    vec3(0.009, lower * 0.5, 0.009),
+                    yaw,
+                    color,
+                    PLAIN,
+                );
+                end += off - vec3(0.0, lower * 0.9, 0.0);
+            }
+            // blanke Kupferenden
+            self.b
+                .add(end, vec3(0.006, 0.012, 0.006), vec3(0.85, 0.45, 0.2), PLAIN);
+            if self.weird.gen_bool(0.45) {
+                self.sparks.push(end);
+            }
         }
         // heruntergefallene Deckenplatten
         for _ in 0..self.weird.gen_range(2..5) {
@@ -253,31 +294,65 @@ impl Gen<'_> {
         self.b.solid(c + vec3(0.0, 0.3, 0.0), vec3(0.33, 0.3, 0.33));
     }
 
-    /// Blut tropft von der Decke: Fleck oben, Lache unten (die Tropfen zeichnet das Spiel).
+    /// Runder Fleck aus vier gedrehten Rechtecken (wirkt rund, nicht eckig).
+    fn blob(&mut self, c: Vec3, r: f32, color: Vec3, floor: bool) {
+        let rot = self.weird.gen_range(0.0..std::f32::consts::FRAC_PI_4);
+        for k in 0..4 {
+            let yaw = rot + k as f32 * std::f32::consts::FRAC_PI_4;
+            let h = vec3(r * 0.42, 0.002, r);
+            if floor {
+                self.b.add_floor(c, h, yaw, color, PLAIN);
+            } else {
+                self.b.add_rot(c, h, yaw, color, PLAIN);
+            }
+        }
+    }
+
+    /// Blut tropft von der Decke: runder Fleck mit Tropfnasen oben, Lache mit Spritzern unten.
+    /// Die fallenden Tropfen zeichnet das Spiel (mehrere Tropfstellen pro Fleck).
     fn blood(&mut self, c: Vec3) {
-        let red = vec3(0.24, 0.01, 0.01);
-        self.b.add(
-            vec3(c.x, CEILING_HEIGHT - 0.003, c.z),
-            vec3(0.18, 0.003, 0.14),
-            red * 0.8,
-            PLAIN,
+        let top = CEILING_HEIGHT - 0.003;
+        let r = self.weird.gen_range(0.18..0.3);
+        self.blob(vec3(c.x, top, c.z), r, BLOOD * 0.8, false);
+        self.blob(
+            vec3(c.x + r * 0.4, top - 0.001, c.z - r * 0.3),
+            r * 0.6,
+            BLOOD * 0.65,
+            false,
         );
-        for _ in 0..3 {
+        // Lache: grosser Fleck, kleinere daneben, Spritzer drumherum
+        let pr = self.weird.gen_range(0.25..0.45);
+        self.blob(c + vec3(0.0, 0.004, 0.0), pr, BLOOD, true);
+        for _ in 0..2 {
             let off = vec3(
-                self.weird.gen_range(-0.15..0.15),
-                0.0,
-                self.weird.gen_range(-0.15..0.15),
+                self.weird.gen_range(-pr..pr),
+                0.0045,
+                self.weird.gen_range(-pr..pr),
             );
-            let s = self.weird.gen_range(0.12..0.32);
-            self.b.add_floor(
-                c + off + vec3(0.0, 0.004, 0.0),
-                vec3(s, 0.002, s * self.weird.gen_range(0.6..1.0)),
-                self.weird.gen_range(0.0..std::f32::consts::TAU),
-                red,
+            let s = pr * self.weird.gen_range(0.35..0.6);
+            self.blob(c + off, s, BLOOD * 1.1, true);
+        }
+        for _ in 0..self.weird.gen_range(4..9) {
+            let a = self.weird.gen_range(0.0..std::f32::consts::TAU);
+            let d = pr * self.weird.gen_range(1.1..1.8);
+            let s = self.weird.gen_range(0.015..0.04);
+            self.blob(c + vec3(a.cos() * d, 0.005, a.sin() * d), s, BLOOD, true);
+        }
+        // mehrere Tropfstellen am Fleck, dazu kleine Tropfnasen
+        for _ in 0..self.weird.gen_range(2..4) {
+            let p = vec3(
+                c.x + self.weird.gen_range(-r..r) * 0.6,
+                CEILING_HEIGHT - 0.01,
+                c.z + self.weird.gen_range(-r..r) * 0.6,
+            );
+            self.b.add(
+                p - vec3(0.0, 0.02, 0.0),
+                vec3(0.006, 0.02, 0.006),
+                BLOOD * 0.9,
                 PLAIN,
             );
+            self.drips.push(p - vec3(0.0, 0.04, 0.0));
         }
-        self.drips.push(vec3(c.x, CEILING_HEIGHT - 0.01, c.z));
     }
 
     /// Strecke auf freiem Boden (fuer Ameisen und Ratten).
@@ -339,7 +414,7 @@ impl Gen<'_> {
                 self.rat_runs.push(run);
             }
         }
-        for _ in 0..count([0, 0, 0, 7]) {
+        for _ in 0..count([0, 0, 2, 9]) {
             if let Some(p) = self.free_spot(a, 0.4) {
                 self.blood(p);
             }

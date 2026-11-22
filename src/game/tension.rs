@@ -103,7 +103,7 @@ impl Game {
         }
     }
 
-    pub(super) fn update_suspicion(&mut self, dt: f32, input: &Input) {
+    pub(super) fn update_suspicion(&mut self, dt: f32, _input: &Input) {
         if !self.tipped {
             return;
         }
@@ -121,7 +121,7 @@ impl Game {
                 (e.pos - self.player.pos).length() < 14.0
                     && self.world.line_of_sight(e.pos + vec3(0.0, 1.7, 0.0), eye)
             });
-        if input.run && moving && watched {
+        if self.player.running && moving && watched {
             self.suspicion += 0.15 * dt;
             self.hint("Renn nicht. Du fällst auf.");
         }
