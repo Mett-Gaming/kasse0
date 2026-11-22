@@ -268,13 +268,33 @@ impl App {
                 self.apply_settings();
                 self.settings.save();
             }
-            Screen::Cheats => {
-                if self.sel < game::CHEATS.len() {
-                    self.game.cheat(self.sel);
+            // Kategorien: Kategorie oeffnen oder zurueck ins Spiel
+            Screen::Cheats { group: None } => {
+                if self.sel < game::cheat_groups().len() {
+                    let g = self.sel;
+                    self.go(Screen::Cheats { group: Some(g) });
+                } else {
+                    self.go(Screen::Playing);
                 }
-                self.go(Screen::Playing);
-                if self.game.take_troll_request() {
-                    self.start_menu_scare();
+            }
+            // Cheats einer Kategorie: ausloesen (und weiterspielen) oder zurueck zu den Kategorien
+            Screen::Cheats { group: Some(g) } => {
+                let list = game::cheat_groups()
+                    .get(g)
+                    .map(|c| c.2.clone())
+                    .unwrap_or_default();
+                match list.get(self.sel) {
+                    Some(&i) => {
+                        self.game.cheat(i);
+                        self.go(Screen::Playing);
+                        if self.game.take_troll_request() {
+                            self.start_menu_scare();
+                        }
+                    }
+                    None => {
+                        self.go(Screen::Cheats { group: None });
+                        self.sel = g;
+                    }
                 }
             }
             Screen::Playing => {}
@@ -306,7 +326,11 @@ impl App {
                 });
                 self.sel = if from_pause { 1 } else { 2 };
             }
-            Screen::Cheats => self.go(Screen::Playing),
+            Screen::Cheats { group: Some(g) } => {
+                self.go(Screen::Cheats { group: None });
+                self.sel = g;
+            }
+            Screen::Cheats { group: None } => self.go(Screen::Playing),
             Screen::End | Screen::Title => {}
         }
     }
@@ -438,7 +462,9 @@ impl App {
                 from_pause,
             ),
             Screen::End => hud::draw_end(&mut self.ui, &self.game, self.sel, self.clock),
-            Screen::Cheats => hud::draw_cheats(&mut self.ui, self.sel, self.clock, &self.game),
+            Screen::Cheats { group } => {
+                hud::draw_cheats(&mut self.ui, self.sel, self.clock, &self.game, group)
+            }
         }
         if self.menu_scare > 0.0 {
             hud::draw_menu_scare(
@@ -614,7 +640,7 @@ impl App {
                     }
                 }
                 KeyCode::F1 if pressed && !repeat && self.game.outcome == Outcome::Running => {
-                    self.go(Screen::Cheats)
+                    self.go(Screen::Cheats { group: None })
                 }
                 _ => {}
             }
@@ -643,17 +669,17 @@ impl App {
             {
                 self.activate(event_loop, 1)
             }
-            // Cheat-Menue: zwei Spalten, links/rechts wechselt die Spalte
-            KeyCode::ArrowLeft | KeyCode::KeyA | KeyCode::ArrowRight | KeyCode::KeyD
-                if self.screen == Screen::Cheats =>
+            // Cheat-Menue: rechts oeffnet die Kategorie, links geht zurueck
+            KeyCode::ArrowRight | KeyCode::KeyD
+                if self.screen == (Screen::Cheats { group: None })
+                    && self.sel < game::cheat_groups().len() =>
             {
-                let rows = n.div_ceil(2);
-                self.sel = if self.sel >= rows {
-                    self.sel - rows
-                } else {
-                    (self.sel + rows).min(n - 1)
-                };
-                self.sfx(Sfx::Blip);
+                self.activate(event_loop, 1)
+            }
+            KeyCode::ArrowLeft | KeyCode::KeyA
+                if matches!(self.screen, Screen::Cheats { group: Some(_) }) =>
+            {
+                self.back()
             }
             KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::KeyE if !repeat => {
                 self.activate(event_loop, 1)

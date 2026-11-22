@@ -341,7 +341,12 @@ impl Game {
                 * if self.paid { 1.4 } else { 1.0 };
             // Rennen faellt auf: dann holen sie deutlich schneller auf
             let s = if chase {
-                super::escape::CHASE_SPEED
+                // im engen Fluchtkorridor etwas langsamer
+                if self.world.corridor.is_some_and(|k| k.contains(c.pos)) {
+                    super::corridor::CORRIDOR_CHASE_SPEED
+                } else {
+                    super::escape::CHASE_SPEED
+                }
             } else if seen {
                 speed * 0.4
             } else if running {
@@ -486,7 +491,7 @@ impl Game {
     }
 
     pub(super) fn paid_and_outside(&self) -> bool {
-        self.paid && self.player.pos.z > self.world.exit_z - 0.5
+        self.paid && self.world.exit_zone.contains_xz(self.player.pos)
     }
 
     pub(super) fn update_employees(&mut self, dt: f32, _input: &Input) {

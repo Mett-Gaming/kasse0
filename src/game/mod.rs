@@ -2,6 +2,7 @@
 
 mod cheats;
 mod checkout;
+mod corridor;
 mod crowd;
 mod death;
 mod draws;
@@ -12,7 +13,7 @@ mod scares;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
-pub use cheats::CHEATS;
+pub use cheats::{cheat_groups, CHEATS};
 pub mod dialog;
 pub mod escalation;
 mod hands;
@@ -293,11 +294,17 @@ pub struct Game {
     pub till_caught: bool,
     /// Flucht zum Ausgang nach dem Bezahlen (Sekunden seit dem Alarm)
     pub chase: Option<f32>,
+    /// Im Fluchtkorridor umgedreht (Game Over), Korridor schon betreten (Hinweis)
+    pub turned_back: bool,
+    corridor_entered: bool,
     /// Die nutzlose Zigarette (smoke.rs), Kippen am Boden, ausgeatmeter Rauch (Sekunden)
     pub cig: smoke::Cigarette,
     pub butts: Vec<smoke::Butt>,
     pub exhale: f32,
     alarm_timer: f32,
+    /// Takt der Verfolger-Schritte und des Herzschlags bei der Flucht
+    step_acc: f32,
+    heart_acc: f32,
     /// Figur der Kassiererin (Personal-Variante)
     pub cashier_variant: usize,
     scan_timer: f32,
@@ -460,10 +467,14 @@ impl Game {
             till: None,
             till_caught: false,
             chase: None,
+            turned_back: false,
+            corridor_entered: false,
             cig: smoke::Cigarette::None,
             butts: Vec::new(),
             exhale: 0.0,
             alarm_timer: 0.0,
+            step_acc: 0.0,
+            heart_acc: 0.0,
             // fest aus dem Seed (nicht aus dem RNG, damit sich sonst nichts verschiebt)
             cashier_variant: {
                 let staff = crate::people::people_of(true);
@@ -809,6 +820,8 @@ impl Game {
 
         if self.outcome != Outcome::Running {
             self.outcome_timer += dt;
+            // ein Schreck im letzten Moment (z. B. umgedreht im Korridor) klingt noch aus
+            self.scare_fx = (self.scare_fx - dt).max(0.0);
             if let Some(c) = self.catcher {
                 // zum Faenger drehen
                 let to = c + vec3(0.0, 1.55, 0.0) - self.eye();
@@ -897,6 +910,7 @@ impl Game {
         self.update_suspicion(dt, input);
         self.update_events(dt);
         self.update_chase(dt);
+        self.update_corridor();
 
         // Die Schwelle: Getraenkeabteilung betreten und wieder verlassen kippt den Markt.
         let inside = self.world.drinks_zone.contains_xz(self.player.pos);
@@ -906,7 +920,10 @@ impl Game {
         self.was_in_drinks = inside;
 
         // Gewonnen: bezahlt und draussen
-        if self.paid && self.player.pos.z > self.world.exit_z {
+        if self.paid
+            && self.world.exit_zone.contains_xz(self.player.pos)
+            && self.outcome == Outcome::Running
+        {
             self.outcome = Outcome::Won;
             self.outcome_timer = 0.0;
             self.play(Sfx::Chime, 0.6);

@@ -158,7 +158,7 @@ impl App {
             }
             33 => self.shot_request = Some(shot("17_drinks_display")),
             34 => {
-                self.go(Screen::Cheats);
+                self.go(Screen::Cheats { group: None });
                 return Some(0.5);
             }
             35 => self.shot_request = Some(shot("18_cheats")),

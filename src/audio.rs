@@ -40,6 +40,10 @@ pub enum Sfx {
     Scare,
     /// Troll-Jumpscare im Menue: verzerrter Schrei, Metallkreischen, Basseinschlag
     Shriek,
+    /// schwerer, rennender Schritt eines Verfolgers (Flucht)
+    Stomp,
+    /// Herzschlag (Flucht): zwei dumpfe Schlaege
+    Heartbeat,
 }
 
 /// Was die Musik gerade tun soll.
@@ -319,6 +323,31 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 (crack * 0.35 + hiss) * (t * 4.0).min(1.0) * (1.0 - t / 0.9)
             })
         }
+        Sfx::Stomp => {
+            // dumpfer Aufprall der Ferse plus kurzes Schlurfen der Sohle
+            let mut lp = 0.0;
+            gen(0.2, &mut |t| {
+                lp += (rng.next() - lp) * 0.25;
+                let f = 85.0 * (-t * 9.0).exp() + 45.0;
+                let thud = (TAU * f * t).sin() * (-t * 28.0).exp() * 0.9;
+                let scuff = lp * (-t * 40.0).exp() * 0.6;
+                ((thud + scuff) * 1.4).tanh() * 0.55
+            })
+        }
+        Sfx::Heartbeat => {
+            // "bumm-bumm": zwei tiefe Schlaege, der zweite leiser
+            gen(0.5, &mut |t| {
+                let beat = |t0: f32, a: f32| {
+                    let x = t - t0;
+                    if x < 0.0 {
+                        0.0
+                    } else {
+                        (TAU * 52.0 * x).sin() * (-x * 22.0).exp() * a
+                    }
+                };
+                ((beat(0.0, 1.0) + beat(0.17, 0.7)) * 1.6).tanh() * 0.6
+            })
+        }
         Sfx::Exhale => {
             // langes, weiches Ausatmen: tief gefiltertes Rauschen, an- und abschwellend
             let mut lp = 0.0;
@@ -372,6 +401,8 @@ impl Audio {
             Sfx::Lighter,
             Sfx::Puff,
             Sfx::Exhale,
+            Sfx::Stomp,
+            Sfx::Heartbeat,
             Sfx::Scare,
             Sfx::Shriek,
         ]
@@ -462,6 +493,8 @@ mod tests {
             Sfx::Lighter,
             Sfx::Puff,
             Sfx::Exhale,
+            Sfx::Stomp,
+            Sfx::Heartbeat,
             Sfx::Scare,
             Sfx::Shriek,
         ] {

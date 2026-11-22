@@ -152,6 +152,11 @@ impl Game {
     pub(super) fn pay(&mut self) {
         self.paid = true;
         self.params.door_open = true;
+        // Die Hindernisse im Fluchtkorridor sind bei jedem Lauf anders (auch beim gleichen Seed)
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos() as u64);
+        self.params.corridor_seed = now ^ self.rng.gen::<u64>();
         self.rebuild_world();
         self.play(Sfx::Beep, 0.5);
         self.play(Sfx::Chime, 0.5);

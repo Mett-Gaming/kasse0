@@ -52,6 +52,8 @@ const FIXED: &[&str] = &[
     "Wer kauft, bleibt",
     "Heute frisch",
     "Seit immer frisch",
+    // Fluchtkorridor (world/gen/corridor.rs)
+    "AUSGANG",
 ];
 
 pub struct SignAtlas {
@@ -80,6 +82,7 @@ impl SignAtlas {
 
 fn all_texts() -> Vec<String> {
     let mut v: Vec<String> = FIXED.iter().map(|s| s.to_string()).collect();
+    v.extend(crate::world::POSTER_TEXTS.iter().map(|s| s.to_string()));
     for (a, b) in SLOGANS {
         v.push(a.into());
         v.push(b.into());

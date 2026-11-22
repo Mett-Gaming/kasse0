@@ -12,11 +12,16 @@ use crate::ui::{self, euro, Ui, DIM, GREEN, RED, WHITE, YELLOW};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Screen {
     Title,
-    Options { from_pause: bool },
+    Options {
+        from_pause: bool,
+    },
     Playing,
     Paused,
     End,
-    Cheats,
+    /// Cheat-Menue (F1): erst die Kategorien (`group: None`), dann die Cheats einer Kategorie
+    Cheats {
+        group: Option<usize>,
+    },
 }
 
 pub const TITLE_ITEMS: &[&str] = &[
@@ -77,7 +82,8 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
         Screen::Options { .. } => (82.0, 17.0),
         Screen::Paused => (66.0, 16.0),
         Screen::End => (205.0, 16.0),
-        Screen::Cheats => (38.0, 15.0),
+        Screen::Cheats { group: None } => (62.0, 22.0),
+        Screen::Cheats { group: Some(_) } => (56.0, 15.0),
         Screen::Playing => (0.0, 0.0),
     }
 }
@@ -88,37 +94,19 @@ pub fn menu_len(screen: Screen) -> usize {
         Screen::Options { .. } => OPTION_COUNT,
         Screen::Paused => PAUSE_ITEMS.len(),
         Screen::End => END_ITEMS.len(),
-        Screen::Cheats => crate::game::CHEATS.len() + 1,
+        Screen::Cheats { group: None } => crate::game::cheat_groups().len() + 1,
+        Screen::Cheats { group: Some(g) } => {
+            crate::game::cheat_groups().get(g).map_or(0, |c| c.2.len()) + 1
+        }
         Screen::Playing => 0,
     }
 }
 
 /// Welche Menuezeile liegt unter dem Mauszeiger?
-/// Zeilen pro Spalte: das Cheat-Menue hat zwei Spalten, alle anderen eine.
-fn menu_rows(screen: Screen) -> usize {
-    let n = menu_len(screen);
-    if screen == Screen::Cheats {
-        n.div_ceil(2)
-    } else {
-        n.max(1)
-    }
-}
-
 /// Mitte (x) und Oberkante (y) des Menuepunkts `i`, dazu die Spaltenbreite.
 pub fn menu_cell(screen: Screen, i: usize) -> (f32, f32, f32) {
     let (y0, step) = menu_layout(screen);
-    let rows = menu_rows(screen);
-    if screen == Screen::Cheats {
-        let col = i / rows;
-        let half = ui::W * 0.5;
-        (
-            half * (col as f32 + 0.5),
-            y0 + (i % rows) as f32 * step,
-            half,
-        )
-    } else {
-        (ui::W * 0.5, y0 + i as f32 * step, 360.0)
-    }
+    (ui::W * 0.5, y0 + i as f32 * step, 360.0)
 }
 
 pub fn menu_hit(screen: Screen, x: f32, y: f32) -> Option<usize> {
@@ -485,8 +473,19 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN, Geldboerse
     till::draw(u, g, time);
 
-    // Flucht nach dem Bezahlen
-    if g.chasing() && (time * 2.5).fract() < 0.6 {
+    // Flucht nach dem Bezahlen; im Korridor: nicht umdrehen
+    let warn = g.turn_warning();
+    if warn > 0.0 {
+        // je weiter man sich dreht, desto roter und schneller
+        u.rect(0.0, 0.0, ui::W, ui::H, [0.6, 0.0, 0.0, 0.25 * warn]);
+        if (time * (3.0 + 6.0 * warn)).fract() < 0.65 {
+            u.text_center(110.0, "NICHT UMDREHEN", RED, 3.0);
+        }
+    } else if g.chasing() && g.in_corridor() {
+        if (time * 1.5).fract() < 0.7 {
+            u.text_center(64.0, "NICHT UMDREHEN. LAUF.", RED, 1.0);
+        }
+    } else if g.chasing() && (time * 2.5).fract() < 0.6 {
         u.text_center(64.0, "ALARM - LAUF ZUM AUSGANG!", RED, 2.0);
     }
 }
@@ -526,13 +525,44 @@ fn draw_controls(u: &mut Ui, x: f32, y: f32) {
 }
 
 /// Cheat-Menue (F1): Aktionen + "Zurück"; daneben der aktuelle Zustand.
-pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game) {
-    u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.7]);
-    u.text_center(16.0, "CHEATS (F1)", RED, 2.0);
-    let mut items: Vec<String> = crate::game::CHEATS.iter().map(|s| s.to_string()).collect();
-    items[0] = format!("Unverwundbar: {}", if g.god { "AN" } else { "AUS" });
-    items.push("Zurück".into());
-    draw_menu(u, Screen::Cheats, &items, sel, time);
+/// Cheat-Menue: Kategorien mit kurzer Beschreibung, darin die einzelnen Cheats.
+pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game, group: Option<usize>) {
+    u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.75]);
+    let groups = crate::game::cheat_groups();
+    let screen = Screen::Cheats { group };
+    match group.and_then(|i| groups.get(i).map(|c| (i, c))) {
+        None => {
+            u.text_center(14.0, "CHEATS (F1)", RED, 2.0);
+            u.text_center(36.0, "Kategorie wählen", DIM, 1.0);
+            let mut items: Vec<String> = groups
+                .iter()
+                .map(|(name, _, list)| format!("{name}  ({})", list.len()))
+                .collect();
+            items.push("Zurück zum Spiel".into());
+            draw_menu(u, screen, &items, sel, time);
+            // Beschreibung der gewaehlten Kategorie
+            if let Some((_, about, _)) = groups.get(sel) {
+                let (_, y, _) = menu_cell(screen, groups.len() + 1);
+                u.text_center(y + 4.0, about, YELLOW, 1.0);
+            }
+        }
+        Some((_, (name, _, list))) => {
+            u.text_center(14.0, &format!("CHEATS > {}", name.to_uppercase()), RED, 1.0);
+            u.text_center(30.0, "Enter: auslösen   Esc: zurück", DIM, 1.0);
+            let mut items: Vec<String> = list
+                .iter()
+                .map(|&i| {
+                    if i == 0 {
+                        format!("Unverwundbar: {}", if g.god { "AN" } else { "AUS" })
+                    } else {
+                        crate::game::CHEATS[i].to_string()
+                    }
+                })
+                .collect();
+            items.push("< Zurück".into());
+            draw_menu(u, screen, &items, sel, time);
+        }
+    }
     let state = format!(
         "Stufe: {}   Wagen: {}   Auffällig: {:.0} %   {}",
         g.tier.name(),
@@ -589,6 +619,8 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
             u.text_center(70.0, "DU BIST AUFGEFALLEN", RED, 2.0);
             let why = if g.till_caught {
                 "Die Kassiererin hat dich durchschaut."
+            } else if g.turned_back {
+                "Du hast dich umgedreht."
             } else if g.chase.is_some() {
                 "Sie haben Kunde 0 geschnappt - kurz vor dem Ausgang."
             } else {
@@ -617,6 +649,33 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cheat_menu_has_categories_that_fit_on_screen() {
+        let g = Game::new(3);
+        let groups = crate::game::cheat_groups();
+        let top = Screen::Cheats { group: None };
+        assert_eq!(menu_len(top), groups.len() + 1);
+        let mut u = Ui::default();
+        draw_cheats(&mut u, 0, 1.0, &g, None);
+        for (i, (_, about, list)) in groups.iter().enumerate() {
+            let screen = Screen::Cheats { group: Some(i) };
+            assert_eq!(menu_len(screen), list.len() + 1);
+            // letzte Zeile ("Zurück") noch ueber der Statuszeile unten
+            let (_, y, _) = menu_cell(screen, list.len());
+            assert!(y + 12.0 < 248.0, "Kategorie {i} zu lang");
+            assert!(Ui::text_width(about, 1.0) < ui::W - 20.0);
+            draw_cheats(&mut u, 0, 1.0, &g, Some(i));
+            // Mausklick trifft die Zeilen
+            assert_eq!(
+                menu_hit(screen, 240.0, menu_cell(screen, 0).1 + 2.0),
+                Some(0)
+            );
+        }
+        let (_, y, _) = menu_cell(top, groups.len() + 1);
+        assert!(y + 12.0 < 248.0, "Kategorien zu lang");
+        assert_eq!(u.verts.len() % 6, 0);
+    }
 
     #[test]
     fn menu_hit_matches_layout() {

@@ -21,6 +21,7 @@ pub const CHEATS: &[&str] = &[
     "Kasse: Barzahlung",
     "Leben auffüllen (alle)",
     "Tutorial überspringen",
+    "Flucht: Korridor",
     "Wagen wird mitgenommen",
     "Schreck: Hinter dir",
     "Schreck: Stromausfall",
@@ -33,6 +34,38 @@ pub const CHEATS: &[&str] = &[
     "Schreck: Tod (Gesicht)",
     "Schreck: Troll-Option",
 ];
+
+/// Kategorien des Cheat-Menues: Name, kurze Beschreibung, Cheats (Index in `CHEATS`).
+/// Jeder Cheat steht in genau einer Kategorie (siehe Test).
+pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
+    vec![
+        (
+            "Spieler",
+            "Unverwundbar, Leben, Tutorial, Auffälligkeit",
+            vec![0, 14, 15, 4, 5],
+        ),
+        (
+            "Markt & Einkauf",
+            "Kippen, Zettel, Warenwert, Umbau, Durchsage",
+            vec![1, 2, 3, 7, 11, 10],
+        ),
+        (
+            "Kasse & Flucht",
+            "Direkt zur Kasse, zum Bezahlen, in den Korridor",
+            vec![6, 12, 13, 16],
+        ),
+        (
+            "Leute",
+            "Mitarbeiter rufen, alle entfernen, Wagen klauen",
+            vec![8, 9, 17],
+        ),
+        (
+            "Schrecken",
+            "Jeden Jumpscare einzeln auslösen",
+            (FIRST_SCARE_CHEAT..CHEATS.len()).collect(),
+        ),
+    ]
+}
 
 impl Game {
     pub fn cheat(&mut self, i: usize) {
@@ -147,6 +180,10 @@ impl Game {
                 self.tutorial = None;
                 "Tutorial übersprungen.".into()
             }
+            16 => {
+                self.debug_jump_to_corridor();
+                "Lauf! Nicht umdrehen.".into()
+            }
             12 | 13 => {
                 let cash = i == 13;
                 self.debug_jump_to_pay(cash);
@@ -181,6 +218,20 @@ impl Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_cheat_is_in_exactly_one_category() {
+        let mut seen = vec![0; CHEATS.len()];
+        for (name, _, list) in cheat_groups() {
+            assert!(!list.is_empty(), "leere Kategorie {name}");
+            for i in list {
+                seen[i] += 1;
+            }
+        }
+        for (i, n) in seen.iter().enumerate() {
+            assert_eq!(*n, 1, "Cheat '{}' steht {n}-mal im Menü", CHEATS[i]);
+        }
+    }
 
     #[test]
     fn every_cheat_runs_and_does_its_job() {

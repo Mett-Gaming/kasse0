@@ -44,8 +44,11 @@ DAS KASSEN-MINISPIEL
 
 DIE FLUCHT
   Kaum hast du bezahlt, kommt die Durchsage: "Kunde 0 hat ein Gesicht.
-  Schnappt ihn!" Der Alarm geht los, und alle rennen auf dich zu. Lauf zum
-  Ausgang! Wer dich jetzt erwischt, beendet den Einkauf sofort.
+  Schnappt ihn!" Der Alarm geht los, und alle rennen auf dich zu. Lauf zur
+  Tür! Wer dich jetzt erwischt, beendet den Einkauf sofort.
+  Hinter der Tür kommt ein langer Gang voller Hindernisse. DREH DICH NICHT UM -
+  wer zurückschaut, ist sofort tot. Was hinter dir passiert, zeigt nur der
+  Spiegel am Ende. Der Ausgang liegt kurz davor links.
 
 STEUERUNG
   WASD               Gehen            Shift   Rennen (fällt auf!)
