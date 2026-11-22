@@ -20,6 +20,37 @@ impl Game {
 
         // Kassen: Kassierer:in, Band, Terminal, Rollo, Kamera
         self.collect_checkout_draws(out);
+        // Fliegen um verdorbene Ware in der Naehe
+        let mut swarms = 0;
+        for &i in &self.world.rotten {
+            let it = &self.world.items[i];
+            if it.taken || (it.pos - self.player.pos).length() > 9.0 {
+                continue;
+            }
+            let base = it.pos + vec3(0.0, it.half().y * 2.0 + 0.12, 0.0) + self.sway_at(it.pos);
+            for k in 0..3 {
+                let a = self.time * (5.0 + k as f32) + i as f32 + k as f32 * 2.1;
+                let p = base
+                    + vec3(
+                        a.cos() * 0.12,
+                        (a * 1.7).sin() * 0.06,
+                        (a * 1.3).sin() * 0.12,
+                    );
+                out.push(MeshDraw {
+                    mesh: MeshId::Cube as usize,
+                    model: Mat4::from_scale_rotation_translation(
+                        Vec3::splat(0.012),
+                        Quat::IDENTITY,
+                        p,
+                    ),
+                    tint: Vec4::new(0.02, 0.02, 0.02, 0.0),
+                });
+            }
+            swarms += 1;
+            if swarms >= 24 {
+                break;
+            }
+        }
         // Warnschilder
         for &(pos, yaw) in &self.world.signs {
             out.push(MeshDraw {
@@ -37,7 +68,8 @@ impl Game {
             variant,
             clip,
             time,
-            pos,
+            // auf der Hoehenwelle des Bodens
+            pos: pos + vec3(0.0, self.sway_at(pos).y, 0.0),
             yaw,
             tint,
             ghost: false,
@@ -94,7 +126,8 @@ impl Game {
                 (t + phase(i, 3.0)) * speedup,
                 e.pos,
                 e.yaw,
-                Vec4::new(1.0, 1.0, 1.0, 0.06),
+                // Personal leuchtet leicht: im dunklen Markt sofort vom Publikum zu unterscheiden
+                Vec4::new(1.0, 1.0, 1.0, 0.22),
             ));
         }
 

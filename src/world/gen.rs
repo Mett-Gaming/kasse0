@@ -1,5 +1,6 @@
 //! Generator fuer KAUF NULL: Discounter-Grundriss mit Abteilungen und echten Waren.
 
+mod decay;
 mod fixtures;
 
 use super::layout::{self, Layout};
@@ -7,6 +8,7 @@ use super::material::*;
 use super::*;
 use crate::catalog::{catalog, Catalog};
 use crate::signs::{BRAND, SLOGANS};
+use decay::DecayArea;
 use fixtures::*;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
@@ -110,6 +112,7 @@ pub fn generate(params: &WorldParams) -> World {
         missing: (0..cat.products.len())
             .filter(|&p| cat.products[p].list.is_some())
             .collect(),
+        giants: Vec::new(),
     };
 
     // --- Huelle ---
@@ -118,12 +121,45 @@ pub fn generate(params: &WorldParams) -> World {
     } else {
         vec3(0.82, 0.8, 0.76)
     };
-    g.b.add(
-        vec3(width * 0.5, -0.05, depth * 0.5),
-        vec3(width * 0.5, 0.05, depth * 0.5),
-        floor_c,
-        FLOOR,
-    );
+    if tipped {
+        // Im gekippten Markt biegt sich der Boden im Gangbereich (Shader): dort als Raster
+        let (gx0, gx1) = (1.0f32, (aisles_x1 + 1.5).min(width));
+        let (gz0, gz1) = (aisle_z0, aisle_z1);
+        let slab = |b: &mut Builder, x0: f32, x1: f32, z0: f32, z1: f32| {
+            if x1 > x0 && z1 > z0 {
+                b.add(
+                    vec3((x0 + x1) * 0.5, -0.05, (z0 + z1) * 0.5),
+                    vec3((x1 - x0) * 0.5, 0.05, (z1 - z0) * 0.5),
+                    floor_c,
+                    FLOOR,
+                );
+            }
+        };
+        slab(&mut g.b, 0.0, width, 0.0, gz0);
+        slab(&mut g.b, 0.0, width, gz1, depth);
+        slab(&mut g.b, 0.0, gx0, gz0, gz1);
+        slab(&mut g.b, gx1, width, gz0, gz1);
+        let (nx, nz) = (
+            ((gx1 - gx0) / 1.0).ceil() as usize,
+            ((gz1 - gz0) / 0.75).ceil() as usize,
+        );
+        for i in 0..nx {
+            for k in 0..nz {
+                let x0 = gx0 + (gx1 - gx0) * i as f32 / nx as f32;
+                let x1 = gx0 + (gx1 - gx0) * (i + 1) as f32 / nx as f32;
+                let z0 = gz0 + (gz1 - gz0) * k as f32 / nz as f32;
+                let z1 = gz0 + (gz1 - gz0) * (k + 1) as f32 / nz as f32;
+                slab(&mut g.b, x0, x1, z0, z1);
+            }
+        }
+    } else {
+        g.b.add(
+            vec3(width * 0.5, -0.05, depth * 0.5),
+            vec3(width * 0.5, 0.05, depth * 0.5),
+            floor_c,
+            FLOOR,
+        );
+    }
     g.b.add(
         vec3(width * 0.5, h + 0.05, depth * 0.5),
         vec3(width * 0.5, 0.05, depth * 0.5),
@@ -1057,6 +1093,7 @@ pub fn generate(params: &WorldParams) -> World {
                         yaw: -FRAC_PI_2,
                         fake: false,
                         taken: false,
+                        rot: 0,
                     });
                 }
             }
@@ -1172,6 +1209,27 @@ pub fn generate(params: &WorldParams) -> World {
         px += 6.0;
     }
 
+    // --- Verfall: Loecher, verdorbene Ware, Riesenwaren (nur gekippt, je nach Stufe) ---
+    {
+        let mut keep_free = vec![
+            vec3(door_cx, 0.0, depth - 1.6),
+            vec3(door_cx, 0.0, depth),
+            vec3(drinks_door_cx, 0.0, DRINKS_D + 0.5),
+            corral,
+        ];
+        keep_free.extend(lanes.iter().map(|l| l.scan_point));
+        let area = DecayArea {
+            x0: 1.0,
+            x1: aisles_x1 + 1.0,
+            z0: aisle_z0 + 0.5,
+            z1: aisle_z1 - 0.5,
+            width,
+            depth,
+            keep_free,
+        };
+        g.decay(&area);
+    }
+
     // Warnschilder "Rutschgefahr"
     let mut signs = Vec::new();
     let sign_count = if tipped { 4 } else { 1 };
@@ -1186,7 +1244,7 @@ pub fn generate(params: &WorldParams) -> World {
     }
 
     let (fog_color, fog_density) = if tipped {
-        (vec3(0.03, 0.035, 0.03), 0.07 + params.darkness * 0.05)
+        (vec3(0.03, 0.035, 0.03), 0.045 + params.darkness * 0.03)
     } else {
         (vec3(0.75, 0.74, 0.7), 0.012)
     };
@@ -1196,6 +1254,7 @@ pub fn generate(params: &WorldParams) -> World {
         items,
         spots,
         layout,
+        giants,
         ..
     } = g;
     let nav = build_nav(&b.solids, &b.obbs, width, depth);
@@ -1220,21 +1279,32 @@ pub fn generate(params: &WorldParams) -> World {
         aisle_count,
         aisle_z0,
         aisle_z1,
+        aisle_x1: aisles_x1,
         lanes,
         door_center: vec3(door_cx, 0.0, depth),
         exit_z: depth + 1.2,
         spots,
         nav,
         signs,
+        giants,
+        rotten: Vec::new(),
         corral,
     };
     world.index_items();
     // Neue Waende duerfen nichts Wichtiges unerreichbar machen
-    if params.walls > 0 && !world.all_reachable() {
-        return generate(&WorldParams {
-            walls: params.walls - 1,
-            ..params.clone()
-        });
+    // Neue Waende, Loecher und Riesenwaren duerfen nichts Wichtiges unerreichbar machen
+    if !world.all_reachable() {
+        let mut p = params.clone();
+        if p.walls > 0 {
+            p.walls -= 1;
+        } else if p.holes > 0 {
+            p.holes -= 1;
+        } else if p.giants > 0 {
+            p.giants -= 1;
+        } else {
+            return world;
+        }
+        return generate(&p);
     }
     world
 }

@@ -16,7 +16,12 @@ pub enum Sfx {
     Click,
     Error,
     Pickup,
+    /// Einkaufswagen beim Rennen: schrill
     Squeak,
+    /// Einkaufswagen beim normalen Schieben: leise, tiefer
+    SqueakSoft,
+    /// Einkaufswagen in der Kurve: klappernde Raeder
+    Rattle,
 }
 
 /// Was die Musik gerade tun soll.
@@ -145,6 +150,26 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 (phase.sin() + 0.3 * (phase * 2.0).sin()) * 0.18 * env
             })
         }
+        Sfx::SqueakSoft => {
+            // leises, tieferes Rad-Quietschen mit langsamem Eiern
+            let mut phase = 0.0f32;
+            gen(0.22, &mut |t| {
+                let f = 1250.0 + 180.0 * (t * 17.0).sin() + 90.0 * (t * 5.0).sin();
+                phase += TAU * f / RATE as f32;
+                let env = (t * 30.0).min(1.0) * (1.0 - t / 0.22).powf(1.5);
+                (phase.sin() + 0.2 * (phase * 1.5).sin()) * 0.1 * env
+            })
+        }
+        Sfx::Rattle => {
+            // klappernde Lenkrollen: kurze Klicks in unregelmaessigem Abstand
+            let mut lp = 0.0;
+            gen(0.3, &mut |t| {
+                let click = ((t * 46.0).fract() < 0.18) as i32 as f32
+                    * (0.6 + 0.4 * (t * 13.0).sin().abs());
+                lp += (rng.next() - lp) * 0.5;
+                lp * click * 0.35 * (1.0 - t / 0.3)
+            })
+        }
         Sfx::Step => {
             let mut lp = 0.0;
             gen(0.08, &mut |t| {
@@ -197,6 +222,8 @@ impl Audio {
             Sfx::Error,
             Sfx::Pickup,
             Sfx::Squeak,
+            Sfx::SqueakSoft,
+            Sfx::Rattle,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -275,6 +302,8 @@ mod tests {
             Sfx::Error,
             Sfx::Pickup,
             Sfx::Squeak,
+            Sfx::SqueakSoft,
+            Sfx::Rattle,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

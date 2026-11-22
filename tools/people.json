@@ -53,19 +53,19 @@
     {"id": "s_m_polo",   "g": "m", "staff": true, "faceless": true, "head": "casual",   "body": "casual",   "legs": "business", "feet": "business",
      "uniform": {"body": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
     {"id": "s_m_sweater","g": "m", "staff": true, "faceless": true, "head": "hoodie",   "body": "hoodie",   "legs": "casual",   "feet": "hiker",
-     "uniform": {"body": [0.21, 0.22, 0.24], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+     "uniform": {"body": [0.1, 0.5, 0.85], "accent": [0.12, 0.13, 0.15], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
     {"id": "s_m_jacket", "g": "m", "staff": true, "faceless": true, "head": "business", "body": "business", "legs": "business", "feet": "business",
-     "uniform": {"body": [0.21, 0.22, 0.24], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+     "uniform": {"body": [0.08, 0.46, 0.8], "accent": [0.95, 0.95, 0.95], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
     {"id": "s_m_vest",   "g": "m", "staff": true, "faceless": true, "head": "hiker",    "body": "worker",   "legs": "hiker",    "feet": "worker",
-     "uniform": {"body": [0.24, 0.25, 0.27], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+     "uniform": {"body": [0.12, 0.58, 0.9], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
     {"id": "s_f_polo",   "g": "f", "staff": true, "faceless": true, "head": "casual",   "body": "casual",   "legs": "suit",     "feet": "suit",
      "uniform": {"body": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
     {"id": "s_f_blazer", "g": "f", "staff": true, "faceless": true, "head": "suit",     "body": "suit",     "legs": "suit",     "feet": "casual",
-     "uniform": {"body": [0.3, 0.31, 0.33], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+     "uniform": {"body": [0.1, 0.5, 0.85], "accent": [0.95, 0.95, 0.95], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
     {"id": "s_f_polo2",  "g": "f", "staff": true, "faceless": true, "head": "explorer", "body": "casual",   "legs": "casual",   "feet": "worker",
      "uniform": {"body": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
     {"id": "s_f_cardigan","g": "f", "staff": true, "faceless": true, "head": "dress",   "body": "suit",     "legs": "suit",     "feet": "suit",
-     "uniform": {"body": [0.17, 0.18, 0.2], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}}
+     "uniform": {"body": [0.08, 0.46, 0.8], "accent": [0.12, 0.13, 0.15], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}}
 
   ]
 }

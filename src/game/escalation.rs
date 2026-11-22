@@ -21,6 +21,29 @@ impl Tier {
     pub fn customers(self) -> usize {
         [3, 5, 7, 9][self as usize]
     }
+    /// Live-Verbiegen der Gaenge: (seitlich, Hoehenwelle) in Metern
+    pub fn sway(self) -> (f32, f32) {
+        [(0.0, 0.0), (0.06, 0.18), (0.15, 0.35), (0.25, 0.55)][self as usize]
+    }
+    /// Loecher im Boden (Hindernisse) und in der Decke
+    pub fn holes(self) -> u32 {
+        [0, 1, 3, 5][self as usize]
+    }
+    pub fn ceiling_holes(self) -> u32 {
+        [0, 2, 4, 7][self as usize]
+    }
+    /// Anteil verdorbener Ware
+    pub fn rot(self) -> f32 {
+        [0.0, 0.03, 0.08, 0.15][self as usize]
+    }
+    /// riesige Waren als Hindernisse
+    pub fn giants(self) -> u32 {
+        [0, 0, 1, 3][self as usize]
+    }
+    /// Wie viele davon Verfolger sind (der Rest kauft nur ein)
+    pub fn stalkers(self) -> usize {
+        [1, 2, 3, 4][self as usize]
+    }
     /// Wie viele gesichtslose Mitarbeiter unterwegs sind
     pub fn employees(self) -> usize {
         [1, 1, 2, 3][self as usize]
@@ -41,8 +64,8 @@ impl Tier {
     pub fn darkness(self) -> f32 {
         match self {
             Tier::Calm | Tier::Uneasy => 0.0,
-            Tier::Wrong => 0.3,
-            Tier::Collapse => 0.45,
+            Tier::Wrong => 0.15,
+            Tier::Collapse => 0.25,
         }
     }
     /// Wie krumm die Gaenge sind (versetzte Regalsegmente, Durchgaenge)

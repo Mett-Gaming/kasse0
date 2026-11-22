@@ -444,6 +444,39 @@ impl App {
                 self.shot_request = Some(shot(&format!("35_walk_{}", step - 69)));
                 return Some(0.12);
             }
+            76 | 78 | 80 => {
+                // Kollaps: Loecher, verdorbene Ware, Riesenwaren, Steigung im Gang
+                self.start_game(seed);
+                self.game.tutorial = None;
+                self.game.tip();
+                for _ in 0..6 {
+                    self.game.cheat(3);
+                }
+                self.game.message = None;
+                self.game.announcement = None;
+                let w = &self.game.world;
+                let x = world::AISLES_X0 + 3.4 * 2.0;
+                let z = w.aisle_z0 + if step == 78 { 6.0 } else { 1.0 };
+                self.game.player.pos = self.game.world.collide(vec3(x, 0.0, z), 0.3);
+                self.game.player.yaw = match step {
+                    76 => std::f32::consts::PI,
+                    78 => std::f32::consts::FRAC_PI_2,
+                    _ => std::f32::consts::PI * 0.9,
+                };
+                self.game.player.pitch = match step {
+                    76 => 0.05,
+                    78 => -0.25,
+                    _ => 0.6,
+                };
+                self.game.trolley.pushing = false;
+                self.game.trolley.pos = self.game.world.corral;
+                self.game.glitch = 0.0;
+                self.game.suspicion = 0.0;
+                return Some(1.5);
+            }
+            77 => self.shot_request = Some(shot("36_collapse_aisle")),
+            79 => self.shot_request = Some(shot("37_collapse_shelf")),
+            81 => self.shot_request = Some(shot("38_collapse_ceiling")),
             _ => return None,
         }
         Some(0.6)

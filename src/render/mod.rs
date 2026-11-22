@@ -46,6 +46,8 @@ struct WorldPush {
     cam_pos: [f32; 4],
     params: [f32; 4],
     fog_color: [f32; 4],
+    /// Live-Verbiegen: seitlich, hoch, Gangbeginn z, Gangende z
+    sway: [f32; 4],
 }
 
 #[repr(C)]
@@ -106,6 +108,8 @@ pub struct FrameParams {
     pub red: f32,
     /// Verfall der Werbeposter (0..1)
     pub decay: f32,
+    /// Live-Verbiegen der Gaenge (siehe world::sway)
+    pub sway: Vec4,
 }
 
 #[derive(Clone, Copy)]
@@ -750,7 +754,7 @@ impl Renderer {
             .map(|m| GpuMeshInst {
                 model: m.model.to_cols_array_2d(),
                 tint: [m.tint.x, m.tint.y, m.tint.z, 1.0],
-                extra: [m.tint.w, 0.0, 0.0, 0.0],
+                extra: [m.tint.w, 0.0, 1.0, 0.0],
             })
             .collect();
         let mut ranges: Vec<(u32, u32, u32)> = Vec::new();

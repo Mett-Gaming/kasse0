@@ -103,3 +103,10 @@ Möglichst alles aus bestehenden, freien Assets, nur grob an den Stil angepasst 
 
 ## Technik: gebogene Gänge
 Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `center.w`, für Kollision, Sichtlinie und Navigation gibt es `world::Obb`. Jede Gondel folgt einer gemeinsamen S-Kurve `x(z) = x0 + A·sin(φ + z/L·k·π)`, mit leicht unterschiedlicher Amplitude pro Gondel, damit die Gänge mal enger, mal weiter werden. Sie wird aus etwa 0,75 m langen, gedrehten Teilstücken zusammengesetzt (Böden, Preisleisten und Waren folgen dem Bogen). Ein ausgelassenes Teilstück ergibt einen Durchgang.
+
+## Feinschliff v0.2
+- **Wagen:** F nimmt die anvisierte Ware heraus (leuchtet auf, Name im Prompt), Mausrad blättert. Quietschen alle 3–5,5 m (beim Rennen 1,6–3 m): leise beim Schieben, Klappern in Kurven, schrill beim Rennen; Lärmradius 8/10/18 m.
+- **Kunden:** normale Kundschaft bummelt (eigenes Regal, Plätze in 7 m Umkreis). Verfolger pro Stufe 1/2/3/4, dazu jeder, dem man den Tomatensaft genommen hat. Verfolger spielen Kundschaft, solange man hinsieht; nur sie können einen erwischen.
+- **Personal:** kräftig blaue Dienstkleidung, schwarze Hosen, gesichtslos, leichtes Eigenleuchten.
+- **Weniger Bildstörung:** VHS-Effekt, Nebel und tote Röhren pro Stufe deutlich reduziert; der Schrecken kommt aus dem Markt selbst.
+- **Verfall pro Stufe** (ruhig/unruhig/falsch/Kollaps): Bodenlöcher 0/1/3/5 (Hindernisse), Deckenlöcher 0/2/4/7, verdorbene Ware 0/3/8/15 % (Maden, Fliegen, kurios schwebend/gekippt/kopfüber), Riesenwaren 0/0/1/3. Live-Verbiegen der Gänge (seitlich/Steigung in m): 0/0, 0,06/0,18, 0,15/0,35, 0,25/0,55. Gleiche Formel im Shader und im Spiel (`world::sway`), Spieler, Wagen und Figuren gehen die Steigung mit.

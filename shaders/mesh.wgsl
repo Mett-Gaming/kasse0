@@ -27,7 +27,12 @@ struct VsOut {
 @vertex
 fn vs_main(v: VsIn, @builtin(instance_index) ii: u32) -> VsOut {
     let inst = minst[ii];
-    let wp = inst.model * vec4<f32>(v.pos, 1.0);
+    var wp = inst.model * vec4<f32>(v.pos, 1.0);
+    // Ware im Regal (statisch, extra.z = 1) folgt dem Live-Verbiegen der Gaenge
+    if (inst.extra.z > 0.5) {
+        let s = sway(wp.xyz);
+        wp = wp + vec4<f32>(s.x, s.y * (1.0 - smoothstep(2.6, 3.4, wp.y)), 0.0, 0.0);
+    }
     var out: VsOut;
     out.clip = pc.view_proj * wp;
     out.world_pos = wp.xyz;

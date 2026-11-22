@@ -48,6 +48,8 @@ pub struct Input {
     pub interact: bool,
     pub cart_toggle: bool,
     pub take_out: bool,
+    /// Mausrad-Rasten seit dem letzten Update (Ware im Wagen waehlen)
+    pub wheel: i32,
     pub choice: Option<usize>,
 }
 
@@ -86,6 +88,15 @@ impl ItemData {
 
     /// Aus einer Ware im Laden.
     pub fn from_shelf(it: &world::ShelfItem) -> Self {
+        let mut d = Self::from_shelf_raw(it);
+        if it.rot == 1 {
+            d.name.push_str(" (verdorben)");
+            d.tint *= vec3(0.5, 0.55, 0.3);
+        }
+        d
+    }
+
+    fn from_shelf_raw(it: &world::ShelfItem) -> Self {
         let p = &catalog().products[it.product as usize];
         if it.fake {
             let seed = (it.pos.x * 31.0 + it.pos.z * 17.0) as u64;
@@ -208,6 +219,13 @@ pub struct Game {
     mirage_timer: f32,
     tipped_time: f32,
     squeak_acc: f32,
+    /// Strecke bis zum naechsten Quietschen, Drehung seit dem letzten
+    squeak_next: f32,
+    /// angewaehlte Ware im Wagen (F nimmt sie heraus)
+    cart_sel: Option<usize>,
+    /// zuletzt anvisierte Ware im Wagen
+    cart_aim: Option<usize>,
+    cart_turn: f32,
     cart_stuck: f32,
     squeak_hinted: bool,
     pub tier: Tier,
@@ -339,6 +357,10 @@ impl Game {
             mirage_timer: 12.0,
             tipped_time: 0.0,
             squeak_acc: 0.0,
+            squeak_next: 3.0,
+            cart_sel: None,
+            cart_aim: None,
+            cart_turn: 0.0,
             cart_stuck: 0.0,
             squeak_hinted: false,
             tier: Tier::Calm,
@@ -467,6 +489,7 @@ impl Game {
             self.held = None;
         }
         self.spawn_customers(self.tier.customers());
+        self.assign_stalkers();
         self.spawn_employees(self.tier.employees());
         if self.cart.len() < before {
             self.say(
@@ -485,6 +508,10 @@ impl Game {
         self.params.warp = self.tier.warp();
         self.params.walls = self.tier.walls();
         self.params.mix = self.tier.mix();
+        self.params.holes = self.tier.holes();
+        self.params.ceiling_holes = self.tier.ceiling_holes();
+        self.params.rot = self.tier.rot();
+        self.params.giants = self.tier.giants();
     }
 
     pub fn cart_value(&self) -> i64 {
@@ -517,6 +544,7 @@ impl Game {
         let extra_c = new.customers().saturating_sub(old.customers());
         let extra_e = new.employees().saturating_sub(old.employees());
         self.spawn_customers(extra_c);
+        self.assign_stalkers();
         self.spawn_employees(extra_e);
         let msg = match new {
             Tier::Uneasy => "Die Gänge sind länger geworden.",
@@ -569,7 +597,21 @@ impl Game {
     pub fn eye(&self) -> Vec3 {
         let p = &self.player;
         let bob = p.bob_phase.sin() * 0.025 * (p.vel.length() / WALK_SPEED).min(1.0);
-        p.pos + vec3(0.0, EYE_HEIGHT + bob, 0.0)
+        p.pos + vec3(0.0, EYE_HEIGHT + bob + self.sway_at(p.pos).y, 0.0)
+    }
+
+    /// Parameter fuer das Live-Verbiegen der Gaenge (Shader und Spiel).
+    pub fn sway_params(&self) -> Vec4 {
+        if !self.tipped {
+            return Vec4::ZERO;
+        }
+        let (lat, up) = self.tier.sway();
+        Vec4::new(lat, up, self.world.aisle_z1, self.world.aisle_x1)
+    }
+
+    /// Wie weit der Boden an dieser Stelle gerade verschoben ist.
+    pub fn sway_at(&self, p: Vec3) -> Vec3 {
+        world::sway(self.sway_params(), p, self.time)
     }
 
     pub fn view_dir(&self) -> Vec3 {
@@ -674,6 +716,9 @@ impl Game {
             if input.cart_toggle {
                 self.toggle_cart();
             }
+            if input.wheel != 0 && self.focus == Some(Focus::Cart) {
+                self.cycle_cart_selection(-input.wheel);
+            }
             if input.take_out {
                 self.take_out();
             }
@@ -681,6 +726,7 @@ impl Game {
         input.interact = false;
         input.cart_toggle = false;
         input.take_out = false;
+        input.wheel = 0;
         input.choice = None;
 
         // Tutorial

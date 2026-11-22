@@ -455,7 +455,7 @@ impl App {
             fog_density: g.world.fog_density,
             // In Menues lesbar bleiben
             glitch: if self.screen == Screen::Playing {
-                g.glitch.max(g.suspicion * 0.45)
+                g.glitch.max(g.suspicion * 0.2)
             } else {
                 0.0
             },
@@ -463,6 +463,7 @@ impl App {
             fade: self.fade,
             red: g.red,
             decay: g.poster_decay(),
+            sway: g.sway_params(),
         };
         if let Err(e) = r.renderer.draw(
             &params,
@@ -628,6 +629,13 @@ impl ApplicationHandler for App {
                         }
                     }
                 }
+            }
+            WindowEvent::MouseWheel { delta, .. } if self.screen == Screen::Playing => {
+                let y = match delta {
+                    winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+                    winit::event::MouseScrollDelta::PixelDelta(p) => (p.y / 40.0) as f32,
+                };
+                self.input.wheel += y.round() as i32;
             }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,

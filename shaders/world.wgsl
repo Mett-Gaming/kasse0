@@ -58,7 +58,18 @@ fn vs_main(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let s = sin(yaw);
     let lp = local * inst.half_ext.xyz;
     let rotated = vec3<f32>(lp.x * c + lp.z * s, lp.y, -lp.x * s + lp.z * c);
-    let wp = inst.center.xyz + rotated;
+    var wp = inst.center.xyz + rotated;
+    // Live-Verbiegen: Boden hebt und senkt sich, Regale/Ware/Schilder schwanken zusaetzlich seitlich.
+    // Decke und grosse Teile (Waende) bleiben fest; was hoch haengt, geht nicht durch die Decke.
+    let material = inst.extra.x;
+    let sw = sway(wp);
+    let lift = sw.y * (1.0 - smoothstep(2.6, 3.4, wp.y));
+    if ((material > 0.5 && material < 1.5) || inst.center.y < 0.05) {
+        // Boden und alles, was flach darauf liegt (Lochraender, Truemmer)
+        wp.y = wp.y + sw.y;
+    } else if (!(material > 1.5 && material < 2.5) && max(inst.half_ext.x, inst.half_ext.z) < 3.0) {
+        wp = wp + vec3<f32>(sw.x, lift, 0.0);
+    }
 
     var out: VsOut;
     out.clip = pc.view_proj * vec4<f32>(wp, 1.0);

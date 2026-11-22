@@ -327,10 +327,15 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                     "[E/Q] Wagen schieben"
                 };
                 u.text_center(y, s, WHITE, 1.0);
-                if !g.cart.is_empty() {
+                if let Some(i) = g.cart_selected() {
                     u.text_center(
                         y + 11.0,
-                        &format!("[F] Ware herausnehmen ({} im Wagen)", g.cart.len()),
+                        &format!(
+                            "[F] Herausnehmen: {}   ({}/{}, Mausrad oder draufzielen)",
+                            g.cart[i].name,
+                            i + 1,
+                            g.cart.len()
+                        ),
                         DIM,
                         1.0,
                     );

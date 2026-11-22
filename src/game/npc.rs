@@ -140,6 +140,12 @@ pub struct Customer {
     /// Zusatzgeschwindigkeit, wenn man ihren Tomatensaft genommen hat
     pub angry: f32,
     pub bump_cd: f32,
+    /// Verfolger: schleicht sich an, sobald man wegsieht. Alle anderen kaufen nur ein.
+    pub stalker: bool,
+    /// Einkaufsbummel: Ziel, Wegfeld dorthin, Wartezeit am Ziel
+    pub target: Vec3,
+    pub field: Vec<u16>,
+    pub wait: f32,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

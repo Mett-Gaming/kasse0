@@ -109,43 +109,81 @@ fn cart_value_drives_escalation() {
 }
 
 #[test]
-fn customers_freeze_when_watched_and_creep_when_not() {
+fn stalker_acts_normal_when_watched_and_creeps_when_not() {
     let mut g = Game::new(99);
     g.tip();
     g.customers.truncate(1);
     g.employees.clear();
-    // Kunde 6 m vor den Spieler in den freien Gang stellen
+    // Verfolger 6 m vor den Spieler in den freien Gang stellen, "zu Hause" am Regal
     let p = g.player.pos;
-    g.customers[0].pos = vec3(p.x, 0.0, p.z - 6.0);
-    g.customers[0].home = g.customers[0].pos;
+    let c = &mut g.customers[0];
+    c.pos = vec3(p.x, 0.0, p.z - 6.0);
+    c.home = c.pos;
+    c.stalker = true;
+    c.field.clear();
+    c.wait = 100.0;
     g.player.yaw = 0.0; // Blick nach Norden
     g.player.pitch = 0.0;
-    let start = g.customers[0].pos;
+    let dist0 = (g.customers[0].pos - g.player.pos).length();
     step(&mut g, 2.0, Input::default());
     assert!(
-        (g.customers[0].pos - start).length() < 0.01,
-        "bewegt sich trotz Blickkontakt"
+        (g.customers[0].pos - g.player.pos).length() > dist0 - 0.05,
+        "kommt trotz Blickkontakt naeher"
+    );
+    assert_eq!(
+        g.customers[0].pose,
+        npc::Pose::Reach,
+        "kauft nicht normal ein"
     );
     // wegsehen
     g.player.yaw = std::f32::consts::PI;
     step(&mut g, 2.0, Input::default());
     assert!(
-        (g.customers[0].pos - start).length() > 0.3,
+        (g.customers[0].pos - g.player.pos).length() < dist0 - 0.3,
         "kommt nicht naeher"
     );
 }
 
 #[test]
-fn caught_when_customer_reaches_player() {
+fn caught_when_stalker_reaches_player() {
     let mut g = Game::new(5);
     g.tip();
     g.employees.clear();
     g.customers.truncate(1);
     let p = g.player.pos;
     g.customers[0].pos = vec3(p.x, 0.0, p.z - 1.5);
+    g.customers[0].stalker = true;
     g.player.yaw = std::f32::consts::PI; // wegsehen
     step(&mut g, 6.0, Input::default());
     assert_eq!(g.outcome, Outcome::Caught);
+}
+
+#[test]
+fn ordinary_customers_only_shop_and_never_catch() {
+    let mut g = Game::new(5);
+    g.tip();
+    g.employees.clear();
+    g.customers.truncate(1);
+    let p = g.player.pos;
+    g.customers[0].pos = vec3(p.x, 0.0, p.z - 1.5);
+    g.customers[0].stalker = false;
+    g.player.yaw = std::f32::consts::PI; // wegsehen
+    let start = g.customers[0].pos;
+    step(&mut g, 8.0, Input::default());
+    assert_eq!(g.outcome, Outcome::Running);
+    assert!(
+        (g.customers[0].pos - start).length() > 0.3,
+        "bummelt nicht herum"
+    );
+}
+
+#[test]
+fn escalation_sets_the_number_of_stalkers() {
+    let mut g = Game::new(21);
+    g.tip();
+    let stalkers = g.customers.iter().filter(|c| c.stalker).count();
+    assert_eq!(stalkers, Tier::Calm.stalkers().min(g.customers.len()));
+    assert!(g.customers.len() > stalkers, "alle verfolgen einen");
 }
 
 /// Von `stand` aus auf `target` schauen.
@@ -563,4 +601,54 @@ fn taking_tomato_juice_angers_its_customer() {
     g.take_pickup(i);
     assert!(g.customers[customer].angry > 0.0);
     assert!(g.suspicion >= 0.35);
+}
+
+#[test]
+fn chosen_item_comes_out_of_the_cart() {
+    let mut g = Game::new(31);
+    g.customers.clear();
+    g.employees.clear();
+    // drei verschiedene Waren in den Wagen
+    let cat = catalog();
+    for p in [0usize, 5, 9] {
+        let prod = &cat.products[p];
+        g.cart.push(ItemData {
+            name: prod.name.clone(),
+            cents: prod.cents as i64,
+            kind: PickupKind::Product {
+                product: p,
+                fake: false,
+            },
+            mesh: prod.mesh,
+            tint: prod.tint,
+        });
+    }
+    g.trolley.pushing = false;
+    let cart = g.trolley.pos;
+    // die erste Ware im Korb anvisieren
+    let half = g.cart[0].half().max(Vec3::splat(0.05));
+    let target = g
+        .cart_item_model(0)
+        .transform_point3(vec3(0.0, half.y, 0.0));
+    let dir = vec3(target.x - cart.x, 0.0, target.z - cart.z).normalize_or_zero();
+    let stand = g.world.collide(vec3(cart.x, 0.0, cart.z) + dir * 0.9, 0.3);
+    look_from(&mut g, stand, target);
+    g.update(1.0 / 60.0, &mut Input::default());
+    assert_eq!(g.focus, Some(Focus::Cart));
+    assert_eq!(g.cart_selected(), Some(0), "angezielte Ware nicht gewaehlt");
+    // Mausrad: eine weiter
+    let mut inp = Input {
+        wheel: -1,
+        ..Default::default()
+    };
+    g.update(1.0 / 60.0, &mut inp);
+    let chosen = g.cart_selected().unwrap();
+    let name = g.cart[chosen].name.clone();
+    let mut inp = Input {
+        take_out: true,
+        ..Default::default()
+    };
+    g.update(1.0 / 60.0, &mut inp);
+    assert_eq!(g.held.as_ref().map(|h| h.name.clone()), Some(name));
+    assert_eq!(g.cart.len(), 2);
 }

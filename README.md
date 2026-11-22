@@ -18,7 +18,7 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 2. Wenn du sie verlässt, ist der Markt **gekippt**. Arbeite den Einkaufszettel ab (**TAB**).
 3. Jeder Artikel existiert **billig** (schwer erreichbar, unten oder oben, tief im Gang) und **teuer** (gut sichtbar). Der **Warenwert** im Wagen bestimmt, wie schlimm es wird (ab 10 €, 25 € und 50 €).
 4. Falsch beschriftete Ware ("Mlich", unsinnige Preise) gehört nicht auf den Zettel.
-5. Die **Kunden** bewegen sich nur, wenn du nicht hinsiehst. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
+5. Die **Kunden** kaufen ganz normal ein. Einige von ihnen verfolgen dich aber: Sie spielen Kundschaft, solange du hinsiehst, und schleichen sich an, sobald du wegsiehst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
 7. Geh zur **geöffneten Kasse** (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und räum ihn mit **E aufs Band** (oder leg einzelne Ware aus der Hand aufs Band). Die Kassiererin scannt Stück für Stück, falsche Ware sortiert sie als "ARTIKEL UNBEKANNT" aus. Bezahl mit **E am Kartenterminal** und verlass den Laden durch die Tür.
 
@@ -32,7 +32,8 @@ Deine Auffälligkeit siehst du nicht als Balken, sondern an Bandstörungen im Bi
 | Maus | Umsehen |
 | E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: Wagen ausräumen; am Kartenterminal: bezahlen |
 | Q (oder E auf den Wagen) | Wagen stehen lassen / wieder schieben |
-| F (am Wagen) | Letzte Ware wieder herausnehmen |
+| F (am Wagen) | Ware wieder herausnehmen: die anvisierte (sie leuchtet auf), sonst die zuletzt eingelegte |
+| Mausrad (am Wagen) | Andere Ware im Wagen anwählen |
 | TAB (halten) | Einkaufszettel und Warenwert |
 | 1 / 2 / 3 | Antwort im Gespräch |
 | Esc / P | Pause (mit Tastenübersicht) |
@@ -63,6 +64,10 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Röhren wechseln zufällig ihr Flacker-Muster: Stroboskop, Pulsieren, fast aus, Unterspannung.
 - Die Gänge biegen sich zu echten S-Kurven, die Regale folgen dem Bogen. Mittendrin öffnen sich Durchgänge, wo vorher keine waren, und es stehen Wände, wo vorher keine standen.
 - Werbeposter verrotten immer weiter.
+- Die Gänge biegen sich live: Regale schwanken, der Boden hebt und senkt sich (Steigung).
+- Löcher im Boden versperren den Weg (hineinfallen kann man nicht), in der Decke klaffen Löcher mit herabhängenden Kabeln.
+- Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
+- Mitarbeiter tragen kräftig blaue Dienstkleidung und leuchten im Dunkeln leicht, damit man sie von der Kundschaft unterscheiden kann.
 - Fata Morganen tauchen auf: Hologramme einer fröhlichen Kundin, eines winkenden Kassierers, eines Ausgangsschilds. Kommst du näher, verschwinden sie.
 
 Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen).

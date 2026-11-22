@@ -106,6 +106,7 @@ impl Renderer {
                 p.fog_density,
             ],
             fog_color: fc.extend(p.decay).to_array(),
+            sway: p.sway.to_array(),
         };
         let scene_stages = vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT;
 

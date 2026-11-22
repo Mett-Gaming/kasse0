@@ -43,17 +43,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     // Zeilen-Wobble (Bandlauf)
     let wobble = (hash21(vec2<f32>(line, floor(time * 30.0))) - 0.5)
-        * ((0.0012 + tipped * 0.002) * vhs + glitch * 0.02);
+        * ((0.0012 + tipped * 0.0008) * vhs + glitch * 0.012);
     // Wanderndes Tracking-Band
     let band_pos = fract(time * 0.06);
-    let band = smoothstep(0.035, 0.0, abs(uv.y - band_pos)) * ((0.15 + tipped * 0.6) * vhs + glitch * 1.5);
+    let band = smoothstep(0.035, 0.0, abs(uv.y - band_pos)) * ((0.15 + tipped * 0.2) * vhs + glitch * 0.8);
     uv.x = uv.x + wobble + band * 0.015 * (hash21(vec2<f32>(line, time)) - 0.5);
     // Glitch: einzelne Bloecke verrutschen
     let block = hash21(vec2<f32>(floor(uv.y * 12.0), floor(time * 8.0)));
-    uv.x = uv.x + select(0.0, (block - 0.5) * 0.08 * glitch, block > 1.0 - glitch * 0.5);
+    uv.x = uv.x + select(0.0, (block - 0.5) * 0.04 * glitch, block > 1.0 - glitch * 0.3);
 
     // Chromatische Verschiebung
-    let ca = (0.0012 + tipped * 0.0025) * vhs + glitch * 0.008;
+    let ca = (0.0012 + tipped * 0.001) * vhs + glitch * 0.005;
     let r = textureSample(src_tex, src_samp, uv + vec2<f32>(ca, 0.0)).r;
     let g = textureSample(src_tex, src_samp, uv).g;
     let b = textureSample(src_tex, src_samp, uv - vec2<f32>(ca, 0.0)).b;
@@ -61,13 +61,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     // Entsaettigung, im gekippten Zustand staerker mit Gruenstich
     let luma = dot(col, vec3<f32>(0.299, 0.587, 0.114));
-    col = mix(col, vec3<f32>(luma), (0.12 + tipped * 0.3) * min(vhs, 1.0));
+    col = mix(col, vec3<f32>(luma), (0.12 + tipped * 0.12) * min(vhs, 1.0));
     col = col * mix(vec3<f32>(1.0), vec3<f32>(0.92, 1.04, 0.95), tipped);
 
     // Rauschen
     let px = floor(in.uv * pc.res.xy * 0.5);
     let noise = hash21(px + vec2<f32>(time * 91.0, time * 37.0)) - 0.5;
-    col = col + noise * ((0.035 + tipped * 0.04) * vhs + glitch * 0.25);
+    col = col + noise * ((0.035 + tipped * 0.015) * vhs + glitch * 0.12);
     col = col + band * 0.12 * hash21(vec2<f32>(floor(in.uv.x * pc.res.z), line + floor(time * 60.0)));
 
     // Text/HUD darueberlegen: nur leichtes Wackeln und wenig Farbversatz, damit er lesbar bleibt

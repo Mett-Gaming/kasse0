@@ -193,6 +193,8 @@ pub(super) struct Gen<'a> {
     pub(super) spots: Vec<Spot>,
     /// Zettel-Waren, die noch nirgends stehen (werden bevorzugt platziert)
     pub(super) missing: std::collections::HashSet<usize>,
+    /// riesige Waren (Verfall)
+    pub(super) giants: Vec<Giant>,
 }
 
 impl Gen<'_> {
@@ -245,6 +247,7 @@ impl Gen<'_> {
     }
 
     pub(super) fn place(&mut self, product: usize, pos: Vec3, yaw: f32) {
+        let rot = self.rot_state();
         // Im gekippten Markt sind manche Zettel-Waren falsch beschriftet (Anomalie)
         let fake = self.params.tipped
             && self.cat.products[product].list.is_some()
@@ -255,9 +258,13 @@ impl Gen<'_> {
             yaw,
             fake,
             taken: false,
+            rot,
         });
         if !fake {
             self.missing.remove(&product);
+        }
+        if rot == 1 {
+            self.maggots(product, pos);
         }
     }
 

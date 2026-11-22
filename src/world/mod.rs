@@ -146,6 +146,13 @@ pub struct WorldParams {
     pub walls: u32,
     /// Sortiment-Mischstufe (siehe layout::MixLevel)
     pub mix: u8,
+    /// Loecher im Boden (Hindernisse) und in der Decke
+    pub holes: u32,
+    pub ceiling_holes: u32,
+    /// Anteil verdorbener Ware im Regal (0..1)
+    pub rot: f32,
+    /// riesige Waren als Hindernisse in den Gaengen
+    pub giants: u32,
 }
 
 impl WorldParams {
@@ -161,8 +168,37 @@ impl WorldParams {
             warp: 0.0,
             walls: 0,
             mix: 0,
+            holes: 0,
+            ceiling_holes: 0,
+            rot: 0.0,
+            giants: 0,
         }
     }
+}
+
+/// Gangbereich beginnt immer hier (siehe gen.rs: aisles_x0, aisle_z0)
+pub const AISLES_X0: f32 = 2.5;
+pub const AISLES_Z0: f32 = 4.0;
+
+/// Live-Verbiegen der Gaenge (gleiche Formel im Shader, siehe _common.wgsl `sway`):
+/// x = seitliches Schwanken der Regale, y = Hoehenwelle des Bodens (Steigung).
+/// `w` = (seitlich, hoch, Gangende z, Gangende x), `t` = Spielzeit. Ausserhalb des
+/// Gangbereichs ist alles fest, damit Boden und Waende zusammenpassen.
+pub fn sway(w: Vec4, p: Vec3, t: f32) -> Vec3 {
+    if w.x == 0.0 && w.y == 0.0 {
+        return Vec3::ZERO;
+    }
+    let smooth = |a: f32, b: f32, x: f32| {
+        let k = ((x - a) / (b - a)).clamp(0.0, 1.0);
+        k * k * (3.0 - 2.0 * k)
+    };
+    let mask = smooth(AISLES_Z0, AISLES_Z0 + 2.0, p.z)
+        * (1.0 - smooth(w.z - 2.0, w.z, p.z))
+        * smooth(AISLES_X0 - 1.0, AISLES_X0 + 0.5, p.x)
+        * (1.0 - smooth(w.w - 0.5, w.w + 1.0, p.x));
+    let lat = w.x * mask * (p.z * 0.45 + t * 0.7).sin() * (t * 0.27 + 1.3).sin();
+    let up = w.y * mask * (p.z * 0.38 - t * 0.35 + 0.8).sin();
+    Vec3::new(lat, up, 0.0)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -204,6 +240,17 @@ pub struct ShelfItem {
     /// falsch beschriftete Anomalie
     pub fake: bool,
     pub taken: bool,
+    /// Verfall: 0 frisch, 1 verdorben (Maden, Fliegen), 2 kurios (schwebt, gekippt, kopfueber)
+    pub rot: u8,
+}
+
+/// Riesige Ware als Hindernis im Gang (nicht greifbar).
+#[derive(Clone, Copy, Debug)]
+pub struct Giant {
+    pub product: u32,
+    pub pos: Vec3,
+    pub yaw: f32,
+    pub scale: f32,
 }
 
 impl ShelfItem {
@@ -263,6 +310,8 @@ pub struct World {
     pub aisle_count: u32,
     pub aisle_z0: f32,
     pub aisle_z1: f32,
+    /// Ende des Gangbereichs in x (Beginn: AISLES_X0)
+    pub aisle_x1: f32,
     pub lanes: Vec<Lane>,
     pub door_center: Vec3,
     /// z-Wert hinter der Tuer, ab dem der Spieler draussen ist
@@ -271,6 +320,10 @@ pub struct World {
     pub nav: NavGrid,
     /// Deko: Warnschilder "Rutschgefahr"
     pub signs: Vec<(Vec3, f32)>,
+    /// riesige Waren in den Gaengen
+    pub giants: Vec<Giant>,
+    /// verdorbene Ware (Index in items), um die Fliegen kreisen
+    pub rotten: Vec<usize>,
     /// Wagenbox am Eingang
     pub corral: Vec3,
 }
@@ -287,6 +340,9 @@ fn grid_key(p: Vec3) -> (i32, i32) {
 impl World {
     fn index_items(&mut self) {
         self.item_grid.clear();
+        self.rotten = (0..self.items.len())
+            .filter(|&i| self.items[i].rot == 1)
+            .collect();
         for (i, it) in self.items.iter().enumerate() {
             self.item_grid
                 .entry(grid_key(it.pos))
@@ -333,15 +389,50 @@ impl World {
                 continue;
             }
             let p = &cat.products[it.product as usize];
-            let tint = if it.fake {
+            let mut tint = if it.fake {
                 p.tint * vec3(0.7, 1.05, 0.85)
             } else {
                 p.tint
             };
+            let mut model = Mat4::from_rotation_translation(Quat::from_rotation_y(it.yaw), it.pos);
+            match it.rot {
+                // verdorben: braun-gruenlich, fleckig
+                1 => tint = tint * vec3(0.5, 0.55, 0.3) + vec3(0.04, 0.05, 0.0),
+                // kurios: schwebt, gekippt oder kopfueber
+                2 => {
+                    let h = hash01(it.pos);
+                    let lift = 0.04 + h * 0.08;
+                    let tilt = if h > 0.6 {
+                        std::f32::consts::PI
+                    } else {
+                        0.5 + h
+                    };
+                    let up = vec3(0.0, p.half.y, 0.0);
+                    model = Mat4::from_translation(it.pos + up + vec3(0.0, lift, 0.0))
+                        * Mat4::from_quat(
+                            Quat::from_rotation_y(it.yaw + h * 9.0) * Quat::from_rotation_x(tilt),
+                        )
+                        * Mat4::from_translation(-up);
+                }
+                _ => {}
+            }
             out.push(MeshDraw {
                 mesh: p.mesh,
-                model: Mat4::from_rotation_translation(Quat::from_rotation_y(it.yaw), it.pos),
+                model,
                 tint: Vec4::new(tint.x, tint.y, tint.z, 0.0),
+            });
+        }
+        // riesige Waren in den Gaengen
+        for g in &self.giants {
+            let p = &cat.products[g.product as usize];
+            out.push(MeshDraw {
+                mesh: p.mesh,
+                model: Mat4::from_scale_rotation_translation(
+                    Vec3::splat(g.scale),
+                    Quat::from_rotation_y(g.yaw),
+                    g.pos,
+                ),
+                tint: (p.tint * vec3(0.75, 0.72, 0.68)).extend(0.0),
             });
         }
     }
@@ -560,3 +651,10 @@ fn build_nav(solids: &[Aabb], obbs: &[Obb], width: f32, depth: f32) -> NavGrid {
 
 #[cfg(test)]
 mod tests;
+
+/// Fester Pseudo-Zufall 0..1 aus einer Position (fuer Verfallsvarianten).
+pub fn hash01(p: Vec3) -> f32 {
+    ((p.x * 12.9898 + p.z * 78.233 + p.y * 37.719).sin() * 43_758.547)
+        .fract()
+        .abs()
+}

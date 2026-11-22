@@ -2,6 +2,10 @@
 
 use super::*;
 
+/// Einkaufsbummel der Kunden: Umkreis um den aktuellen Platz und Tempo
+const BROWSE_RADIUS: f32 = 7.0;
+const BROWSE_SPEED: f32 = 0.75;
+
 impl Game {
     // --------------------------------------------------------------- Spawns
 
@@ -85,6 +89,10 @@ impl Game {
                 pose: Pose::Reach,
                 angry: 0.0,
                 bump_cd: 0.0,
+                stalker: false,
+                target: Vec3::ZERO,
+                field: Vec::new(),
+                wait: 0.0,
             });
             // "ihr" Tomatensaft
             self.pickups.push(Pickup {
@@ -119,6 +127,10 @@ impl Game {
                 pose: Pose::Idle,
                 angry: 0.0,
                 bump_cd: 0.0,
+                stalker: false,
+                target: Vec3::ZERO,
+                field: Vec::new(),
+                wait: 0.0,
             });
             added += 1;
         }
@@ -149,6 +161,10 @@ impl Game {
             pose: Pose::Idle,
             angry: 1.0,
             bump_cd: 0.0,
+            stalker: true,
+            target: pos,
+            field: Vec::new(),
+            wait: 1.0e6,
         });
     }
 
@@ -208,31 +224,27 @@ impl Game {
             c.seen = seen;
             c.moving = false;
             c.bump_cd -= dt;
+            // Verfolger kommen naeher, sobald man wegsieht (oder immer, wenn man aufgefallen ist)
+            let hunting = c.stalker && (!seen || noticed);
+            if !hunting {
+                self.browse_customer(i, dt);
+                continue;
+            }
             let speed = base
                 * (1.0 + self.suspicion * 1.2)
                 * (1.0 + c.angry)
                 * if self.paid { 1.4 } else { 1.0 };
-            let may_move = !seen || noticed;
-            if may_move {
-                let s = if seen { speed * 0.4 } else { speed };
-                let old = c.pos;
-                c.pos = npc::step_along(&self.world, &self.player_field, c.pos, player, s, dt);
-                c.moving = (c.pos - old).length_squared() > 1e-8;
-                if (c.pos - old).length_squared() > 1e-8 {
-                    c.yaw = npc::yaw_towards(old, c.pos);
-                }
-                c.pose = Pose::Idle;
-            } else {
-                // beim Hinsehen: Rollenspiel am Regal oder starr zum Spieler
-                let at_home = (c.pos - c.home).length() < 0.5;
-                if at_home {
-                    c.pose = Pose::Reach;
-                    c.yaw = c.home_facing.x.atan2(c.home_facing.z);
-                } else {
-                    c.pose = Pose::Idle;
-                    c.yaw = npc::yaw_towards(c.pos, player);
-                }
+            let s = if seen { speed * 0.4 } else { speed };
+            let old = c.pos;
+            c.pos = npc::step_along(&self.world, &self.player_field, c.pos, player, s, dt);
+            c.moving = (c.pos - old).length_squared() > 1e-8;
+            if c.moving {
+                c.yaw = npc::yaw_towards(old, c.pos);
             }
+            c.pose = Pose::Idle;
+            // nach dem Anschleichen nicht zurueck "nach Hause" rennen, sondern hier weiterbummeln
+            c.field.clear();
+            c.wait = 0.0;
             let dist = vec3(c.pos.x - player.x, 0.0, c.pos.z - player.z).length();
             // Waehrend eines Gespraechs (und kurz danach) ist man sicher
             let safe = self.god || self.dialog.is_some() || self.grace > 0.0;
@@ -256,6 +268,107 @@ impl Game {
                     self.customers[i].pos -= push;
                     self.customers[j].pos += push;
                 }
+            }
+        }
+    }
+
+    /// Ganz normal einkaufen: zum eigenen Regal, hineingreifen, in der Naehe herumschlendern.
+    fn browse_customer(&mut self, i: usize, dt: f32) {
+        let arrived = {
+            let c = &self.customers[i];
+            c.field.is_empty() || (c.pos - c.target).length() < 0.5
+        };
+        if arrived {
+            let c = &mut self.customers[i];
+            c.wait -= dt;
+            let at_home = (c.pos - c.home).length() < 0.8;
+            if at_home {
+                // am Regal: Ware begutachten
+                c.pose = Pose::Reach;
+                let want = c.home_facing.x.atan2(c.home_facing.z);
+                c.yaw = lerp_angle(c.yaw, want, (dt * 4.0).min(1.0));
+            } else {
+                c.pose = Pose::Idle;
+            }
+            if c.wait > 0.0 {
+                return;
+            }
+            let (pos, home) = (c.pos, c.home);
+            let go_home = !at_home && self.rng.gen_bool(0.6);
+            let target = if go_home {
+                home
+            } else {
+                self.near_walkable_cell(pos, BROWSE_RADIUS).unwrap_or(home)
+            };
+            let field = npc::bfs(&self.world.nav, target);
+            let wait = if go_home {
+                self.rng.gen_range(4.0..9.0)
+            } else {
+                self.rng.gen_range(1.5..4.0)
+            };
+            let c = &mut self.customers[i];
+            c.target = target;
+            c.field = field;
+            c.wait = wait;
+            return;
+        }
+        let c = &mut self.customers[i];
+        let old = c.pos;
+        c.pos = npc::step_along(&self.world, &c.field, c.pos, c.target, BROWSE_SPEED, dt);
+        c.moving = (c.pos - old).length_squared() > 1e-8;
+        if c.moving {
+            c.yaw = lerp_angle(c.yaw, npc::yaw_towards(old, c.pos), (dt * 6.0).min(1.0));
+        } else {
+            // kommt nicht weiter: neues Ziel suchen
+            c.field.clear();
+        }
+        c.pose = Pose::Idle;
+    }
+
+    /// Zufaelliger begehbarer Platz im Umkreis (fuer den Einkaufsbummel).
+    fn near_walkable_cell(&mut self, center: Vec3, radius: f32) -> Option<Vec3> {
+        let nav = &self.world.nav;
+        for _ in 0..60 {
+            let p = center
+                + vec3(
+                    self.rng.gen_range(-radius..radius),
+                    0.0,
+                    self.rng.gen_range(-radius..radius),
+                );
+            let Some((x, z)) = nav.cell_of(p) else {
+                continue;
+            };
+            if !nav.is_walkable(x, z) {
+                continue;
+            }
+            let c = nav.center(x, z);
+            if self.world.drinks_zone.contains_xz(c) || c.z > self.world.size.z - 0.5 {
+                continue;
+            }
+            return Some(c);
+        }
+        None
+    }
+
+    /// Sorgt dafuer, dass so viele Kunden Verfolger sind, wie die Stufe vorgibt
+    /// (bevorzugt solche, die gerade weit weg sind).
+    pub(super) fn assign_stalkers(&mut self) {
+        let want = self.tier.stalkers().min(self.customers.len());
+        let mut have = self.customers.iter().filter(|c| c.stalker).count();
+        let player = self.player.pos;
+        let mut order: Vec<usize> = (0..self.customers.len()).collect();
+        order.sort_by(|&a, &b| {
+            let da = (self.customers[a].pos - player).length();
+            let db = (self.customers[b].pos - player).length();
+            db.total_cmp(&da)
+        });
+        for i in order {
+            if have >= want {
+                break;
+            }
+            if !self.customers[i].stalker {
+                self.customers[i].stalker = true;
+                have += 1;
             }
         }
     }

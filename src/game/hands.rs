@@ -10,6 +10,11 @@ const CART_PUSH_RADIUS: f32 = 0.42;
 const CART_RADIUS: f32 = 0.5;
 /// Wie nah der Wagen fuer Q/F sein muss
 const CART_REACH: f32 = 1.9;
+/// Quietschen: zufaelliger Abstand in Metern (normal bzw. beim Rennen)
+const SQUEAK_EVERY: (f32, f32) = (3.0, 5.5);
+const SQUEAK_EVERY_RUN: (f32, f32) = (1.6, 3.0);
+/// Ab so viel Drehung (Bogenmass) seit dem letzten Geraeusch klappert der Wagen statt zu quietschen
+const RATTLE_TURN: f32 = 0.9;
 
 impl Game {
     pub(super) fn update_movement(&mut self, dt: f32, input: &Input) {
@@ -46,7 +51,9 @@ impl Game {
             let want = pos + forward * CART_OFFSET;
             let t = &mut self.trolley;
             t.pos = t.pos.lerp(want, (dt * 12.0).min(1.0));
+            let old_yaw = t.yaw;
             t.yaw = lerp_angle(t.yaw, self.player.yaw, (dt * 12.0).min(1.0));
+            let turned = lerp_angle(0.0, t.yaw - old_yaw, 1.0).abs();
 
             // Feststecken erkennen
             let moved = (pos - old).length();
@@ -58,14 +65,28 @@ impl Game {
             } else {
                 self.cart_stuck = 0.0;
             }
-            // Das Rad quietscht - Mitarbeiter hoeren das
+            // Das Rad quietscht - je nach Bewegung anders; Mitarbeiter hoeren das
             self.squeak_acc += moved;
-            if self.squeak_acc > 1.3 {
+            self.cart_turn += turned;
+            if self.squeak_acc > self.squeak_next {
+                let (sfx, vol, radius) = if input.run {
+                    (Sfx::Squeak, 0.5, 18.0)
+                } else if self.cart_turn > RATTLE_TURN {
+                    (Sfx::Rattle, 0.4, 10.0)
+                } else {
+                    (Sfx::SqueakSoft, 0.3, 8.0)
+                };
+                let (lo, hi) = if input.run {
+                    SQUEAK_EVERY_RUN
+                } else {
+                    SQUEAK_EVERY
+                };
                 self.squeak_acc = 0.0;
-                self.sfx
-                    .push((Sfx::Squeak, if input.run { 0.6 } else { 0.35 }));
+                self.cart_turn = 0.0;
+                self.squeak_next = self.rng.gen_range(lo..hi);
+                self.sfx.push((sfx, vol));
                 if self.tipped {
-                    self.make_noise(if input.run { 20.0 } else { 14.0 });
+                    self.make_noise(radius);
                     if !self.squeak_hinted {
                         self.squeak_hinted = true;
                         self.say("Das Rad quietscht. Die Mitarbeiter hören das.", 4.0);
@@ -105,6 +126,40 @@ impl Game {
         )
     }
 
+    /// Lage der i-ten Ware im Wagenkorb (Weltkoordinaten).
+    pub(super) fn cart_item_model(&self, i: usize) -> Mat4 {
+        let base = self.trolley.pos + vec3(0.0, self.sway_at(self.trolley.pos).y, 0.0);
+        let m = Mat4::from_rotation_translation(Quat::from_rotation_y(-self.trolley.yaw), base);
+        let col = (i % 3) as f32 - 1.0;
+        let row = ((i / 3) % 4) as f32 - 1.5;
+        let layer = (i / 12) as f32;
+        let local = vec3(col * 0.13, 0.42 + layer * 0.15, row * 0.17);
+        let spin = Quat::from_rotation_y(i as f32 * 1.7);
+        m * Mat4::from_rotation_translation(spin, local)
+    }
+
+    /// Ware, die F herausnehmen wuerde (nur wenn man den Wagen anschaut und die Hand frei ist).
+    pub fn cart_selected(&self) -> Option<usize> {
+        if self.focus != Some(Focus::Cart) || self.held.is_some() || self.cart.is_empty() {
+            return None;
+        }
+        Some(
+            self.cart_sel
+                .filter(|&i| i < self.cart.len())
+                .unwrap_or(self.cart.len() - 1),
+        )
+    }
+
+    /// Mausrad am Wagen: andere Ware anwaehlen.
+    pub(super) fn cycle_cart_selection(&mut self, steps: i32) {
+        let n = self.cart.len() as i32;
+        if n == 0 || steps == 0 {
+            return;
+        }
+        let cur = self.cart_selected().unwrap_or(n as usize - 1) as i32;
+        self.cart_sel = Some((cur + steps).rem_euclid(n) as usize);
+    }
+
     pub fn cart_distance(&self) -> f32 {
         vec3(
             self.trolley.pos.x - self.player.pos.x,
@@ -130,6 +185,32 @@ impl Game {
             best = t;
             self.focus = Some(Focus::Cart);
             self.aim_cart = true;
+        }
+        // Gezielt eine Ware im Wagen anvisieren (zum Herausnehmen)
+        if self.held.is_none() && self.cart_distance() < CART_REACH + 0.5 {
+            let mut hit: Option<(usize, f32)> = None;
+            for i in 0..self.cart.len() {
+                let half = self.cart[i].half().max(Vec3::splat(0.05));
+                let c = self
+                    .cart_item_model(i)
+                    .transform_point3(vec3(0.0, half.y, 0.0));
+                if let Some(t) = world::Aabb::from_center(c, half).ray(eye, dir, REACH + 0.6) {
+                    if hit.is_none_or(|(_, b)| t < b) {
+                        hit = Some((i, t));
+                    }
+                }
+            }
+            // Zielen waehlt nur beim Wechsel auf eine andere Ware; dazwischen gilt das Mausrad
+            let aimed = hit.map(|(i, _)| i);
+            if aimed.is_some() && aimed != self.cart_aim {
+                self.cart_sel = aimed;
+            }
+            self.cart_aim = aimed;
+            if let Some((_, t)) = hit {
+                best = best.min(t);
+                self.focus = Some(Focus::Cart);
+                self.aim_cart = true;
+            }
         }
         // Beim Schieben reicht ein Blick nach unten in den Korb
         if self.trolley.pushing && self.player.pitch < -0.35 {
@@ -307,12 +388,13 @@ impl Game {
         self.trolley.yaw = std::f32::consts::PI - e.yaw;
         // Quietschen, leiser je weiter weg
         self.squeak_acc += (e.pos - old).length();
-        if self.squeak_acc > 1.3 {
+        if self.squeak_acc > self.squeak_next {
             self.squeak_acc = 0.0;
+            self.squeak_next = self.rng.gen_range(SQUEAK_EVERY.0..SQUEAK_EVERY.1);
             let d = (e.pos - self.player.pos).length();
-            let vol = (1.0 - d / 25.0).max(0.0) * 0.4;
+            let vol = (1.0 - d / 25.0).max(0.0) * 0.35;
             if vol > 0.02 {
-                self.sfx.push((Sfx::Squeak, vol));
+                self.sfx.push((Sfx::SqueakSoft, vol));
             }
         }
         let arrived = (e.pos - corral).length() < 1.3 || (self.trolley.pos - corral).length() < 0.8;
@@ -341,7 +423,17 @@ impl Game {
             self.hint("Dein Wagen ist zu weit weg.");
             return;
         }
-        if let Some(item) = self.cart.pop() {
+        if self.cart.is_empty() {
+            return;
+        }
+        // gezielt angewaehlte Ware, sonst die zuletzt eingelegte
+        let idx = self
+            .cart_sel
+            .filter(|&i| i < self.cart.len())
+            .unwrap_or(self.cart.len() - 1);
+        self.cart_sel = None;
+        {
+            let item = self.cart.remove(idx);
             self.held = Some(item);
             self.play(Sfx::Pickup, 0.4);
             if let Some(t) = &mut self.tutorial {
@@ -373,6 +465,7 @@ impl Game {
             self.red = self.red.max(0.4);
             if let Some(c) = self.customers.get_mut(customer) {
                 c.angry = 1.0;
+                c.stalker = true;
             }
             self.say("Das war IHR Tomatensaft. Sie hat es gesehen.", 3.5);
             self.play(Sfx::Sting, 0.3);
@@ -482,23 +575,26 @@ impl Game {
         }
 
         // Wagen + Inhalt
-        let m = Mat4::from_rotation_translation(rot(-self.trolley.yaw), self.trolley.pos);
+        let cart_pos = self.trolley.pos + vec3(0.0, self.sway_at(self.trolley.pos).y, 0.0);
+        let m = Mat4::from_rotation_translation(rot(-self.trolley.yaw), cart_pos);
         out.push(MeshDraw {
             mesh: MeshId::Cart as usize,
             model: m,
             tint: white,
         });
+        let selected = self.cart_selected();
         for (i, item) in self.cart.iter().enumerate() {
-            let col = (i % 3) as f32 - 1.0;
-            let row = ((i / 3) % 4) as f32 - 1.5;
-            let layer = (i / 12) as f32;
-            let local = vec3(col * 0.13, 0.42 + layer * 0.15, row * 0.17);
-            let spin = Quat::from_rotation_y(i as f32 * 1.7);
-            let model = m * Mat4::from_rotation_translation(spin, local);
+            let mut model = self.cart_item_model(i);
+            let mut tint = item.tint.extend(0.0);
+            if selected == Some(i) {
+                // angewaehlte Ware: leicht angehoben und hell
+                model = Mat4::from_translation(vec3(0.0, 0.03, 0.0)) * model;
+                tint = (item.tint * 1.15).extend(0.45);
+            }
             out.push(MeshDraw {
                 mesh: item.mesh as usize,
                 model,
-                tint: item.tint.extend(0.0),
+                tint,
             });
         }
 
@@ -523,7 +619,10 @@ impl Game {
         for l in &self.loose {
             out.push(MeshDraw {
                 mesh: l.data.mesh as usize,
-                model: Mat4::from_rotation_translation(rot(-l.yaw), l.pos),
+                model: Mat4::from_rotation_translation(
+                    rot(-l.yaw),
+                    l.pos + vec3(0.0, self.sway_at(l.pos).y, 0.0),
+                ),
                 tint: l.data.tint.extend(0.0),
             });
         }
@@ -534,7 +633,7 @@ impl Game {
                 let off = vec3((k as f32 - 1.0) * 0.08, 0.0, 0.0);
                 out.push(MeshDraw {
                     mesh: p.data.mesh,
-                    model: Mat4::from_translation(p.pos + off),
+                    model: Mat4::from_translation(p.pos + off + self.sway_at(p.pos)),
                     tint: white,
                 });
             }

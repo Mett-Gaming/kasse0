@@ -284,3 +284,75 @@ fn zz_bench_generate() {
         println!("  item_draws: {:.1} ms", t.elapsed().as_secs_f32() * 1000.0);
     }
 }
+
+fn collapsed(seed: u64) -> World {
+    let mut p = WorldParams::normal(seed);
+    p.tipped = true;
+    p.stretch = 2.0;
+    p.warp = 1.0;
+    p.walls = 3;
+    p.mix = 3;
+    p.holes = 5;
+    p.ceiling_holes = 7;
+    p.rot = 0.15;
+    p.giants = 3;
+    generate(&p)
+}
+
+#[test]
+fn collapse_has_holes_rot_and_giants_but_stays_reachable() {
+    let mut holes = 0;
+    let mut giants = 0;
+    for seed in 0..10 {
+        let w = collapsed(seed);
+        assert!(w.all_reachable(), "seed {seed}: unerreichbar");
+        assert!(!w.rotten.is_empty(), "seed {seed}: keine verdorbene Ware");
+        assert!(
+            w.items.iter().any(|it| it.rot == 2),
+            "seed {seed}: nichts Kurioses"
+        );
+        giants += w.giants.len();
+        // Loecher: schwarze, flache Leere am Boden
+        holes += w
+            .instances
+            .iter()
+            .filter(|i| i.center[1] < 0.01 && i.extra[0] == material::EMISSIVE && i.color[0] < 0.01)
+            .count();
+        // Spawn und Kassen bleiben frei
+        assert_eq!(w.collide(w.spawn, 0.3), w.spawn);
+        for lane in &w.lanes {
+            assert_eq!(w.collide(lane.scan_point, 0.3), lane.scan_point);
+        }
+    }
+    assert!(holes > 10, "kaum Loecher: {holes}");
+    assert!(giants > 3, "kaum Riesenwaren: {giants}");
+    // im normalen Markt nichts davon
+    let n = gen(3, false);
+    assert!(n.rotten.is_empty() && n.giants.is_empty());
+}
+
+#[test]
+fn sway_bends_only_the_aisles_and_keeps_the_floor_connected() {
+    let w = collapsed(4);
+    let s = Vec4::new(0.25, 0.55, w.aisle_z1, w.aisle_x1);
+    // ausserhalb des Gangbereichs: fest (Waende, Kassen, Getraenke-Nordwand)
+    for p in [
+        vec3(0.2, 0.0, 10.0),
+        vec3(5.0, 0.0, 1.0),
+        vec3(5.0, 0.0, w.aisle_z1 + 2.0),
+    ] {
+        assert!(sway(s, p, 3.0).length() < 1e-4, "{p:?} bewegt sich");
+    }
+    // im Gang: Steigung bis zur halben Amplitude, aber stetig (keine Stufen)
+    let mut max_up: f32 = 0.0;
+    let x = (AISLES_X0 + w.aisle_x1) * 0.5;
+    let mut z = w.aisle_z0;
+    while z < w.aisle_z1 {
+        let a = sway(s, vec3(x, 0.0, z), 7.0);
+        let b = sway(s, vec3(x, 0.0, z + 0.05), 7.0);
+        assert!((a - b).length() < 0.05, "Sprung bei z = {z}");
+        max_up = max_up.max(a.y.abs());
+        z += 0.05;
+    }
+    assert!(max_up > 0.25, "keine Steigung: {max_up}");
+}
