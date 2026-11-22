@@ -161,7 +161,10 @@ impl Game {
 
     /// Ware, die F herausnehmen wuerde (nur wenn man den Wagen anschaut und die Hand frei ist).
     pub fn cart_selected(&self) -> Option<usize> {
-        if self.focus != Some(Focus::Cart) || self.held.is_some() || self.cart.is_empty() {
+        if !matches!(self.focus, Some(Focus::Cart | Focus::Belt))
+            || self.held.is_some()
+            || self.cart.is_empty()
+        {
             return None;
         }
         Some(

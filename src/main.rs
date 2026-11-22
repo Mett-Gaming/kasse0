@@ -496,6 +496,18 @@ impl App {
             return;
         }
         if self.screen == Screen::Playing {
+            // Ziffern: 1-3 waehlen Antworten, 0-9 tippen die PIN am Kartenterminal
+            if let Some(d) = digit_key(code) {
+                if pressed {
+                    if (1..=3).contains(&d) {
+                        self.input.choice = Some(d as usize - 1);
+                    }
+                    if !repeat {
+                        self.input.digit = Some(d);
+                    }
+                }
+                return;
+            }
             match code {
                 KeyCode::KeyW | KeyCode::ArrowUp => self.input.forward = pressed,
                 KeyCode::KeyS | KeyCode::ArrowDown => self.input.back = pressed,
@@ -509,9 +521,6 @@ impl App {
                 KeyCode::KeyQ if pressed && !repeat => self.input.cart_toggle = true,
                 KeyCode::KeyF if pressed && !repeat => self.input.take_out = true,
                 KeyCode::KeyE | KeyCode::Space if pressed && !repeat => self.input.interact = true,
-                KeyCode::Digit1 | KeyCode::Numpad1 if pressed => self.input.choice = Some(0),
-                KeyCode::Digit2 | KeyCode::Numpad2 if pressed => self.input.choice = Some(1),
-                KeyCode::Digit3 | KeyCode::Numpad3 if pressed => self.input.choice = Some(2),
                 KeyCode::Escape | KeyCode::KeyP if pressed && !repeat => {
                     if self.game.outcome == Outcome::Running {
                         self.go(Screen::Paused);
@@ -687,6 +696,23 @@ impl ApplicationHandler for App {
             r.window.request_redraw();
         }
     }
+}
+
+/// Zifferntaste (obere Reihe oder Ziffernblock) als Zahl 0-9.
+fn digit_key(code: KeyCode) -> Option<u8> {
+    Some(match code {
+        KeyCode::Digit0 | KeyCode::Numpad0 => 0,
+        KeyCode::Digit1 | KeyCode::Numpad1 => 1,
+        KeyCode::Digit2 | KeyCode::Numpad2 => 2,
+        KeyCode::Digit3 | KeyCode::Numpad3 => 3,
+        KeyCode::Digit4 | KeyCode::Numpad4 => 4,
+        KeyCode::Digit5 | KeyCode::Numpad5 => 5,
+        KeyCode::Digit6 | KeyCode::Numpad6 => 6,
+        KeyCode::Digit7 | KeyCode::Numpad7 => 7,
+        KeyCode::Digit8 | KeyCode::Numpad8 => 8,
+        KeyCode::Digit9 | KeyCode::Numpad9 => 9,
+        _ => return None,
+    })
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

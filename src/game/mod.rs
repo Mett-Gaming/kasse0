@@ -12,6 +12,7 @@ pub mod escalation;
 mod hands;
 mod mirage;
 pub mod npc;
+pub mod till;
 pub mod tutorial;
 
 use crate::assets::{half_extent_idx, MeshId};
@@ -55,6 +56,8 @@ pub struct Input {
     /// Mausrad-Rasten seit dem letzten Update (Ware im Wagen waehlen)
     pub wheel: i32,
     pub choice: Option<usize>,
+    /// Zifferntaste 0-9 (PIN am Kartenterminal)
+    pub digit: Option<u8>,
 }
 
 pub struct Player {
@@ -251,9 +254,10 @@ pub struct Game {
     /// Ware auf dem Kassenband (vorne = Index 0) und bereits gescannte Ware
     pub belt: Vec<BeltItem>,
     pub scanned: Vec<ItemData>,
-    /// Wagen wird gerade aufs Band ausgeraeumt
-    pub unloading: bool,
-    unload_timer: f32,
+    /// Kassen-Minispiel (laeuft ab der ersten Ware auf dem Band)
+    pub till: Option<till::Till>,
+    /// Run an der Kasse verloren (die Kassiererin hat einen durchschaut)
+    pub till_caught: bool,
     scan_timer: f32,
     pub paid: bool,
     pub outcome: Outcome,
@@ -391,8 +395,8 @@ impl Game {
             dialog: None,
             belt: Vec::new(),
             scanned: Vec::new(),
-            unloading: false,
-            unload_timer: 0.0,
+            till: None,
+            till_caught: false,
             scan_timer: 0.0,
             paid: false,
             outcome: Outcome::Running,
@@ -682,6 +686,14 @@ impl Game {
         if self.dialog.is_some() || self.outcome != Outcome::Running {
             return;
         }
+        // Am Kartenterminal zieht die Maus die Karte durch, der Blick bleibt stehen
+        if self.swiping() {
+            self.swipe_move(dy);
+            return;
+        }
+        if self.till_paying() {
+            return;
+        }
         let s = BASE_SENSITIVITY * self.sensitivity;
         self.turn_acc += (dx * s).abs();
         if let Some(t) = &mut self.tutorial {
@@ -732,6 +744,7 @@ impl Game {
             input.cart_toggle = false;
             input.take_out = false;
             input.choice = None;
+            input.digit = None;
             return;
         }
         // Todesanimation: keine Eingaben, keine NPCs
@@ -741,6 +754,7 @@ impl Game {
             input.cart_toggle = false;
             input.take_out = false;
             input.choice = None;
+            input.digit = None;
             input.wheel = 0;
             return;
         }
@@ -748,6 +762,9 @@ impl Game {
 
         if self.dialog.is_some() {
             self.update_dialog(dt, input);
+        } else if self.till_paying() {
+            // Karte durchziehen / PIN: man steht am Terminal still
+            self.update_till_pay(dt, input);
         } else {
             self.update_movement(dt, input);
             self.update_focus();
@@ -757,18 +774,21 @@ impl Game {
             if input.cart_toggle {
                 self.toggle_cart();
             }
-            if input.wheel != 0 && self.focus == Some(Focus::Cart) {
+            if input.wheel != 0 && matches!(self.focus, Some(Focus::Cart | Focus::Belt)) {
                 self.cycle_cart_selection(-input.wheel);
             }
             if input.take_out {
                 self.take_out();
             }
         }
+        // Kassen-Minispiel: Fragen, Weggehen, Misstrauen, Leben
+        self.update_till(dt, input);
         input.interact = false;
         input.cart_toggle = false;
         input.take_out = false;
         input.wheel = 0;
         input.choice = None;
+        input.digit = None;
 
         // Tutorial
         if let Some(t) = &mut self.tutorial {

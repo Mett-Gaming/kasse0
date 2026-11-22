@@ -195,6 +195,7 @@ impl Game {
             let looking_away = self.turn_acc > 1.6 || self.player.pitch.abs() > 0.7;
             if self.collapse_timer > interval
                 && !self.checking_out()
+                && !self.till_active()
                 && (looking_away || self.collapse_timer > interval * 3.0)
             {
                 self.collapse_timer = 0.0;
