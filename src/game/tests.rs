@@ -881,3 +881,56 @@ fn customers_whisper_when_they_meet() {
     step(&mut g, 2.0, Input::default());
     assert!(!g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Whisper)));
 }
+
+#[test]
+fn cheap_shopping_and_time_still_reach_the_late_stages() {
+    // Nur billige Ware: der Zettel-Fortschritt treibt die Stufe bis zum Kollaps
+    let mut g = Game::new(12);
+    g.tip();
+    g.customers.clear();
+    g.employees.clear();
+    let mut seen = vec![g.tier];
+    for e in g.list.clone() {
+        if g.list_done(e) {
+            continue;
+        }
+        let i = shelf_item(&g, e, false).expect("billige Ware fehlt");
+        g.take(i);
+        seen.push(g.tier);
+    }
+    assert!(
+        g.cart_value() < 2500,
+        "Test braucht billigen Einkauf: {}",
+        g.cart_value()
+    );
+    assert_eq!(g.tier, Tier::Collapse, "Zettel komplett, aber kein Kollaps");
+    assert!(
+        seen.contains(&Tier::Uneasy) || seen.contains(&Tier::Wrong),
+        "keine Zwischenstufe"
+    );
+    // Ohne Einkauf: die Zeit allein hebt die Stufe an
+    let mut g = Game::new(13);
+    g.tip();
+    g.customers.clear();
+    g.employees.clear();
+    g.tipped_time_add(400.0);
+    g.update(1.0 / 60.0, &mut Input::default());
+    assert!(
+        g.tier >= Tier::Wrong,
+        "Zeit hebt die Stufe nicht an: {:?}",
+        g.tier
+    );
+}
+
+#[test]
+fn escalation_tables_are_monotonic() {
+    let mut last = Tier::Calm;
+    for done in 0..=7 {
+        let t = escalation::tier_for_progress(done, 7);
+        assert!(t >= last);
+        last = t;
+    }
+    assert_eq!(escalation::tier_for_progress(7, 7), Tier::Collapse);
+    assert_eq!(escalation::tier_for_time(0.0), Tier::Calm);
+    assert_eq!(escalation::tier_for_time(600.0), Tier::Collapse);
+}

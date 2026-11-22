@@ -98,6 +98,34 @@ impl Tier {
     }
 }
 
+/// Fortschritt auf dem Zettel: auch wer billig einkauft, erreicht die spaeten Stufen.
+/// Alles erledigt = Kollaps (der Weg zur Kasse ist das Finale).
+pub fn tier_for_progress(done: usize, total: usize) -> Tier {
+    if total == 0 {
+        return Tier::Calm;
+    }
+    let f = done as f32 / total as f32;
+    if done >= total {
+        Tier::Collapse
+    } else if f >= 0.7 {
+        Tier::Wrong
+    } else if f >= 0.4 {
+        Tier::Uneasy
+    } else {
+        Tier::Calm
+    }
+}
+
+/// Zeit im gekippten Markt (Sekunden): wer troedelt, dem wird es auch ungemuetlich.
+pub fn tier_for_time(secs: f32) -> Tier {
+    match secs {
+        s if s >= 540.0 => Tier::Collapse,
+        s if s >= 360.0 => Tier::Wrong,
+        s if s >= 180.0 => Tier::Uneasy,
+        _ => Tier::Calm,
+    }
+}
+
 /// Warenwert in Cent, damit es keine Rundungsfehler gibt.
 pub fn tier_for_value(cents: u32) -> Tier {
     match cents {

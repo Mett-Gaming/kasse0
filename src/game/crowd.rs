@@ -54,6 +54,7 @@ impl Game {
                 variant,
                 wait: 0.0,
                 whisper_cd: 0.0,
+                gait: Default::default(),
             });
         }
     }
@@ -95,6 +96,7 @@ impl Game {
                 angry: 0.0,
                 bump_cd: 0.0,
                 whisper_cd: 0.0,
+                gait: Default::default(),
                 stalker: false,
                 target: Vec3::ZERO,
                 field: Vec::new(),
@@ -134,6 +136,7 @@ impl Game {
                 angry: 0.0,
                 bump_cd: 0.0,
                 whisper_cd: 0.0,
+                gait: Default::default(),
                 stalker: false,
                 target: Vec3::ZERO,
                 field: Vec::new(),
@@ -169,6 +172,7 @@ impl Game {
             angry: 1.0,
             bump_cd: 0.0,
             whisper_cd: 0.0,
+            gait: Default::default(),
             stalker: true,
             target: pos,
             field: Vec::new(),
@@ -190,6 +194,19 @@ impl Game {
         self.update_customers(dt);
         self.update_employees(dt, input);
         self.update_whispers(dt);
+        // Gangart: Animationszeit an die zurueckgelegte Strecke koppeln (Fuesse rutschen nicht)
+        for c in &mut self.customers {
+            c.gait
+                .advance(c.pos, dt, crate::people::PEOPLE[c.variant].1);
+        }
+        for e in &mut self.employees {
+            e.gait
+                .advance(e.pos, dt, crate::people::PEOPLE[e.variant].1);
+        }
+        for s in &mut self.shoppers {
+            s.gait
+                .advance(s.pos, dt, crate::people::PEOPLE[s.variant].1);
+        }
     }
 
     pub(super) fn update_shoppers(&mut self, dt: f32) {
