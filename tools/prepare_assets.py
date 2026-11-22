@@ -41,10 +41,12 @@ JOBS = [
     dict(name="cart", src=os.path.join(DL, "shopping_cart.glb"), size=1.0, tris=2500,
          colors={"_crayfishdiffuse": (0.62, 0.64, 0.66), "02___Default": (0.75, 0.1, 0.08),
                  "03___Default": (0.08, 0.08, 0.08)}),
-    dict(name="register", src=os.path.join(DL, "CashRegister_01", "CashRegister_01_1k.gltf"),
-         size=0.55, tris=1500),
+    # Kasse: Kassen-Station mit Bildschirm, Schublade und Bondrucker (J-Toastie, CC-BY 3.0,
+    # poly.pizza/m/ju1CrAV1UY, Datei static.poly.pizza/8e168263-...glb als pos_machine.glb)
+    dict(name="register", src=os.path.join(DL, "pos_machine.glb"), size=0.5, tris=1500),
     # Kasse: Stuhl, Zigaretten-Rollo, Kamera, Kartenterminal (Multimeter auf Stange), Zigaretten
-    dict(name="chair", src=os.path.join(DL, "modern_arm_chair_01", "modern_arm_chair_01_1k.gltf"), height=1.0, tris=1500),
+    # Buerostuhl der Kassiererin (Kenney, CC0, poly.pizza/m/CKSz6PB1vO, als desk_chair.glb)
+    dict(name="chair", src=os.path.join(DL, "desk_chair.glb"), height=1.05, tris=1500),
     dict(name="shutter", src=os.path.join(DL, "rollershutter_window_01", "rollershutter_window_01_1k.gltf"), size=1.3, tris=800),
     dict(name="camera", src=os.path.join(DL, "security_camera_01", "security_camera_01_1k.gltf"), size=0.4, tris=800),
     dict(name="terminal", src=os.path.join(DL, "retro_multimeter", "retro_multimeter_1k.gltf"), height=0.2, tris=600),

@@ -1,5 +1,6 @@
 //! HUD, Menues und End-Screens (alles im 480x270-Raster, unter dem VHS-Effekt).
 
+mod belt_window;
 mod smoke;
 mod till;
 
@@ -307,7 +308,7 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
             1.0,
         );
         let action = if g.focus == Some(Focus::Belt) {
-            "[E] Aufs Band legen"
+            "[E] Kassenfenster öffnen"
         } else if g.aim_cart {
             "[E] In den Wagen legen"
         } else {
@@ -344,17 +345,12 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                 );
             }
             Some(Focus::Belt) => match g.belt_pick() {
-                Some(i) if g.cart_at_register() => {
-                    let s = format!(
-                        "[E] Aufs Band: {}   ({}/{}, Mausrad)",
-                        g.cart[i].name,
-                        i + 1,
-                        g.cart.len()
-                    );
+                Some(_) if g.cart_at_register() => {
+                    let s = format!("[E] Kassenfenster öffnen ({} im Wagen)", g.cart.len());
                     u.text_center(y, &s, YELLOW, 1.0);
                     u.text_center(
                         y + 11.0,
-                        "Getränke zuerst. Nichts Falsches aufs Band.",
+                        "Dort ziehst du die Ware mit der Maus aufs Band.",
                         DIM,
                         1.0,
                     );
@@ -469,6 +465,9 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
 
     // die nutzlose Zigarette (1/2/3)
     smoke::draw(u, g, time);
+
+    // Kassenfenster (Waren mit der Maus aufs Band)
+    belt_window::draw(u, g, time);
 
     // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN, Geldboerse
     till::draw(u, g, time);

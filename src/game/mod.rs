@@ -1,5 +1,6 @@
 //! Ein Run: Einkaufen, Kippen, Kunden, Mitarbeiter, Kasse, Ausgang.
 
+pub mod belt_window;
 mod cheats;
 mod checkout;
 mod corridor;
@@ -65,6 +66,14 @@ pub struct Input {
     pub choice: Option<usize>,
     /// Zifferntaste 0-9 (PIN am Kartenterminal)
     pub digit: Option<u8>,
+    /// R: an der Kasse reklamieren (falsch gescannt)
+    pub complain: bool,
+    /// Kassenfenster (belt_window.rs): Mauszeiger im HUD-Raster, Taste gehalten,
+    /// gerade gedrueckt / losgelassen (Flanken werden in update() verbraucht)
+    pub ui_mouse: (f32, f32),
+    pub ui_down: bool,
+    pub ui_pressed: bool,
+    pub ui_released: bool,
 }
 
 pub struct Player {
@@ -307,6 +316,10 @@ pub struct Game {
     heart_acc: f32,
     /// Figur der Kassiererin (Personal-Variante)
     pub cashier_variant: usize,
+    /// Druck an der Kasse aus (fuer die alten Tests; die Druck-Tests schalten ihn ein)
+    pub calm_till: bool,
+    /// Kassenfenster offen (belt_window.rs)
+    pub belt_window: Option<belt_window::BeltWindow>,
     scan_timer: f32,
     pub paid: bool,
     pub outcome: Outcome,
@@ -480,6 +493,8 @@ impl Game {
                 let staff = crate::people::people_of(true);
                 staff[(seed as usize) % staff.len()]
             },
+            calm_till: cfg!(test),
+            belt_window: None,
             scan_timer: 0.0,
             paid: false,
             outcome: Outcome::Running,
@@ -773,6 +788,10 @@ impl Game {
         if self.dialog.is_some() || self.outcome != Outcome::Running {
             return;
         }
+        // Im Kassenfenster ist die Maus ein Zeiger, kein Blick
+        if self.belt_window_open() {
+            return;
+        }
         // Am Kartenterminal zieht die Maus die Karte durch, der Blick bleibt stehen
         if self.swiping() {
             self.swipe_move(dx);
@@ -835,6 +854,9 @@ impl Game {
             input.take_out = false;
             input.choice = None;
             input.digit = None;
+            input.complain = false;
+            input.ui_pressed = false;
+            input.ui_released = false;
             return;
         }
         // Todesanimation: keine Eingaben, keine NPCs
@@ -845,6 +867,9 @@ impl Game {
             input.take_out = false;
             input.choice = None;
             input.digit = None;
+            input.complain = false;
+            input.ui_pressed = false;
+            input.ui_released = false;
             input.wheel = 0;
             return;
         }
@@ -858,6 +883,9 @@ impl Game {
 
         if self.dialog.is_some() {
             self.update_dialog(dt, input);
+        } else if self.belt_window_open() {
+            // Kassenfenster: Waren mit der Maus aufs Band ziehen (belt_window.rs)
+            self.update_belt_window(input);
         } else if self.till_paying() {
             // Karte durchziehen / PIN: man steht am Terminal still
             self.update_till_pay(dt, input);
@@ -886,6 +914,9 @@ impl Game {
         input.wheel = 0;
         input.choice = None;
         input.digit = None;
+        input.complain = false;
+        input.ui_pressed = false;
+        input.ui_released = false;
 
         // Tutorial
         if let Some(t) = &mut self.tutorial {

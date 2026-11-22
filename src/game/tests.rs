@@ -247,13 +247,28 @@ pub(super) fn look_at_belt(g: &mut Game) {
     g.update(1.0 / 60.0, &mut Input::default());
 }
 
+/// Eine Ware aufs Band legen wie im Kassenfenster: was man in der Hand hat, sonst die
+/// gewaehlte Ware aus dem Wagen (belt_window.rs).
+pub(super) fn belt_drop(g: &mut Game) {
+    let src = if g.held.is_some() {
+        belt_window::DragSrc::Hand
+    } else {
+        match g.belt_pick() {
+            Some(i) => belt_window::DragSrc::Cart(i),
+            None => return,
+        }
+    };
+    g.window_drop(src);
+    g.update(1.0 / 60.0, &mut Input::default());
+}
+
 /// Den ganzen Wagen richtig aufs Band legen: Getraenke zuerst (Wagen steht an der Kasse).
 pub(super) fn put_all_on_belt(g: &mut Game) {
     look_at_belt(g);
     while !g.cart.is_empty() {
         let drink = g.cart.iter().position(|c| c.is_drink());
         g.cart_sel = Some(drink.unwrap_or(g.cart.len() - 1));
-        press_e(g);
+        belt_drop(g);
     }
 }
 
@@ -647,7 +662,7 @@ fn incomplete_list_blocks_payment() {
     g.trolley.pushing = false;
     g.trolley.pos = lane.scan_point + vec3(0.0, 0.0, -1.0);
     look_at_belt(&mut g);
-    press_e(&mut g);
+    belt_drop(&mut g);
     step(&mut g, 8.0, Input::default());
     assert_eq!(g.scanned.len(), 1);
     look_at_terminal(&mut g);
@@ -671,7 +686,7 @@ fn held_item_goes_on_belt_and_fakes_are_rejected() {
     g.trolley.pos = g.world.corral;
     g.held = Some(fake);
     look_at_belt(&mut g);
-    press_e(&mut g);
+    belt_drop(&mut g);
     assert!(g.held.is_none());
     assert_eq!(g.belt.len(), 1, "nicht aufs Band gelegt");
     let before = g.suspicion;
@@ -683,7 +698,7 @@ fn held_item_goes_on_belt_and_fakes_are_rejected() {
     assert!(g.suspicion <= before);
     // Wertstufe zaehlt Band und Gescanntes mit
     g.held = Some(ItemData::from_shelf(&g.world.items[i]));
-    press_e(&mut g);
+    belt_drop(&mut g);
     assert!(g.cart_value() > 0);
 }
 

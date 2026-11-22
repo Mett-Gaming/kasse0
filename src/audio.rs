@@ -44,6 +44,10 @@ pub enum Sfx {
     Stomp,
     /// Herzschlag (Flucht): zwei dumpfe Schlaege
     Heartbeat,
+    /// Kassiererin hebt ruckartig den Kopf: Knarzen von Stuhl und Nacken
+    Creak,
+    /// Klopfen am Absperrband
+    Knock,
 }
 
 /// Was die Musik gerade tun soll.
@@ -334,6 +338,32 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 ((thud + scuff) * 1.4).tanh() * 0.55
             })
         }
+        Sfx::Creak => {
+            // langsames, holpriges Knarzen: tiefe Frequenz mit unregelmaessigen Rucken
+            let mut phase = 0.0f32;
+            gen(0.55, &mut |t| {
+                let f = 180.0 + 90.0 * (t * 9.0).sin() + 60.0 * (t * 23.0).sin();
+                phase += TAU * f / RATE as f32;
+                let rucks = (((t * 31.0).fract() < 0.35) as i32 as f32) * 0.7 + 0.3;
+                let env = (t * 20.0).min(1.0) * (1.0 - t / 0.55);
+                ((phase.sin() * 0.6 + (phase * 2.7).sin() * 0.4) * rucks * env * 1.5).tanh() * 0.35
+            })
+        }
+        Sfx::Knock => {
+            // drei dumpfe Schlaege mit Knoecheln auf Plastik/Metall
+            gen(0.6, &mut |t| {
+                let hit = |t0: f32| {
+                    let x = t - t0;
+                    if x < 0.0 {
+                        0.0
+                    } else {
+                        ((TAU * 140.0 * x).sin() + 0.5 * (TAU * 410.0 * x).sin())
+                            * (-x * 35.0).exp()
+                    }
+                };
+                ((hit(0.0) + hit(0.18) + hit(0.36)) * 1.3).tanh() * 0.5
+            })
+        }
         Sfx::Heartbeat => {
             // "bumm-bumm": zwei tiefe Schlaege, der zweite leiser
             gen(0.5, &mut |t| {
@@ -403,6 +433,8 @@ impl Audio {
             Sfx::Exhale,
             Sfx::Stomp,
             Sfx::Heartbeat,
+            Sfx::Creak,
+            Sfx::Knock,
             Sfx::Scare,
             Sfx::Shriek,
         ]
@@ -495,6 +527,8 @@ mod tests {
             Sfx::Exhale,
             Sfx::Stomp,
             Sfx::Heartbeat,
+            Sfx::Creak,
+            Sfx::Knock,
             Sfx::Scare,
             Sfx::Shriek,
         ] {

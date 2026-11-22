@@ -59,6 +59,8 @@ struct App {
     mouse_delta: (f32, f32),
     cursor: (f32, f32),
     grabbed: bool,
+    /// Kassenfenster im letzten Bild offen (dann Maus wieder einfangen, wenn es zugeht)
+    window_was_open: bool,
     last_frame: Instant,
     accumulator: f32,
     clock: f32,
@@ -106,6 +108,7 @@ impl App {
             mouse_delta: (0.0, 0.0),
             cursor: (0.0, 0.0),
             grabbed: false,
+            window_was_open: false,
             last_frame: Instant::now(),
             accumulator: 0.0,
             clock: 0.0,
@@ -390,6 +393,15 @@ impl App {
 
         match self.screen {
             Screen::Playing => {
+                // Kassenfenster: Mauszeiger frei, Position geht ans Spiel (game/belt_window.rs)
+                let window = self.game.belt_window_open();
+                if window && self.grabbed {
+                    self.set_grab(false);
+                } else if !window && !self.grabbed && self.window_was_open {
+                    self.set_grab(true);
+                }
+                self.window_was_open = window;
+                self.input.ui_mouse = self.cursor;
                 let (mx, my) = std::mem::take(&mut self.mouse_delta);
                 self.game.look(mx, my);
                 self.accumulator += dt;
@@ -633,7 +645,12 @@ impl App {
                 }
                 KeyCode::KeyQ if pressed && !repeat => self.input.cart_toggle = true,
                 KeyCode::KeyF if pressed && !repeat => self.input.take_out = true,
+                KeyCode::KeyR if pressed && !repeat => self.input.complain = true,
                 KeyCode::KeyE | KeyCode::Space if pressed && !repeat => self.input.interact = true,
+                // Esc schliesst zuerst das Kassenfenster, sonst Pause
+                KeyCode::Escape if pressed && !repeat && self.game.belt_window_open() => {
+                    self.game.close_belt_window();
+                }
                 KeyCode::Escape | KeyCode::KeyP if pressed && !repeat => {
                     if self.game.outcome == Outcome::Running {
                         self.go(Screen::Paused);
@@ -771,12 +788,27 @@ impl ApplicationHandler for App {
                 };
                 self.input.wheel += y.round() as i32;
             }
+            // Kassenfenster: Ware loslassen
+            WindowEvent::MouseInput {
+                state: ElementState::Released,
+                button: MouseButton::Left,
+                ..
+            } => {
+                self.input.ui_released = true;
+                self.input.ui_down = false;
+            }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
                 button,
                 ..
             } => {
-                if self.screen == Screen::Playing {
+                if self.screen == Screen::Playing && self.game.belt_window_open() {
+                    // Kassenfenster: Ware anfassen
+                    if button == MouseButton::Left {
+                        self.input.ui_pressed = true;
+                        self.input.ui_down = true;
+                    }
+                } else if self.screen == Screen::Playing {
                     if !self.grabbed {
                         self.set_grab(true);
                     } else if button == MouseButton::Left {

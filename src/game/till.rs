@@ -211,6 +211,21 @@ pub struct Till {
     lr_prev: (bool, bool),
     /// Anzeige des Kartenlesers ("ZU SCHNELL" ...) und wie lange noch
     pub reader: Option<(&'static str, f32)>,
+    /// Sekunden seit der ersten Ware auf dem Band (treibt den Stress, pressure.rs)
+    pub time: f32,
+    /// Sie schaut gerade auf (pressure.rs) und Wartezeit bis zum naechsten Mal
+    pub look: Option<pressure::LookUp>,
+    look_wait: f32,
+    /// Takte fuer Genoergel, Durchsagen, Flackern, Klopfen und Herzschlag (pressure.rs)
+    nag_wait: f32,
+    announce_wait: f32,
+    flicker_wait: f32,
+    knock_wait: f32,
+    heart_acc: f32,
+    /// Kassenbon mit eventuell falsch gescannten Zeilen (receipt.rs)
+    pub receipt: Vec<receipt::ReceiptLine>,
+    /// Zeit fuers Barzahlen (cash.rs, haengt vom Stress beim Start ab)
+    pub cash_limit: f32,
 }
 
 impl Till {
@@ -224,6 +239,16 @@ impl Till {
             sel: 0,
             lr_prev: (false, false),
             reader: None,
+            time: 0.0,
+            look: None,
+            look_wait: rng.gen_range(pressure::LOOK_EVERY.0..pressure::LOOK_EVERY.1),
+            nag_wait: rng.gen_range(pressure::NAG_EVERY.0..pressure::NAG_EVERY.1),
+            announce_wait: rng.gen_range(6.0..12.0),
+            flicker_wait: rng.gen_range(3.0..8.0),
+            knock_wait: 0.0,
+            heart_acc: 0.0,
+            receipt: Vec::new(),
+            cash_limit: cash::CASH_TIME_MAX,
             lives: TILL_LIVES,
             doubt: 0.0,
             pin: [
@@ -417,6 +442,11 @@ impl Game {
             self.hint("Die Kassiererin will noch etwas von dir wissen.");
             return;
         }
+        // Falsch gescannte Zeilen, die man nicht reklamiert hat, kosten jetzt (receipt.rs)
+        if !self.till_charge_unnoticed() {
+            return;
+        }
+        let t = self.till.as_mut().unwrap();
         if t.cash {
             self.start_cash();
             return;
@@ -544,6 +574,14 @@ impl Game {
         if !self.till_active() {
             return;
         }
+        // Druck: Ungeduld, Aufschauen, Atmosphaere (pressure.rs); R reklamiert (receipt.rs)
+        self.update_till_pressure(dt);
+        if input.complain {
+            self.till_complain();
+        }
+        if !self.till_active() {
+            return;
+        }
         let near = self.near_till();
         let all_scanned = self.belt.is_empty() && self.scanned_complete();
         let Some(t) = &mut self.till else { return };
@@ -643,5 +681,7 @@ impl Game {
 }
 
 pub mod cash;
+pub mod pressure;
+pub mod receipt;
 #[cfg(test)]
 mod tests;

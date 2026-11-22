@@ -19,6 +19,8 @@ use rand_pcg::Pcg64;
 use std::f32::consts::{FRAC_PI_2, PI};
 
 const AISLE_PITCH: f32 = 3.4;
+/// Quengelware-Regal (Mitte) relativ zur Bandmitte: 1,3 m Gang zwischen Band und Regal
+const QUENGEL_DX: f32 = -1.85;
 /// So viel wird der Kollisionskoerper neben einem Durchgang gekuerzt (Meter)
 const PASSAGE_TRIM: f32 = 0.035;
 const GONDOLA_HALF_W: f32 = 0.6;
@@ -911,19 +913,74 @@ pub fn generate(params: &WorldParams) -> World {
             vec3(0.06, 0.06, 0.06),
             PLAIN,
         );
-        // Scannerfenster am Bandende, Ablage dahinter
+        // Theken-Scanner am Bandende (Einrichtung aus Boxen): Glasfenster in der Theke mit
+        // rotem Laser-Kreuz, dahinter ein senkrechter Scanner-Turm mit Glasfront
+        let glass = vec3(0.05, 0.07, 0.08);
+        let laser = if tipped {
+            vec3(0.8, 0.04, 0.04)
+        } else {
+            vec3(1.0, 0.12, 0.1)
+        };
+        let (glow, flick) = (
+            if open { 1.4 } else { 0.12 },
+            if tipped { 0.45 } else { 0.05 },
+        );
+        let sz = z0 + 2.5;
+        g.b.add(
+            vec3(cx, 0.913, sz),
+            vec3(0.19, 0.004, 0.11),
+            vec3(0.12, 0.12, 0.13),
+            PLAIN,
+        );
+        g.b.add(vec3(cx, 0.916, sz), vec3(0.16, 0.002, 0.09), glass, PLAIN);
         g.b.add_ex(
-            vec3(cx, 0.913, z0 + 2.55),
-            vec3(0.2, 0.004, 0.09),
-            if tipped {
-                vec3(0.6, 0.05, 0.05)
-            } else {
-                vec3(0.9, 0.25, 0.2)
-            },
+            vec3(cx, 0.919, sz),
+            vec3(0.14, 0.001, 0.004),
+            laser,
             EMISSIVE,
             i as f32 * 3.1,
-            if open { 1.1 } else { 0.15 },
-            if tipped { 0.4 } else { 0.0 },
+            glow,
+            flick,
+        );
+        g.b.add_ex(
+            vec3(cx, 0.919, sz),
+            vec3(0.004, 0.001, 0.08),
+            laser,
+            EMISSIVE,
+            i as f32 * 3.1,
+            glow,
+            flick,
+        );
+        // Turm auf der Kassiererseite, Glas zur Bandmitte (-x)
+        g.b.add(
+            vec3(cx + 0.24, 1.07, sz),
+            vec3(0.05, 0.16, 0.13),
+            vec3(0.16, 0.16, 0.18),
+            PLAIN,
+        );
+        g.b.add(
+            vec3(cx + 0.187, 1.07, sz),
+            vec3(0.003, 0.11, 0.1),
+            glass,
+            PLAIN,
+        );
+        g.b.add_ex(
+            vec3(cx + 0.183, 1.07, sz),
+            vec3(0.001, 0.08, 0.004),
+            laser,
+            EMISSIVE,
+            i as f32 * 3.1 + 1.0,
+            glow,
+            flick,
+        );
+        g.b.add_ex(
+            vec3(cx + 0.183, 1.07, sz),
+            vec3(0.001, 0.004, 0.07),
+            laser,
+            EMISSIVE,
+            i as f32 * 3.1 + 1.0,
+            glow,
+            flick,
         );
         // Kassiererplatz (Stuhl + Person sind Modelle) und Schrank mit Zigaretten-Rollo
         g.b.solid(vec3(cx + 0.85, 0.6, z0 + 2.4), vec3(0.45, 0.6, 0.65));
@@ -953,8 +1010,9 @@ pub fn generate(params: &WorldParams) -> World {
                 0.0,
             );
         }
+        // Quengelware-Regal: 1,3 m neben dem Band, damit man (auch mit Wagen) vorbeikommt
         g.b.add_solid(
-            vec3(cx - 1.25, 0.6, z0 + 1.0),
+            vec3(cx + QUENGEL_DX, 0.6, z0 + 1.0),
             vec3(0.2, 0.6, 0.6),
             vec3(0.3, 0.3, 0.32),
         );
@@ -1006,7 +1064,7 @@ pub fn generate(params: &WorldParams) -> World {
         }
         // Quengelware neben dem Band
         let suess = cat.sub_index("suess");
-        let qf = Frame::new(vec3(cx - 1.25, 0.0, z0 + 0.42), 0.0);
+        let qf = Frame::new(vec3(cx + QUENGEL_DX, 0.0, z0 + 0.42), 0.0);
         for &y in &[0.62f32, 0.92, 1.2] {
             g.b.add(
                 qf.pos(0.6, 0.0, y - 0.01),
@@ -1052,13 +1110,14 @@ pub fn generate(params: &WorldParams) -> World {
         );
         lanes.push(Lane {
             scan_point: vec3(cx - 0.7, 0.0, z0 + 2.4),
-            register: vec3(cx + 0.12, 0.91, z0 + 2.75),
+            register: vec3(cx + 0.17, 0.91, z0 + 2.83),
             open,
             belt_start: vec3(cx, 0.912, z0 + 0.15),
             belt_end: vec3(cx, 0.912, z0 + 2.32),
-            bag: vec3(cx - 0.12, 0.906, z0 + 2.85),
+            bag: vec3(cx - 0.2, 0.906, z0 + 2.85),
             terminal: vec3(cx - 0.36, 1.1, z0 + 2.35),
-            seat: vec3(cx + 0.8, 0.0, z0 + 2.5),
+            // Stuhl ein Stueck von der Theke weg, damit sie realistisch davor sitzen kann
+            seat: vec3(cx + 0.95, 0.0, z0 + 2.45),
             shutter: vec3(cx + 1.32, 1.0, z0 + 2.4),
             camera: vec3(cx + 0.4, 3.78, z0 + 1.2),
             monitor,

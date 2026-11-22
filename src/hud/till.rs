@@ -1,7 +1,7 @@
 //! HUD des Kassen-Minispiels: Misstrauen der Kassiererin, Kassen-Leben, ihre Fragen,
 //! Karte durchziehen und PIN-Eingabe am Terminal.
 
-use crate::game::till::cash::{denom_label, CASH_TIME, DENOMS};
+use crate::game::till::cash::{denom_label, DENOMS};
 use crate::game::till::{Pay, Till, PIN_TIME, QUESTION_TIME, TILL_LIVES};
 use crate::game::Game;
 use crate::ui::{self, euro, Ui, DIM, GREEN, RED, WHITE, YELLOW};
@@ -306,7 +306,7 @@ fn draw_cash(u: &mut Ui, g: &Game, t: &Till, left: f32) {
     row(u, "SCHEINE", y0 + 74.0, 0..NOTES, 62.0);
     row(u, "MÜNZEN", y0 + 112.0, NOTES..DENOMS.len(), 38.0);
 
-    let frac = (left / CASH_TIME).clamp(0.0, 1.0);
+    let frac = (left / t.cash_limit.max(0.1)).clamp(0.0, 1.0);
     let c = if frac < 0.3 {
         RED
     } else {
@@ -319,6 +319,47 @@ fn draw_cash(u: &mut Ui, g: &Game, t: &Till, left: f32) {
         WHITE,
         1.0,
     );
+}
+
+/// Zeilen auf dem Kassendisplay
+pub const RECEIPT_LINES: usize = 8;
+
+/// Kassendisplay rechts oben: die letzten Zeilen mit Preis, Summe, "R: reklamieren".
+/// Doppelte oder viel zu teure Zeilen sehen aus wie alle anderen - man muss sie bemerken.
+fn draw_receipt(u: &mut Ui, g: &Game, t: &Till) {
+    let (w, x0, y0) = (126.0, ui::W - 130.0, 30.0);
+    let shown: Vec<(&str, i64)> = t.receipt.iter().filter_map(|l| l.shown()).collect();
+    let lines = &shown[shown.len().saturating_sub(RECEIPT_LINES)..];
+    let h = 16.0 + lines.len() as f32 * 10.0 + 24.0;
+    u.rect(x0, y0, w, h, [0.02, 0.08, 0.04, 0.88]);
+    u.rect(x0, y0, w, 1.0, [0.5, 0.9, 0.55, 0.6]);
+    let ink = [0.55, 0.95, 0.6, 1.0];
+    u.text(x0 + 4.0, y0 + 4.0, "KASSE 0", YELLOW, 1.0);
+    for (k, (name, cents)) in lines.iter().enumerate() {
+        let y = y0 + 16.0 + k as f32 * 10.0;
+        let short: String = name.chars().take(7).collect();
+        u.text(x0 + 4.0, y, &short, ink, 1.0);
+        let price = euro(*cents);
+        u.text(
+            x0 + w - 4.0 - Ui::text_width(&price, 1.0),
+            y,
+            &price,
+            ink,
+            1.0,
+        );
+    }
+    let y = y0 + 16.0 + lines.len() as f32 * 10.0 + 2.0;
+    u.rect(x0 + 4.0, y, w - 8.0, 1.0, [0.5, 0.9, 0.55, 0.4]);
+    let sum = euro(g.scanned_value());
+    u.text(x0 + 4.0, y + 3.0, "SUMME", ink, 1.0);
+    u.text(
+        x0 + w - 4.0 - Ui::text_width(&sum, 1.0),
+        y + 3.0,
+        &sum,
+        ink,
+        1.0,
+    );
+    u.text(x0 + 4.0, y + 13.0, "R: reklamieren", DIM, 1.0);
 }
 
 pub fn draw(u: &mut Ui, g: &Game, time: f32) {
@@ -335,6 +376,11 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
         if k < t.lives {
             u.rect(x, 249.0, 7.0, 7.0, RED);
         }
+    }
+
+    // Kassendisplay (nicht waehrend man bezahlt): Fehlscans sind nicht markiert
+    if t.pay == Pay::Idle && !t.receipt.is_empty() && !g.belt_window_open() {
+        draw_receipt(u, g, t);
     }
 
     // Frage der Kassiererin

@@ -7,11 +7,12 @@ Spiel, Engine, Code, Shader und alle Sounds (synthetisiert): eigenes Projekt.
 | Modell | Quelle | Autor | Lizenz |
 |---|---|---|---|
 | Kundschaft und Personal (24 + 8 Varianten, Teile gemischt, Personal in Dienstkleidung umgefärbt und gesichtslos) | [Ultimate Modular Men Pack](https://poly.pizza/bundle/ZiH8muWqwQ), [Ultimate Modular Women Pack](https://poly.pizza/bundle/aCBDXDdTNN) | Quaternius | CC0 1.0 |
-| Mannequin in Sitzpose (frühere Kassiererin, noch in den Spieldateien; die Kassiererin ist jetzt eine Personal-Figur aus dem Modular-Pack oben) | Universal Animation Library 1 | Quaternius | CC0 1.0 |
+| Mannequin in Sitzpose (frühere Kassiererin, noch in den Spieldateien) und Sitz-Animation `Sitting_Idle_Loop` (auf die Personal-Figur der Kassiererin übertragen) | Universal Animation Library 1 | Quaternius | CC0 1.0 |
 | Einkaufswagen ("Shopping cart") | [poly.pizza/m/4lhRcMbl1pw](https://poly.pizza/m/4lhRcMbl1pw) | Poly by Google | **CC-BY 3.0** |
 | Ratte ("Rat") | [poly.pizza/m/6hsesZHvcPI](https://poly.pizza/m/6hsesZHvcPI) | Poly by Google | **CC-BY 3.0** |
 | Zigarette ("Cigarette") | [poly.pizza/m/2RL6h8MbDPb](https://poly.pizza/m/2RL6h8MbDPb) | Zgeal | **CC-BY 3.0** |
-| Kasse ("Cash Register 01") | [polyhaven.com/a/CashRegister_01](https://polyhaven.com/a/CashRegister_01) | Poly Haven | CC0 1.0 |
+| Kasse ("POS Machine") | [poly.pizza/m/ju1CrAV1UY](https://poly.pizza/m/ju1CrAV1UY) | J-Toastie | **CC-BY 3.0** |
+| Stuhl der Kassiererin ("Desk Chair") | [poly.pizza/m/CKSz6PB1vO](https://poly.pizza/m/CKSz6PB1vO) | Kenney | CC0 1.0 |
 | Warnschild ("Wet Floor Sign 01") | [polyhaven.com/a/WetFloorSign_01](https://polyhaven.com/a/WetFloorSign_01) | Poly Haven | CC0 1.0 |
 | Konservendose ("Russian Food Cans 01") | [polyhaven.com/a/russian_food_cans_01](https://polyhaven.com/a/russian_food_cans_01) | Poly Haven | CC0 1.0 |
 
@@ -40,16 +41,15 @@ Bezogen ueber opengameart.org, Quelldateien in `assets_src/packs/`. Kenney-Model
 | Kerzen | Candle (8apROCXjeN4) | Jarlan Perez | CC-BY 3.0 |
 | Glühbirne | Light bulb (eKaX3HRxj58) | jeremy | CC-BY 3.0 |
 
-Alle CC-BY-3.0-Modelle (Einkaufswagen, Ratte, Butter, Reis, Batterien, Kekse, Kerzen, Glühbirne) müssen beim Weitergeben mit Titel, Autor und Lizenz genannt werden (https://creativecommons.org/licenses/by/3.0/).
+Alle CC-BY-3.0-Modelle (Einkaufswagen, Ratte, Zigarette, Kasse, Butter, Reis, Batterien, Kekse, Kerzen, Glühbirne) müssen beim Weitergeben mit Titel, Autor und Lizenz genannt werden (https://creativecommons.org/licenses/by/3.0/).
 
 Der Einkaufswagen steht unter CC-BY 3.0 und muss beim Weitergeben des Spiels genannt werden: "Shopping cart" by Poly by Google, CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
 
 ### Kasse (Poly Haven, CC0, https://polyhaven.com/a/<id>)
-- Stuhl der Kassierer:in: `modern_arm_chair_01`
 - Zigaretten-Rollo: `rollershutter_window_01`, Zigaretten: `cigarette_pack`
 - Ueberwachungskamera: `security_camera_01`
 - Kartenterminal: `retro_multimeter` (als Terminal auf der Stange)
-- Kassierer:in: Quaternius Universal Animation Library (CC0), Pose `Driving_Loop` (sitzend)
+- Kasse und Stuhl: siehe Tabelle oben (POS Machine, Desk Chair). Der Theken-Scanner ist Einrichtung aus Boxen.
 
 ## Schrift
 8x8-Bitmapfont aus dem Crate `font8x8` (Public Domain, basierend auf Daniel Hepper's font8x8).

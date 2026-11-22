@@ -41,7 +41,15 @@ pub enum Clip {
     Walk = 1,
     Reach = 2,
     Run = 3,
+    /// Sitzen (Kassiererin): aus der Animations-Bibliothek uebertragen (tools/prepare_people.py)
+    Sit = 4,
 }
+
+/// Sitzpose: so weit liegt das Gesaess hinter dem Figur-Ursprung (Meter, gegen die
+/// Blickrichtung) - so stellt man die Figur, damit sie auf einem Stuhl landet
+pub const SIT_BACK: f32 = 0.25;
+/// und so viel hoeher, damit es auf der Sitzflaeche aufliegt
+pub const SIT_UP: f32 = 0.03;
 
 struct ClipData {
     fps: f32,
@@ -214,6 +222,42 @@ mod tests {
             assert!(
                 p.iter().zip(&q).any(|(x, y)| !x.abs_diff_eq(*y, 1e-3)),
                 "Animation steht still"
+            );
+        }
+    }
+
+    #[test]
+    fn sitting_pose_is_lower_and_has_the_seat_behind() {
+        // Sitzpose: Kopf deutlich tiefer als im Stehen, Fuesse weiter am Boden
+        let skins = load_skins();
+        for (v, s) in skins.iter().enumerate() {
+            let a = anims(PEOPLE[v].1);
+            let top = |clip: Clip| {
+                let mut m = Vec::new();
+                a.sample(clip, 0.0, &mut m);
+                let (mut lo, mut hi) = (f32::MAX, f32::MIN);
+                for vx in s.vertices.iter().step_by(5) {
+                    let p = Vec3::from(vx.pos).extend(1.0);
+                    let mut r = Vec4::ZERO;
+                    for k in 0..4 {
+                        r += m[vx.joints[k] as usize] * p * vx.weights[k];
+                    }
+                    lo = lo.min(r.y);
+                    hi = hi.max(r.y);
+                }
+                (lo, hi)
+            };
+            let (_, stand) = top(Clip::Idle);
+            let (feet, sit) = top(Clip::Sit);
+            assert!(
+                sit < stand - 0.25,
+                "{} sitzt nicht: {stand} -> {sit}",
+                PEOPLE[v].0
+            );
+            assert!(
+                feet.abs() < 0.15,
+                "{} Fuesse schweben im Sitzen: {feet}",
+                PEOPLE[v].0
             );
         }
     }

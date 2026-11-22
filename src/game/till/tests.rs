@@ -1,6 +1,6 @@
 use super::super::tests::{
-    look_at_belt, look_at_terminal, press_e, put_all_on_belt, scan_and_answer, shelf_item, step,
-    swipe, type_pin,
+    belt_drop, look_at_belt, look_at_terminal, press_e, put_all_on_belt, scan_and_answer,
+    shelf_item, step, swipe, type_pin,
 };
 use super::*;
 
@@ -127,7 +127,7 @@ fn paying_too_much_cash_costs_a_life_and_is_returned() {
 #[test]
 fn paying_cash_too_slowly_is_suspicious() {
     let mut g = at_terminal(47, true);
-    step(&mut g, cash::CASH_TIME + 0.2, Input::default());
+    step(&mut g, cash::CASH_TIME_MAX + 0.2, Input::default());
     assert!((doubt(&g) - cash::SUS_CASH_SLOW).abs() < 1e-4);
     assert!(!g.paid);
 }
@@ -182,11 +182,11 @@ fn drinks_not_first_costs_a_life_at_once() {
     // erst etwas anderes, dann das Wasser
     let other = g.cart.iter().position(|c| !c.is_drink()).unwrap();
     g.cart_sel = Some(other);
-    press_e(&mut g);
+    belt_drop(&mut g);
     assert_eq!(doubt(&g), 0.0);
     let water = g.cart.iter().position(|c| c.is_drink()).unwrap();
     g.cart_sel = Some(water);
-    press_e(&mut g);
+    belt_drop(&mut g);
     assert_eq!(lives(&g), TILL_LIVES - 1, "Reihenfolge kostet kein Leben");
 }
 
@@ -394,4 +394,188 @@ fn full_doubt_costs_a_life_and_the_third_ends_the_run() {
     }
     // Die Leben im Markt bleiben davon unberuehrt
     assert_eq!(g.deaths, 0);
+}
+
+// ------------------------------------------------------------ Druck an der Kasse
+
+/// An der Kasse mit Ware auf dem Band, Druck eingeschaltet, keine Fragen, kein Aufschauen.
+fn under_pressure(seed: u64) -> Game {
+    let mut g = at_till(seed);
+    put_all_on_belt(&mut g);
+    g.calm_till = false;
+    let t = g.till.as_mut().unwrap();
+    t.ask_at.clear();
+    t.look_wait = 1e6;
+    g
+}
+
+/// Blick auf den Kopf der Kassiererin (oder mit `away` genau entgegengesetzt).
+fn look_at_cashier(g: &mut Game, away: bool) {
+    let head = g.open_lane().unwrap().seat + vec3(0.0, 1.6, 0.0);
+    let to = head - g.eye();
+    let mut yaw = to.x.atan2(-to.z);
+    let mut pitch = (to.y / to.length()).asin();
+    if away {
+        yaw += std::f32::consts::PI;
+        pitch = 0.0;
+    }
+    g.player.yaw = yaw;
+    g.player.pitch = pitch;
+}
+
+fn force_look(g: &mut Game) {
+    let t = g.till.as_mut().unwrap();
+    t.look = Some(pressure::LookUp {
+        warn: 0.0,
+        stare: 2.0,
+        caught: false,
+    });
+    t.look_wait = 1e6;
+}
+
+#[test]
+fn stress_rises_with_time_and_lost_lives() {
+    let mut g = under_pressure(91);
+    let s0 = g.till_stress();
+    g.till.as_mut().unwrap().time = 90.0;
+    let s1 = g.till_stress();
+    g.till.as_mut().unwrap().lives -= 1;
+    let s2 = g.till_stress();
+    assert!(s0 < s1 && s1 < s2, "Stress {s0} {s1} {s2}");
+    assert!(s2 <= 1.0);
+}
+
+#[test]
+fn the_cashier_gets_impatient_on_her_own() {
+    let wait = |time: f32| {
+        let mut g = under_pressure(92);
+        g.till.as_mut().unwrap().time = time;
+        look_at_cashier(&mut g, true);
+        let before = doubt(&g);
+        step(&mut g, 10.0, Input::default());
+        doubt(&g) - before
+    };
+    let calm = wait(0.0);
+    let late = wait(90.0);
+    assert!(calm > 0.02, "keine Ungeduld: {calm}");
+    assert!(
+        late > calm,
+        "unter Stress nicht ungeduldiger: {calm} vs {late}"
+    );
+}
+
+#[test]
+fn when_she_looks_up_the_scanner_stops_and_staring_is_noticed() {
+    let mut g = under_pressure(93);
+    look_at_cashier(&mut g, true);
+    force_look(&mut g);
+    let scanned = g.scanned.len();
+    let before = doubt(&g);
+    step(&mut g, 1.0, Input::default());
+    assert!(g.cashier_looking());
+    assert_eq!(g.scanned.len(), scanned, "sie scannt, obwohl sie aufschaut");
+    assert!(
+        doubt(&g) - before < 0.05,
+        "stillhalten und wegschauen faellt auf"
+    );
+    // ins leere Gesicht schauen faellt auf
+    force_look(&mut g);
+    look_at_cashier(&mut g, false);
+    let before = doubt(&g);
+    step(&mut g, 0.2, Input::default());
+    assert!(
+        doubt(&g) - before >= pressure::SUS_STARE,
+        "Anstarren faellt nicht auf"
+    );
+}
+
+#[test]
+fn moving_while_she_stares_is_noticed() {
+    let mut g = under_pressure(94);
+    look_at_cashier(&mut g, true);
+    force_look(&mut g);
+    let before = doubt(&g);
+    step(
+        &mut g,
+        0.6,
+        Input {
+            back: true,
+            ..Default::default()
+        },
+    );
+    assert!(
+        doubt(&g) - before >= pressure::SUS_STARE,
+        "Bewegen faellt nicht auf"
+    );
+}
+
+#[test]
+fn wrong_scans_must_be_reclaimed_with_r() {
+    let mut g = at_till(95);
+    put_all_on_belt(&mut g);
+    g.till.as_mut().unwrap().cash = false;
+    scan_and_answer(&mut g);
+    let fair = g.scanned_value();
+    // viel zu teuer: die Summe steigt, R korrigiert
+    g.debug_force_wrong_scan(false);
+    assert!(g.scanned_value() > fair, "Fehlscan aendert die Summe nicht");
+    let r = Input {
+        complain: true,
+        ..Default::default()
+    };
+    frame(&mut g, r);
+    assert_eq!(g.scanned_value(), fair, "Reklamation korrigiert nicht");
+    assert_eq!(lives(&g), TILL_LIVES);
+    // R ohne Fehler: sie wird misstrauisch
+    let before = doubt(&g);
+    frame(&mut g, r);
+    assert!((doubt(&g) - before - receipt::SUS_FALSE_COMPLAINT).abs() < 1e-3);
+    // doppelt gescannt und nicht bemerkt: beim Bezahlen ist ein Leben weg
+    g.debug_force_wrong_scan(true);
+    assert!(g.scanned_value() > fair);
+    look_at_terminal(&mut g);
+    press_e(&mut g);
+    assert_eq!(
+        lives(&g),
+        TILL_LIVES - 1,
+        "nicht bemerkter Fehlscan kostet nichts"
+    );
+    assert!(g.swiping(), "Bezahlen startet danach nicht");
+    assert_eq!(
+        g.scanned_value(),
+        fair,
+        "Fehlscan nach dem Leben nicht korrigiert"
+    );
+    // Display und Summe passen immer zusammen
+    let t = g.till.as_ref().unwrap();
+    let shown: i64 = t
+        .receipt
+        .iter()
+        .filter_map(|l| l.shown())
+        .map(|l| l.1)
+        .sum();
+    assert_eq!(shown, g.scanned_value());
+}
+
+#[test]
+fn someone_knocks_at_the_barrier() {
+    let mut g = under_pressure(96);
+    let mut other = Game::new(5);
+    other.tip();
+    let mut c = other.customers.remove(0);
+    let (x0, x1, z0, _) = g.world.checkout_zone().unwrap();
+    c.pos = g.world.collide(vec3((x0 + x1) * 0.5, 0.0, z0 - 0.6), 0.25);
+    c.stalker = true;
+    g.customers = vec![c];
+    g.sfx.clear();
+    let mut knocks = 0;
+    for _ in 0..60 * 4 {
+        g.update(1.0 / 60.0, &mut Input::default());
+        knocks += g
+            .sfx
+            .drain(..)
+            .filter(|(s, _)| matches!(s, Sfx::Knock))
+            .count();
+    }
+    assert!(knocks > 0, "kein Klopfen am Absperrband");
 }

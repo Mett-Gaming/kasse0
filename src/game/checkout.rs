@@ -91,31 +91,6 @@ impl Game {
         }
     }
 
-    /// E auf das Band: Ware aus der Hand ablegen oder die gewaehlte Ware aus dem Wagen.
-    pub(super) fn use_belt(&mut self) {
-        if self.paid {
-            self.hint("Du hast schon bezahlt.");
-            return;
-        }
-        if let Some(item) = self.held.take() {
-            self.put_on_belt(item);
-            return;
-        }
-        if self.open_lane().is_none() {
-            return;
-        }
-        if self.cart.is_empty() {
-            self.hint("Dein Wagen ist leer.");
-        } else if !self.cart_at_register() {
-            self.say("Bring deinen Wagen zur Kasse.", 3.0);
-            self.play(Sfx::Error, 0.5);
-        } else if let Some(i) = self.belt_pick() {
-            let item = self.cart.remove(i);
-            self.cart_sel = None;
-            self.put_on_belt(item);
-        }
-    }
-
     /// E am Kartenterminal: bezahlen.
     pub(super) fn use_terminal(&mut self) {
         if self.paid {
@@ -146,7 +121,9 @@ impl Game {
     }
 
     pub fn scanned_value(&self) -> i64 {
-        self.scanned.iter().map(|c| c.cents).sum::<i64>().max(0)
+        // dazu, was die Kassiererin falsch gescannt hat und noch nicht reklamiert ist
+        let extra = self.till.as_ref().map_or(0, |t| t.overcharge());
+        (self.scanned.iter().map(|c| c.cents).sum::<i64>() + extra).max(0)
     }
 
     pub(super) fn pay(&mut self) {
@@ -196,7 +173,8 @@ impl Game {
             .belt
             .first()
             .is_some_and(|b| b.s >= len - b.data.half().z - 0.02);
-        if !(ready && near) {
+        // schaut sie gerade auf, ruht der Scanner (till/pressure.rs)
+        if !(ready && near) || self.cashier_looking() {
             self.scan_timer = 0.0;
             return;
         }
@@ -213,6 +191,7 @@ impl Game {
             }
             _ => {
                 self.play(Sfx::Beep, 0.6);
+                self.till_receipt_scan(&item);
                 self.scanned.push(item);
                 self.till_after_scan();
             }
@@ -235,22 +214,22 @@ impl Game {
     pub(super) fn collect_checkout_draws(&self, out: &mut Vec<MeshDraw>) {
         let white = Vec4::new(1.0, 1.0, 1.0, 0.0);
         let face_x = Quat::from_rotation_y(-std::f32::consts::FRAC_PI_2);
-        let open = self.open_lane().map(|l| l.seat);
         let eye = self.eye();
+        // Kasse (Bildschirm und Schublade im Modell bei +z) und Stuhl (Lehne bei +z) zur
+        // Kassiererin bzw. zum Band drehen: beide um +90 Grad
+        let to_cashier = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
         for lane in &self.world.lanes {
             out.push(MeshDraw {
                 mesh: MeshId::Register as usize,
-                model: Mat4::from_rotation_translation(face_x, lane.register),
+                model: Mat4::from_rotation_translation(to_cashier, lane.register),
                 tint: white,
             });
-            // An der offenen Kasse steht die Kassiererin (animierte Figur, draws.rs) statt des Stuhls
-            if Some(lane.seat) != open {
-                out.push(MeshDraw {
-                    mesh: MeshId::Chair as usize,
-                    model: Mat4::from_rotation_translation(face_x, lane.seat),
-                    tint: Vec4::new(0.55, 0.55, 0.6, 0.0),
-                });
-            }
+            // Buerostuhl; an der offenen Kasse sitzt die Kassiererin darauf (draws.rs)
+            out.push(MeshDraw {
+                mesh: MeshId::Chair as usize,
+                model: Mat4::from_rotation_translation(to_cashier, lane.seat),
+                tint: Vec4::new(0.8, 0.8, 0.82, 0.0),
+            });
             // Zigaretten-Rollo: im gekippten Markt hochgezogen, dahinter Zigaretten
             let rolled = self.tipped;
             let (sy, y) = if rolled { (0.5, 1.68) } else { (2.3, 1.0) };

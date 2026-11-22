@@ -99,7 +99,7 @@ impl Game {
                 }
                 // ausatmen; der Zug hat sie kuerzer gemacht
                 self.exhale = 2.2;
-                self.play(Sfx::Exhale, 0.45);
+                self.play(Sfx::Exhale, 0.225);
                 let len = (len - PUFF_BURN).max(0.06);
                 let puffs = puffs + 1;
                 if puffs >= MAX_PUFFS {

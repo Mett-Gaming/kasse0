@@ -21,7 +21,8 @@ SO SPIELST DU
   5. Die gesichtslosen Mitarbeiter sprechen dich an: unauffällig antworten (1, 2, 3).
   6. Die Kassen sind abgesperrt, bis dein Zettel komplett ist. Unten links zeigt ein
      Balken, wie auffällig du bist.
-  7. An der offenen Kasse die Ware Stück für Stück aufs Band legen (E, Mausrad wählt).
+  7. An der offenen Kasse E am Band drücken: Im Kassenfenster ziehst du die Ware
+     mit gedrückter Maustaste aus dem Wagen aufs Band (E/Esc schließt es).
      Ab jetzt läuft das Kassen-Minispiel, und raus geht es erst nach dem Bezahlen.
 
 DAS KASSEN-MINISPIEL
@@ -36,6 +37,12 @@ DAS KASSEN-MINISPIEL
       Dann die PIN, die das Terminal kurz zeigt, eintippen (0-9).
     - Manchmal geht die Karte nicht: Dann zahlst du bar aus der Geldbörse,
       schnell und passend (A/D oder Mausrad wählen, E hinlegen, F zurück).
+    - Schaut sie auf (der Scanner stoppt, es knarzt): still stehen und ihr
+      nicht ins Gesicht schauen - im Kassenfenster: Maus stillhalten.
+    - Kassendisplay rechts oben prüfen: Scannt sie etwas doppelt oder zu
+      teuer, mit R reklamieren - übersehen kostet beim Bezahlen ein Leben.
+    - Trödle nicht: sie wird von allein ungeduldig, und je länger du stehst,
+      desto schlimmer wird alles.
     - Nicht von der Kasse weggehen.
   Du hast drei Kassen-Leben. Ein direkter Fehler (Getränke nicht zuerst, falsche
   Ware, schlechte Antwort, Karte zu schnell, falsche PIN, zu viel Geld) kostet
@@ -53,7 +60,8 @@ DIE FLUCHT
 STEUERUNG
   WASD               Gehen            Shift   Rennen (fällt auf!)
   Maus               Umsehen          TAB     Einkaufszettel
-  E / Linksklick     Ware greifen, in den Wagen / aufs Band legen, Karte durchziehen
+  E / Linksklick     Ware greifen, in den Wagen legen, Kassenfenster öffnen, Karte
+  Maus ziehen        im Kassenfenster: Ware aus dem Wagen aufs Band
   Q                  Wagen stehen lassen / schieben
   Shift halten       Rennen (kostet Ausdauer)
   F                  Ware aus dem Wagen nehmen (die anvisierte leuchtet auf)
@@ -62,6 +70,7 @@ STEUERUNG
                      sonst: Zigarette anzünden / Zug nehmen / wegschnippen
                      (nach dem 4. Zug fliegt sie von allein weg)
   0 - 9              PIN am Kartenterminal
+  R                  an der Kasse reklamieren (falsch gescannt)
   A / D, Mausrad     beim Barzahlen: Schein oder Münze wählen (E hinlegen, F zurück)
   Esc                Pause            F12     Screenshot (Ordner "Bilder")
 

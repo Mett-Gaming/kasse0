@@ -20,7 +20,7 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 4. Falsch beschriftete Ware ("Mlich", unsinnige Preise) gehört nicht auf den Zettel.
 5. Die **Kunden** kaufen ganz normal ein, solange du hinsiehst. Siehst du weg, starren sie herüber, und einige verfolgen dich: Sie schleichen sich an und holen deutlich auf, wenn du rennst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
-7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort steht die Kassiererin). Zieh den Wagen heran und leg die Ware **Stück für Stück mit E aufs Band** (Mausrad wählt, welche). Dann beginnt das **Kassen-Minispiel** (siehe unten). Bezahlt ist, wenn die Karte durchgezogen und die PIN eingetippt ist (oder du bar und passend gezahlt hast).
+7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und drück **E am Band**: Es öffnet sich das **Kassenfenster** mit deinem Wagen links, dem Band in der Mitte und dem Bon rechts. Zieh die Waren **mit gedrückter Maustaste** aufs Band. E oder Esc schließt das Fenster. Dann beginnt das **Kassen-Minispiel** (siehe unten). Bezahlt ist, wenn die Karte durchgezogen und die PIN eingetippt ist (oder du bar und passend gezahlt hast).
 8. **Flucht:** Kaum hast du bezahlt, kommt die Durchsage *"Kunde 0 hat ein Gesicht. Schnappt ihn!"*. Der Alarm geht los, und alle Kunden und Mitarbeiter rennen auf dich zu. Du hörst ihre Schritte immer näher kommen und dein Herz immer schneller schlagen. Lauf zur Tür! Wer dich jetzt erwischt, beendet den Einkauf sofort.
 9. **Der Korridor:** Hinter der Tür wartet ein langer, enger Gang mit rot flackernden Röhren. Weich den Kistenstapeln, umgekippten Regalen und Paletten aus. Sie liegen bei jedem Lauf woanders. An den Wänden hängen Poster: *NICHT UMDREHEN*. Das ist ernst gemeint: **Wer sich umdreht, ist sofort tot**, und was dann direkt vor dir steht, willst du nicht sehen (schon beim Seitenblick färbt sich das Bild rot). Was hinter dir los ist, siehst du nur im großen Spiegel am Ende des Gangs. Der Ausgang liegt kurz davor links.
 
@@ -31,6 +31,10 @@ In den **Kassenbereich kommen keine NPCs** hinein. Sobald die erste Ware auf dem
 - **Karte durchziehen:** E am Kartenterminal öffnet den Kartenleser. Mit E nimmst du die SCAMCART aus dem Portemonnaie, dann ziehst du sie mit der Maus **gleichmäßig nach rechts** durch den Leser. Das Display meldet „ZU SCHNELL“ (kostet ein Leben) oder „ZU LANGSAM“ (macht sie misstrauisch; auch, wenn du unterwegs anhältst). Dann noch mal. Bei „ANGENOMMEN“ geht es weiter zur PIN.
 - **PIN eintippen (0–9):** Das Terminal zeigt die PIN kurz an. Merk sie dir und tipp sie ein, bevor die Zeit abläuft.
 - **Manchmal nur bar:** *"Kartenzahlung geht heute nicht."* Dann öffnet sich deine Geldbörse. Wähle Scheine und Münzen mit A/D oder dem Mausrad, leg sie mit E hin (F nimmt zurück) und zahl **genau passend**, bevor die Zeit abläuft. Zu viel fällt auf.
+- **Sie wird ungeduldig:** Ihr Misstrauen steigt von allein, je länger du brauchst, desto schneller. Sie nörgelt, das Licht flackert, dein Herz rast, und am Absperrband klopft es.
+- **Sie schaut auf:** Ab und zu stoppt der Scanner, es knarzt, und sie starrt dich an. Dann **still stehen und nicht ins Gesicht schauen**.
+- **Kassendisplay prüfen:** Rechts oben läuft der Bon mit. Manchmal scannt sie etwas doppelt oder viel zu teuer. Bemerk es und drück **R** zum Reklamieren. Wer es übersieht, verliert beim Bezahlen ein Leben. Wer grundlos reklamiert, macht sie misstrauisch.
+- Je länger du an der Kasse stehst und je mehr Leben schon weg sind, desto schlimmer wird alles (auch beim Barzahlen: weniger Zeit, mehr Kleingeld-Chaos).
 - **Nicht weggehen:** Entfernst du dich von der Kasse, steigt ihr Misstrauen, und die Verfolger können dich wieder erwischen.
 
 **Direkte Fehler** (Getränke nicht zuerst, falsche Ware, schlechte Antwort, Karte zu schnell, falsche PIN, zu viel Geld) kosten **sofort ein Kassen-Leben**. Weiche Fehler (neutrale Antwort, Schweigen, zu langsam, Weggehen) füllen nur ihren Misstrauens-Balken. Ist der voll, hebt sie den Kopf: ebenfalls ein Leben weg, und der Balken beginnt wieder bei null. Nach dem dritten Mal hat sie dich durchschaut, und der Run ist vorbei. Die Kassen-Leben sind getrennt von den drei Leben im Markt.
@@ -53,6 +57,7 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 | TAB (halten) | Einkaufszettel und Warenwert |
 | 1 / 2 / 3 | Antwort im Gespräch und an der Kasse. Sonst völlig nutzlos: **1** zündet eine Zigarette an, **2** führt sie zum Mund und nimmt einen Zug (sie wird jedes Mal kürzer), **3** schnippt sie weg (die Kippe glimmt am Boden weiter). Nach dem 4. Zug wirfst du sie von allein weg |
 | 0–9 | PIN am Kartenterminal |
+| R | An der Kasse reklamieren (falsch gescannt) |
 | A / D oder Mausrad, E, F (beim Barzahlen) | Schein oder Münze wählen, hinlegen, zurücknehmen |
 | Esc / P | Pause (mit Tastenübersicht) |
 | F1 | Cheat-Menü zum Testen, nach Kategorien: Spieler, Markt & Einkauf, Kasse & Flucht, Leute, Schrecken. Enter oder Rechts öffnet eine Kategorie, Esc oder Links geht zurück |

@@ -327,7 +327,8 @@ impl Game {
             return;
         }
         match self.focus {
-            Some(Focus::Belt) => return self.use_belt(),
+            // E am Band oeffnet das Kassenfenster (belt_window.rs)
+            Some(Focus::Belt) => return self.open_belt_window(),
             Some(Focus::Terminal) => return self.use_terminal(),
             _ => {}
         }

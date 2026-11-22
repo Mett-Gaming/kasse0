@@ -140,18 +140,34 @@ impl Game {
         // zum Band, im gekippten Markt dreht sie sich sonst immer zu dir. Waehrend des Schrecks
         // "sie beugt sich vor" zeichnet scares.rs sie.
         if let Some(lane) = self.open_lane().filter(|_| !self.cashier_standing()) {
-            let scanning = self.scan_timer > 0.0;
-            let yaw = if self.tipped && !scanning {
+            // schaut sie auf (till/pressure.rs), ruckt sie zum Spieler herum und leuchtet heller
+            let looking = self.cashier_looking();
+            let scanning = self.scan_timer > 0.0 && !looking;
+            let yaw = if looking || (self.tipped && !scanning) {
                 npc::yaw_towards(lane.seat, self.player.pos)
             } else {
                 -std::f32::consts::FRAC_PI_2
             };
-            let glow = if self.tipped { 0.22 } else { 0.0 };
+            let glow = if self.cashier_staring() {
+                0.5 + 0.1 * (t * 17.0).sin()
+            } else if self.tipped {
+                0.22
+            } else {
+                0.0
+            };
+            // beim Aufschauen friert sie ein (keine Bewegung im Clip)
+            let anim_t = if looking { 0.0 } else { t };
+            // sie sitzt auf dem Buerostuhl: Figur so stellen, dass das Gesaess auf der
+            // Sitzflaeche liegt (dreht sich mit dem Stuhl zu dir, wenn sie dich ansieht)
+            let facing = vec3(yaw.sin(), 0.0, yaw.cos());
+            let pos = lane.seat
+                + facing * crate::people::SIT_BACK
+                + vec3(0.0, crate::people::SIT_UP, 0.0);
             out.push(person(
                 self.cashier_variant,
-                if scanning { Clip::Reach } else { Clip::Idle },
-                t,
-                lane.seat,
+                Clip::Sit,
+                anim_t,
+                pos,
                 yaw,
                 Vec4::new(1.0, 1.0, 1.0, glow),
             ));
