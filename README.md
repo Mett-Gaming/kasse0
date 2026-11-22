@@ -122,11 +122,12 @@ Die Engine **Mettgine** liegt als Git-Submodule in `mettgine/` ([Mett-Gaming/met
 
 ```powershell
 git clone --recursive https://github.com/Mett-Gaming/kasse0.git
+git submodule foreach "git checkout main"   # einmal nach dem Klonen
 git pull
 git submodule update --init --remote --merge
 ```
 
-Die Engine steht dabei auf ihrem Zweig `main` (in `.gitmodules`: `branch = main`, `update = merge`), nicht auf einem losen Commit. Engine-Änderungen werden ohne Pull-Requests direkt gemacht:
+Nach dem Klonen steht die Engine kurz auf einem losen Commit; der einmalige `git checkout main` setzt sie auf ihren Zweig. Danach holt `update --remote --merge` neue Engine-Stände per Merge (in `.gitmodules`: `branch = main`, `update = merge`). Engine-Änderungen werden ohne Pull-Requests direkt gemacht:
 1. In `mettgine/` ändern und dort committen, dann `git fetch origin`, `git merge origin/main`, `git push origin main` (bei neuer Funktion oder Korrektur mit Tag `vX.Y.Z`).
 2. In kasse0 den neuen Engine-Stand festhalten: `git add mettgine`, mit den Spieländerungen committen und wie gewohnt pushen.
 
