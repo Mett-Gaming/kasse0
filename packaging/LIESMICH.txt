@@ -25,16 +25,26 @@ SO SPIELST DU
      Ab jetzt läuft das Kassen-Minispiel, und raus geht es erst nach dem Bezahlen.
 
 DAS KASSEN-MINISPIEL
-  An der Kasse sind Kunden und Mitarbeiter harmlos, solange du dort bleibst.
-  Dafür beobachtet dich die Kassiererin. Fall ihr nicht auf:
+  In den Kassenbereich kommen Kunden und Mitarbeiter nicht hinein, und solange du
+  an der Kasse bleibst, sind sie harmlos. Dafür beobachtet dich die Kassiererin.
+  Fall ihr nicht auf:
     - Getränke zuerst aufs Band, keine falsch beschriftete Ware.
     - Ihre Fragen unauffällig beantworten (1, 2, 3), nicht schweigen.
     - Am Kartenterminal (E) die Karte mit der Maus ruhig nach unten ziehen.
-      Zu schnell = Karte nicht gelesen.
-    - Die PIN, die das Terminal kurz zeigt, eintippen (0-9).
+      Zu schnell = Karte nicht gelesen. Dann die PIN, die das Terminal kurz
+      zeigt, eintippen (0-9).
+    - Manchmal geht die Karte nicht: Dann zahlst du bar aus der Geldbörse,
+      schnell und passend (A/D oder Mausrad wählen, E hinlegen, F zurück).
     - Nicht von der Kasse weggehen.
-  Fehler füllen ihr Misstrauen (Balken unten links). Ist es voll, verlierst du
-  eines von drei Kassen-Leben. Nach dem dritten ist der Einkauf vorbei.
+  Du hast drei Kassen-Leben. Ein direkter Fehler (Getränke nicht zuerst, falsche
+  Ware, schlechte Antwort, Karte zu schnell, falsche PIN, zu viel Geld) kostet
+  sofort eines. Kleinere Patzer füllen ihr Misstrauen (Balken unten links); ist
+  es voll, ist auch ein Leben weg. Nach dem dritten ist der Einkauf vorbei.
+
+DIE FLUCHT
+  Kaum hast du bezahlt, kommt die Durchsage: "Kunde 0 hat ein Gesicht.
+  Schnappt ihn!" Der Alarm geht los, und alle rennen auf dich zu. Lauf zum
+  Ausgang! Wer dich jetzt erwischt, beendet den Einkauf sofort.
 
 STEUERUNG
   WASD               Gehen            Shift   Rennen (fällt auf!)
@@ -46,6 +56,7 @@ STEUERUNG
   Mausrad            am Wagen / Band: andere Ware anwählen
   1 / 2 / 3          Antwort im Gespräch und an der Kasse
   0 - 9              PIN am Kartenterminal
+  A / D, Mausrad     beim Barzahlen: Schein oder Münze wählen (E hinlegen, F zurück)
   Esc                Pause            F12     Screenshot (Ordner "Bilder")
 
 Du hast drei Leben im Markt: zweimal erwischt wachst du am Eingang auf (der Wagen

@@ -23,11 +23,11 @@ pub fn bfs(nav: &NavGrid, goal: Vec3) -> Vec<u16> {
                 continue;
             }
             let (nx, nz) = (nx as usize, nz as usize);
-            if !nav.is_walkable(nx, nz) || field[nz * nav.w + nx] != UNREACHABLE {
+            if !nav.npc_walkable(nx, nz) || field[nz * nav.w + nx] != UNREACHABLE {
                 continue;
             }
             // keine Ecken schneiden
-            if dx != 0 && dz != 0 && !(nav.is_walkable(x, nz) && nav.is_walkable(nx, z)) {
+            if dx != 0 && dz != 0 && !(nav.npc_walkable(x, nz) && nav.npc_walkable(nx, z)) {
                 continue;
             }
             field[nz * nav.w + nx] = d + 1;
@@ -50,16 +50,20 @@ const NEIGHBORS: [(i32, i32); 8] = [
 
 pub fn nearest_walkable(nav: &NavGrid, p: Vec3) -> Option<(usize, usize)> {
     let (cx, cz) = nav.cell_of(p)?;
-    if nav.is_walkable(cx, cz) {
+    if nav.npc_walkable(cx, cz) {
         return Some((cx, cz));
     }
-    // bis etwa 1,5 m Umkreis absuchen (unabhaengig von der Zellgroesse)
-    let max_r = (1.5 / nav.cell).ceil() as i32;
+    // Umkreis absuchen (unabhaengig von der Zellgroesse); 3 m reichen auch aus der Mitte
+    // des fuer NPCs gesperrten Kassenbereichs bis zu seinem Rand
+    let max_r = (3.0 / nav.cell).ceil() as i32;
     for r in 1..=max_r {
         for dz in -r..=r {
             for dx in -r..=r {
+                if dx.abs() != r && dz.abs() != r {
+                    continue; // nur der Ring, das Innere wurde schon abgesucht
+                }
                 let (x, z) = (cx as i32 + dx, cz as i32 + dz);
-                if x >= 0 && z >= 0 && nav.is_walkable(x as usize, z as usize) {
+                if x >= 0 && z >= 0 && nav.npc_walkable(x as usize, z as usize) {
                     return Some((x as usize, z as usize));
                 }
             }
@@ -113,7 +117,12 @@ pub fn step_along(
         return pos;
     }
     let step = (speed * dt).min(len);
-    world.collide(pos + d / len * step, 0.25)
+    let new = world.collide(pos + d / len * step, 0.25);
+    // Nicht in den Kassenbereich hinein (wer schon drin ist, darf hinaus)
+    if world.in_checkout_zone(new, 0.25) && !world.in_checkout_zone(pos, 0.25) {
+        return pos;
+    }
+    new
 }
 
 pub fn yaw_towards(from: Vec3, to: Vec3) -> f32 {

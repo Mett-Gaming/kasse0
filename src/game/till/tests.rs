@@ -23,20 +23,133 @@ fn at_till(seed: u64) -> Game {
     g
 }
 
+fn lives(g: &Game) -> u32 {
+    g.till.as_ref().map_or(TILL_LIVES, |t| t.lives)
+}
+
 fn doubt(g: &Game) -> f32 {
     g.till.as_ref().map_or(0.0, |t| t.doubt)
 }
 
-/// Bis zum Terminal: alles richtig aufs Band, scannen, Fragen gut beantworten.
-fn ready_to_pay(seed: u64) -> Game {
+/// Bis zum Terminal: alles richtig aufs Band, scannen, Fragen gut beantworten, E am Terminal.
+fn at_terminal(seed: u64, cash: bool) -> Game {
     let mut g = at_till(seed);
     put_all_on_belt(&mut g);
+    g.till.as_mut().unwrap().cash = cash;
     scan_and_answer(&mut g);
     assert!(g.scanned_complete());
     look_at_terminal(&mut g);
     press_e(&mut g);
+    g
+}
+
+fn ready_to_pay(seed: u64) -> Game {
+    let g = at_terminal(seed, false);
     assert!(g.swiping(), "Durchziehen startet nicht");
     g
+}
+
+/// Ein Bild mit diesen Eingaben.
+fn frame(g: &mut Game, inp: Input) {
+    let mut inp = inp;
+    g.update(1.0 / 60.0, &mut inp);
+}
+
+/// Passend bar bezahlen: von gross nach klein hinlegen, was in die Restsumme passt.
+fn pay_cash_exactly(g: &mut Game) {
+    let total = g.scanned_value();
+    for _ in 0..200 {
+        let t = g.till.as_ref().unwrap();
+        if g.paid {
+            return;
+        }
+        let rest = total - t.given_sum();
+        let want = (0..cash::DENOMS.len())
+            .find(|&i| t.wallet[i] > 0 && cash::DENOMS[i] <= rest)
+            .expect("Geldboerse reicht nicht");
+        let steps = want as i32 - t.sel as i32;
+        frame(
+            g,
+            Input {
+                wheel: -steps,
+                ..Default::default()
+            },
+        );
+        frame(
+            g,
+            Input {
+                interact: true,
+                ..Default::default()
+            },
+        );
+    }
+}
+
+#[test]
+fn sometimes_you_must_pay_cash_exactly() {
+    let mut g = at_terminal(45, true);
+    assert!(
+        matches!(g.till.as_ref().unwrap().pay, Pay::Cash(_)),
+        "keine Barzahlung"
+    );
+    assert!(!g.swiping());
+    pay_cash_exactly(&mut g);
+    assert!(g.paid, "passend bezahlt, aber nicht fertig");
+    assert_eq!(doubt(&g), 0.0);
+}
+
+#[test]
+fn paying_too_much_cash_costs_a_life_and_is_returned() {
+    let mut g = at_terminal(46, true);
+    // den groessten Schein, der zu viel ist, hinlegen
+    let total = g.scanned_value();
+    let t = g.till.as_mut().unwrap();
+    t.wallet[0] += 1; // sicher ein 50-Euro-Schein
+    t.sel = 0;
+    let before: u32 = t.wallet.iter().sum();
+    if cash::DENOMS[0] <= total {
+        t.given = vec![0; (total / cash::DENOMS[0]) as usize];
+    }
+    frame(
+        &mut g,
+        Input {
+            interact: true,
+            ..Default::default()
+        },
+    );
+    let t = g.till.as_ref().unwrap();
+    assert!(!g.paid);
+    assert_eq!(t.lives, TILL_LIVES - 1, "zu viel kostet kein Leben");
+    assert!(t.given.is_empty(), "Geld nicht zurueckgeschoben");
+    assert!(t.wallet.iter().sum::<u32>() >= before, "Geld verschwunden");
+}
+
+#[test]
+fn paying_cash_too_slowly_is_suspicious() {
+    let mut g = at_terminal(47, true);
+    step(&mut g, cash::CASH_TIME + 0.2, Input::default());
+    assert!((doubt(&g) - cash::SUS_CASH_SLOW).abs() < 1e-4);
+    assert!(!g.paid);
+}
+
+#[test]
+fn cheats_jump_straight_to_card_or_cash_payment() {
+    let mut g = Game::new(49);
+    g.cheat(12);
+    assert!(g.swiping(), "Karten-Cheat startet kein Durchziehen");
+    assert!(g.scanned_complete());
+    swipe(&mut g, 1.0);
+    type_pin(&mut g);
+    assert!(g.paid, "nach dem Karten-Cheat nicht bezahlbar");
+
+    let mut g = Game::new(50);
+    g.cheat(13);
+    assert!(
+        matches!(g.till.as_ref().unwrap().pay, Pay::Cash(_)),
+        "Bar-Cheat oeffnet keine Geldboerse"
+    );
+    pay_cash_exactly(&mut g);
+    assert!(g.paid, "nach dem Bar-Cheat nicht bezahlbar");
 }
 
 #[test]
@@ -50,7 +163,7 @@ fn first_item_on_belt_starts_the_till_game() {
 }
 
 #[test]
-fn drinks_must_go_on_the_belt_first() {
+fn drinks_not_first_costs_a_life_at_once() {
     let mut g = at_till(32);
     // erst etwas anderes, dann das Wasser
     let other = g.cart.iter().position(|c| !c.is_drink()).unwrap();
@@ -60,7 +173,7 @@ fn drinks_must_go_on_the_belt_first() {
     let water = g.cart.iter().position(|c| c.is_drink()).unwrap();
     g.cart_sel = Some(water);
     press_e(&mut g);
-    assert!((doubt(&g) - SUS_ORDER).abs() < 1e-4, "Reihenfolge egal");
+    assert_eq!(lives(&g), TILL_LIVES - 1, "Reihenfolge kostet kein Leben");
 }
 
 #[test]
@@ -124,20 +237,68 @@ fn silence_and_bad_answers_make_her_suspicious() {
 }
 
 #[test]
+fn bad_answer_costs_a_life_neutral_only_doubt() {
+    let mut g = at_till(48);
+    put_all_on_belt(&mut g);
+    let ask = |g: &mut Game| {
+        for _ in 0..60 * 30 {
+            let t = g.till.as_ref().unwrap();
+            if t.asked.as_ref().is_some_and(|a| a.reply.is_none()) {
+                return;
+            }
+            step(g, 1.0 / 60.0, Input::default());
+        }
+        panic!("keine Frage");
+    };
+    let pick = |g: &Game, answer: usize| {
+        let a = g.till.as_ref().unwrap().asked.as_ref().unwrap();
+        a.order.iter().position(|&o| o == answer).unwrap()
+    };
+    ask(&mut g);
+    let k = pick(&g, 2); // schlechte Antwort
+    step(
+        &mut g,
+        1.0 / 60.0,
+        Input {
+            choice: Some(k),
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        lives(&g),
+        TILL_LIVES - 1,
+        "schlechte Antwort kostet kein Leben"
+    );
+    ask(&mut g);
+    let k = pick(&g, 1); // neutrale Antwort
+    step(
+        &mut g,
+        1.0 / 60.0,
+        Input {
+            choice: Some(k),
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        lives(&g),
+        TILL_LIVES - 1,
+        "neutrale Antwort kostet ein Leben"
+    );
+    assert!((doubt(&g) - SUS_NEUTRAL).abs() < 0.05);
+}
+
+#[test]
 fn swiping_too_fast_fails_and_slowly_works() {
     let mut g = ready_to_pay(36);
     swipe(&mut g, 0.15);
-    assert!(
-        (doubt(&g) - SUS_SWIPE).abs() < 1e-4,
-        "zu schnell geht durch"
-    );
+    assert_eq!(lives(&g), TILL_LIVES - 1, "zu schnell kostet kein Leben");
     assert!(g.swiping(), "nach dem Fehler nicht erneut durchziehen");
     swipe(&mut g, 1.0);
     assert!(
         matches!(g.till.as_ref().unwrap().pay, Pay::ShowPin(_)),
         "langsam durchgezogen und nicht gelesen"
     );
-    assert!((doubt(&g) - SUS_SWIPE).abs() < 1e-4);
+    assert_eq!(lives(&g), TILL_LIVES - 1);
 }
 
 #[test]
@@ -149,7 +310,7 @@ fn camera_stays_still_while_swiping() {
 }
 
 #[test]
-fn wrong_pin_costs_doubt_right_pin_pays() {
+fn wrong_pin_costs_a_life_right_pin_pays() {
     let mut g = ready_to_pay(38);
     swipe(&mut g, 1.0);
     step(&mut g, PIN_SHOW + 0.1, Input::default());
@@ -159,7 +320,7 @@ fn wrong_pin_costs_doubt_right_pin_pays() {
         ..Default::default()
     };
     g.update(1.0 / 60.0, &mut inp);
-    assert!((doubt(&g) - SUS_PIN).abs() < 1e-4, "falsche PIN egal");
+    assert_eq!(lives(&g), TILL_LIVES - 1, "falsche PIN kostet kein Leben");
     assert!(!g.paid);
     type_pin(&mut g);
     assert!(g.paid, "richtige PIN bezahlt nicht");

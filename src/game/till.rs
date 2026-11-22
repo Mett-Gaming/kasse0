@@ -21,14 +21,10 @@ pub const PIN_SHOW: f32 = 2.5;
 /// So lange hat man zum Eintippen
 pub const PIN_TIME: f32 = 10.0;
 
-/// Misstrauen je Fehler (1.0 = ein Leben weg)
-pub const SUS_ORDER: f32 = 0.35;
-pub const SUS_FAKE: f32 = 0.3;
+/// Direkte Fehler kosten sofort ein Leben (`till_mistake`). Weiche Fehler fuellen nur das
+/// Misstrauen (1.0 = ein Leben weg):
 pub const SUS_NEUTRAL: f32 = 0.2;
-pub const SUS_BAD: f32 = 0.45;
 pub const SUS_SILENT: f32 = 0.35;
-pub const SUS_SWIPE: f32 = 0.25;
-pub const SUS_PIN: f32 = 0.3;
 pub const SUS_PIN_SLOW: f32 = 0.2;
 /// pro Sekunde, wenn man waehrend des Kassierens weggeht
 pub const SUS_AWAY: f32 = 0.08;
@@ -69,10 +65,6 @@ pub const TILL_QUESTIONS: &[TillQuestion] = &[
         answers: ["Jeden Tag.", "Ab und zu.", "Ich war noch nie hier."],
     },
     TillQuestion {
-        text: "Zahlen Sie mit Karte?",
-        answers: ["Ja, mit Karte.", "Geht auch bar?", "Womit zahlt man hier?"],
-    },
-    TillQuestion {
         text: "Sind Sie Kunde Nummer 0?",
         answers: ["Nein.", "Vielleicht.", "Ja."],
     },
@@ -111,6 +103,8 @@ pub enum Pay {
     ShowPin(f32),
     /// PIN eintippen (Restzeit)
     Pin(f32),
+    /// Bar und passend aus der Geldboerse bezahlen (Restzeit), siehe cash.rs
+    Cash(f32),
 }
 
 pub struct Till {
@@ -128,6 +122,16 @@ pub struct Till {
     other_on_belt: bool,
     /// Ist man gerade an der Kasse (fuer den Hinweis beim Weggehen)?
     was_near: bool,
+    /// Heute nur Barzahlung ("Kartenzahlung geht nicht")
+    pub cash: bool,
+    /// Geldboerse: Anzahl je Schein/Muenze (cash::DENOMS)
+    pub wallet: [u32; cash::DENOMS.len()],
+    /// schon hingelegtes Geld (Indizes in cash::DENOMS)
+    pub given: Vec<usize>,
+    /// gewaehlter Schein/Muenze
+    pub sel: usize,
+    /// A/D im letzten Bild gedrueckt (zum Weiterschalten)
+    lr_prev: (bool, bool),
 }
 
 impl Till {
@@ -135,6 +139,11 @@ impl Till {
         let first = rng.gen_range(1..=2);
         let second = first + rng.gen_range(2..=3);
         Self {
+            cash: rng.gen_bool(cash::CASH_CHANCE),
+            wallet: [0; cash::DENOMS.len()],
+            given: Vec::new(),
+            sel: 0,
+            lr_prev: (false, false),
             lives: TILL_LIVES,
             doubt: 0.0,
             pin: [
@@ -239,10 +248,7 @@ impl Game {
         let drink = data.is_drink();
         let t = self.till.as_mut().unwrap();
         if drink && t.other_on_belt {
-            self.till_doubt(
-                SUS_ORDER,
-                "Kassiererin: \"Schwere Sachen zuerst.\" Sie mustert dich.",
-            );
+            self.till_mistake("Kassiererin: \"Schwere Sachen zuerst.\"");
         } else if !drink {
             t.other_on_belt = true;
         }
@@ -282,6 +288,34 @@ impl Game {
         self.play(Sfx::Blip, 0.6);
     }
 
+    /// Cheat/Test: Zettel gescannt, alle Fragen beantwortet, direkt am Terminal bezahlen -
+    /// mit Karte (`cash = false`) oder bar.
+    pub fn debug_jump_to_pay(&mut self, cash: bool) {
+        self.tip();
+        self.fill_list_cheap();
+        self.scanned.append(&mut self.cart);
+        self.belt.clear();
+        self.held = None;
+        self.dialog = None;
+        if self.till.is_none() {
+            self.till = Some(Till::new(&mut self.rng));
+        }
+        let Some(lane) = self.open_lane() else { return };
+        let t = self.till.as_mut().unwrap();
+        t.ask_at.clear();
+        t.asked = None;
+        t.cash = cash;
+        t.pay = Pay::Idle;
+        // an die Kasse, Blick aufs Terminal, Wagen daneben
+        self.player.pos = lane.scan_point;
+        let to = lane.terminal - (lane.scan_point + vec3(0.0, EYE_HEIGHT, 0.0));
+        self.player.yaw = to.x.atan2(-to.z);
+        self.player.pitch = (to.y / to.length()).asin();
+        self.trolley.pushing = false;
+        self.trolley.pos = lane.scan_point + vec3(0.0, 0.0, -1.0);
+        self.start_swipe();
+    }
+
     /// E am Kartenterminal: Karte durchziehen beginnen.
     pub(super) fn start_swipe(&mut self) {
         if self.till.is_none() {
@@ -290,6 +324,10 @@ impl Game {
         let t = self.till.as_mut().unwrap();
         if t.asked.is_some() || t.questions_left() {
             self.hint("Die Kassiererin will noch etwas von dir wissen.");
+            return;
+        }
+        if t.cash {
+            self.start_cash();
             return;
         }
         t.pay = Pay::Swipe {
@@ -311,6 +349,7 @@ impl Game {
         let Some(t) = &mut self.till else { return };
         match t.pay {
             Pay::Idle => {}
+            Pay::Cash(left) => self.update_cash(left, dt, input),
             Pay::Swipe { progress, started } => {
                 if input.interact {
                     t.pay = Pay::Idle;
@@ -326,10 +365,7 @@ impl Game {
                         progress: 0.0,
                         started: None,
                     };
-                    self.till_doubt(
-                        SUS_SWIPE,
-                        "Zu schnell! KARTE NICHT GELESEN. Sie sieht von der Kasse auf.",
-                    );
+                    self.till_mistake("Zu schnell! KARTE NICHT GELESEN.");
                 } else {
                     t.pay = Pay::ShowPin(PIN_SHOW);
                     t.typed.clear();
@@ -361,7 +397,7 @@ impl Game {
                     } else {
                         t.typed.clear();
                         t.pay = Pay::ShowPin(PIN_SHOW);
-                        self.till_doubt(SUS_PIN, "PIN FALSCH. Die Kassiererin wartet.");
+                        self.till_mistake("PIN FALSCH.");
                     }
                     return;
                 }
@@ -397,19 +433,22 @@ impl Game {
                 a.timer -= dt;
                 let choice = input.choice.filter(|&c| c < 3);
                 if choice.is_some() || a.timer <= 0.0 {
-                    let (reply, sus) = match choice.map(|k| verdict(a.order[k])) {
+                    let v = choice.map(|k| verdict(a.order[k]));
+                    let (reply, sus) = match v {
                         Some(Verdict::Good) => (REPLY_GOOD, 0.0),
                         Some(Verdict::Neutral) => (REPLY_NEUTRAL, SUS_NEUTRAL),
-                        Some(Verdict::Bad) => (REPLY_BAD, SUS_BAD),
+                        Some(Verdict::Bad) => (REPLY_BAD, 0.0),
                         None => (REPLY_SILENT, SUS_SILENT),
                     };
                     a.reply = Some((reply, 1.8));
                     self.play(Sfx::Blip, 0.6);
-                    if sus > 0.0 {
+                    if v == Some(Verdict::Bad) {
+                        self.till_mistake("Falsche Antwort.");
+                    } else if sus > 0.0 {
                         let msg = if choice.is_none() {
                             "Du hast geschwiegen. Sie wird misstrauisch."
                         } else {
-                            "Falsche Antwort. Sie wird misstrauisch."
+                            "Komische Antwort. Sie wird misstrauisch."
                         };
                         self.till_doubt(sus, msg);
                     }
@@ -434,12 +473,28 @@ impl Game {
         let Some(t) = &mut self.till else { return };
         t.was_near = near;
 
-        // Misstrauen voll: ein Leben weg
+        // Misstrauen voll: ein Leben weg, der Balken beginnt von vorn
         if t.doubt < 1.0 {
             return;
         }
         t.doubt = 0.0;
-        t.lives = t.lives.saturating_sub(1);
+        self.till_lose_life("Ihr Misstrauen ist zu groß.");
+    }
+
+    /// Direkter Fehler (Getraenke nicht zuerst, falsche Ware, schlechte Antwort, Karte zu
+    /// schnell, falsche PIN, zu viel Geld): kostet sofort ein Kassen-Leben.
+    pub(super) fn till_mistake(&mut self, msg: &str) {
+        self.play(Sfx::Error, 0.6);
+        self.till_lose_life(msg);
+    }
+
+    /// Ein Kassen-Leben weg; beim letzten ist der Run vorbei.
+    fn till_lose_life(&mut self, reason: &str) {
+        let Some(t) = &mut self.till else { return };
+        if t.lives == 0 {
+            return;
+        }
+        t.lives -= 1;
         let lives = t.lives;
         self.red = 1.0;
         self.glitch = 1.0;
@@ -449,16 +504,18 @@ impl Game {
             self.outcome = Outcome::Caught;
             self.outcome_timer = 0.0;
             self.catcher = self.open_lane().map(|l| l.seat - vec3(0.0, 0.4, 0.0));
+            self.say(reason, 5.0);
             return;
         }
         self.say(
             format!(
-                "Die Kassiererin hebt den Kopf. Sie hat dich bemerkt. (Noch {lives} Leben an der Kasse)"
+                "{reason} Die Kassiererin hebt den Kopf - ein Leben weg. (Noch {lives} an der Kasse)"
             ),
             5.0,
         );
     }
 }
 
+pub mod cash;
 #[cfg(test)]
 mod tests;

@@ -132,6 +132,26 @@ impl Game {
             ));
         }
 
+        // Kassiererin an der offenen Kasse: gesichtslose Personal-Figur. Beim Scannen greift sie
+        // zum Band, im gekippten Markt dreht sie sich sonst immer zu dir.
+        if let Some(lane) = self.open_lane() {
+            let scanning = self.scan_timer > 0.0;
+            let yaw = if self.tipped && !scanning {
+                npc::yaw_towards(lane.seat, self.player.pos)
+            } else {
+                -std::f32::consts::FRAC_PI_2
+            };
+            let glow = if self.tipped { 0.22 } else { 0.0 };
+            out.push(person(
+                self.cashier_variant,
+                if scanning { Clip::Reach } else { Clip::Idle },
+                t,
+                lane.seat,
+                yaw,
+                Vec4::new(1.0, 1.0, 1.0, glow),
+            ));
+        }
+
         // Fata Morgana: wirkt echt, bis man auf 3 m heran ist - dann flackert sie als Hologramm
         for (i, h) in self.holograms.iter().enumerate() {
             let Some(v) = h.person else { continue };

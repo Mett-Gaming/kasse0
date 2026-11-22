@@ -274,6 +274,8 @@ pub struct NavGrid {
     pub w: usize,
     pub h: usize,
     pub walkable: Vec<bool>,
+    /// Zellen, die NPCs nicht betreten (Kassenbereich)
+    pub npc_block: Vec<bool>,
 }
 
 impl NavGrid {
@@ -295,7 +297,54 @@ impl NavGrid {
     pub fn is_walkable(&self, x: usize, z: usize) -> bool {
         x < self.w && z < self.h && self.walkable[z * self.w + x]
     }
+    /// Begehbar fuer NPCs: wie `is_walkable`, aber der Kassenbereich ist fuer sie gesperrt.
+    pub fn npc_walkable(&self, x: usize, z: usize) -> bool {
+        self.is_walkable(x, z) && !self.npc_block.get(z * self.w + x).copied().unwrap_or(false)
+    }
 }
+
+impl World {
+    /// Kassenbereich (Gassen mit etwas Rand davor und dahinter): (x von, x bis, z Nord, z Sued).
+    pub fn checkout_zone(&self) -> Option<(f32, f32, f32, f32)> {
+        let lanes = &self.lanes;
+        if lanes.is_empty() {
+            return None;
+        }
+        let xs: Vec<f32> = lanes.iter().map(|l| l.belt_start.x).collect();
+        let spacing = if xs.len() > 1 {
+            (xs[1] - xs[0]).abs()
+        } else {
+            4.0
+        };
+        let lo = xs.iter().copied().fold(f32::MAX, f32::min) - spacing * 0.5;
+        let hi = xs.iter().copied().fold(f32::MIN, f32::max) + spacing * 0.5;
+        let z0 = lanes[0].belt_start.z - 0.15 - CHECKOUT_GAP;
+        let z1 = z0 + CHECKOUT_GAP * 2.0 + 3.0;
+        Some((lo.max(0.05), hi, z0, z1))
+    }
+
+    /// Liegt der Punkt (mit Radius `r`) im Kassenbereich?
+    pub fn in_checkout_zone(&self, p: Vec3, r: f32) -> bool {
+        self.checkout_zone().is_some_and(|(x0, x1, z0, z1)| {
+            p.x > x0 - r && p.x < x1 + r && p.z > z0 - r && p.z < z1 + r
+        })
+    }
+
+    /// Kassenbereich im Navigationsraster fuer NPCs sperren.
+    pub fn block_checkout_for_npcs(&mut self) {
+        let nav = &self.nav;
+        let mut block = vec![false; nav.w * nav.h];
+        for z in 0..nav.h {
+            for x in 0..nav.w {
+                block[z * nav.w + x] = self.in_checkout_zone(nav.center(x, z), 0.25);
+            }
+        }
+        self.nav.npc_block = block;
+    }
+}
+
+/// Rand des Kassenbereichs vor und hinter den Gassen (dort steht auch das Absperrband)
+pub const CHECKOUT_GAP: f32 = 0.4;
 
 pub struct World {
     pub instances: Vec<GpuInstance>,
@@ -679,6 +728,7 @@ fn build_nav(solids: &[Aabb], obbs: &[Obb], width: f32, depth: f32) -> NavGrid {
         w,
         h,
         walkable,
+        npc_block: Vec::new(),
     }
 }
 

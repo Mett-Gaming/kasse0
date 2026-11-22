@@ -54,7 +54,7 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
         Screen::Options { .. } => (82.0, 17.0),
         Screen::Paused => (66.0, 16.0),
         Screen::End => (205.0, 16.0),
-        Screen::Cheats => (40.0, 15.0),
+        Screen::Cheats => (34.0, 13.5),
         Screen::Playing => (0.0, 0.0),
     }
 }
@@ -334,7 +334,7 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                 } else if g.scanned_complete() && asking {
                     "Die Kassiererin will noch etwas wissen ...".to_string()
                 } else if g.scanned_complete() {
-                    format!("[E] Karte durchziehen   {}", euro(g.scanned_value()))
+                    format!("[E] Bezahlen   {}", euro(g.scanned_value()))
                 } else {
                     "Zettel nicht vollständig gescannt".to_string()
                 };
@@ -427,8 +427,13 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         }
     }
 
-    // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN
+    // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN, Geldboerse
     till::draw(u, g, time);
+
+    // Flucht nach dem Bezahlen
+    if g.chasing() && (time * 2.5).fract() < 0.6 {
+        u.text_center(64.0, "ALARM - LAUF ZUM AUSGANG!", RED, 2.0);
+    }
 }
 
 /// Alle Tasten auf einen Blick; erledigte abgehakt, aktuelle hervorgehoben.
@@ -529,6 +534,8 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
             u.text_center(70.0, "DU BIST AUFGEFALLEN", RED, 2.0);
             let why = if g.till_caught {
                 "Die Kassiererin hat dich durchschaut."
+            } else if g.chase.is_some() {
+                "Sie haben Kunde 0 geschnappt - kurz vor dem Ausgang."
             } else {
                 "Sie haben dich erreicht."
             };

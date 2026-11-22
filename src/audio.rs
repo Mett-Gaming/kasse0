@@ -26,6 +26,10 @@ pub enum Sfx {
     Spark,
     /// Kunden fluestern miteinander
     Whisper,
+    /// Alarmsirene nach dem Bezahlen (Kunde 0 hat ein Gesicht)
+    Alarm,
+    /// Muenze oder Schein auf den Tresen
+    Coin,
 }
 
 /// Was die Musik gerade tun soll.
@@ -222,6 +226,24 @@ fn synth(sfx: Sfx) -> Vec<f32> {
             }
             buf
         }
+        Sfx::Alarm => {
+            // zweitoenige Sirene mit kratzigem Lautsprecher
+            let mut phase = 0.0f32;
+            gen(1.3, &mut |t| {
+                let f = if (t * 2.0).fract() < 0.5 {
+                    880.0
+                } else {
+                    660.0
+                };
+                phase += TAU * f / RATE as f32;
+                let env = (t * 30.0).min(1.0) * (1.0 - (t - 1.2).max(0.0) * 10.0);
+                ((phase.sin() + 0.5 * (phase * 3.0).sin()) * 1.6).tanh() * 0.22 * env
+            })
+        }
+        Sfx::Coin => gen(0.18, &mut |t| {
+            let ring = (TAU * 2600.0 * t).sin() + 0.6 * (TAU * 3900.0 * t).sin();
+            ring * 0.12 * (-t * 22.0).exp() + rng.next() * 0.05 * (-t * 90.0).exp()
+        }),
         Sfx::Sting => {
             let mut lp = 0.0;
             gen(1.6, &mut |t| {
@@ -257,6 +279,8 @@ impl Audio {
             Sfx::Rattle,
             Sfx::Spark,
             Sfx::Whisper,
+            Sfx::Alarm,
+            Sfx::Coin,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -339,6 +363,8 @@ mod tests {
             Sfx::Rattle,
             Sfx::Spark,
             Sfx::Whisper,
+            Sfx::Alarm,
+            Sfx::Coin,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

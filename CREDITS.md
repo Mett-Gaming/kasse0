@@ -7,7 +7,7 @@ Spiel, Engine, Code, Shader und alle Sounds (synthetisiert): eigenes Projekt.
 | Modell | Quelle | Autor | Lizenz |
 |---|---|---|---|
 | Kundschaft und Personal (24 + 8 Varianten, Teile gemischt, Personal in Dienstkleidung umgefärbt und gesichtslos) | [Ultimate Modular Men Pack](https://poly.pizza/bundle/ZiH8muWqwQ), [Ultimate Modular Women Pack](https://poly.pizza/bundle/aCBDXDdTNN) | Quaternius | CC0 1.0 |
-| Kassiererin (Mannequin, Sitzpose) | Universal Animation Library 1 | Quaternius | CC0 1.0 |
+| Mannequin in Sitzpose (frühere Kassiererin, noch in den Spieldateien; die Kassiererin ist jetzt eine Personal-Figur aus dem Modular-Pack oben) | Universal Animation Library 1 | Quaternius | CC0 1.0 |
 | Einkaufswagen ("Shopping cart") | [poly.pizza/m/4lhRcMbl1pw](https://poly.pizza/m/4lhRcMbl1pw) | Poly by Google | **CC-BY 3.0** |
 | Ratte ("Rat") | [poly.pizza/m/6hsesZHvcPI](https://poly.pizza/m/6hsesZHvcPI) | Poly by Google | **CC-BY 3.0** |
 | Kasse ("Cash Register 01") | [polyhaven.com/a/CashRegister_01](https://polyhaven.com/a/CashRegister_01) | Poly Haven | CC0 1.0 |

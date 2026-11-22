@@ -15,6 +15,8 @@ pub const CHEATS: &[&str] = &[
     "Kunden und Mitarbeiter entfernen",
     "Durchsage auslösen",
     "Markt umbauen",
+    "Kasse: direkt zur Kartenzahlung",
+    "Kasse: direkt zur Barzahlung",
     "Mitarbeiter nimmt deinen Wagen mit",
 ];
 
@@ -116,6 +118,15 @@ impl Game {
                 self.rebuild_world();
                 self.glitch = 0.7;
                 "Markt umgebaut.".into()
+            }
+            12 | 13 => {
+                let cash = i == 13;
+                self.debug_jump_to_pay(cash);
+                if cash {
+                    "Barzahlung.".into()
+                } else {
+                    "Kartenzahlung.".into()
+                }
             }
             _ => {
                 // Wagen 2 m vor dir abstellen, ein Mitarbeiter schnappt ihn sich

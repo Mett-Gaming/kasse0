@@ -5,6 +5,7 @@ mod checkout;
 mod crowd;
 mod death;
 mod draws;
+pub mod escape;
 mod tension;
 pub use cheats::CHEATS;
 pub mod dialog;
@@ -258,6 +259,11 @@ pub struct Game {
     pub till: Option<till::Till>,
     /// Run an der Kasse verloren (die Kassiererin hat einen durchschaut)
     pub till_caught: bool,
+    /// Flucht zum Ausgang nach dem Bezahlen (Sekunden seit dem Alarm)
+    pub chase: Option<f32>,
+    alarm_timer: f32,
+    /// Figur der Kassiererin (Personal-Variante)
+    pub cashier_variant: usize,
     scan_timer: f32,
     pub paid: bool,
     pub outcome: Outcome,
@@ -397,6 +403,13 @@ impl Game {
             scanned: Vec::new(),
             till: None,
             till_caught: false,
+            chase: None,
+            alarm_timer: 0.0,
+            // fest aus dem Seed (nicht aus dem RNG, damit sich sonst nichts verschiebt)
+            cashier_variant: {
+                let staff = crate::people::people_of(true);
+                staff[(seed as usize) % staff.len()]
+            },
             scan_timer: 0.0,
             paid: false,
             outcome: Outcome::Running,
@@ -815,6 +828,7 @@ impl Game {
         self.update_npcs(dt, input);
         self.update_suspicion(dt, input);
         self.update_events(dt);
+        self.update_chase(dt);
 
         // Die Schwelle: Getraenkeabteilung betreten und wieder verlassen kippt den Markt.
         let inside = self.world.drinks_zone.contains_xz(self.player.pos);

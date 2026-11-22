@@ -11,8 +11,6 @@ const BELT_SPEED: f32 = 0.45;
 const BELT_GAP: f32 = 0.05;
 /// Wie weit man von der Kasse weg sein darf, damit weiter gescannt wird
 const SCAN_PRESENCE: f32 = 3.0;
-/// Abstand des Absperrbands vor und hinter den Kassengassen
-const BARRIER_GAP: f32 = 0.4;
 
 /// Eine Ware auf dem Band; `s` = Strecke ab Bandanfang.
 #[derive(Clone, Debug)]
@@ -171,6 +169,8 @@ impl Game {
         for c in &mut self.customers {
             c.angry += 0.5;
         }
+        // Finale: Alarm, alle rennen auf einen zu (escape.rs)
+        self.start_chase();
     }
 
     /// Band bewegen, scannen.
@@ -204,13 +204,7 @@ impl Game {
         match item.kind {
             PickupKind::Product { fake: true, .. } => {
                 // Die Kassierer:in legt die falsche Ware weg - und merkt sich das
-                self.till_doubt(
-                    super::till::SUS_FAKE,
-                    format!(
-                        "ARTIKEL UNBEKANNT: {}. Die Kassiererin legt ihn zur Seite.",
-                        item.name
-                    ),
-                );
+                self.till_mistake(&format!("ARTIKEL UNBEKANNT: {}.", item.name));
             }
             _ => {
                 self.play(Sfx::Beep, 0.6);
@@ -240,27 +234,12 @@ impl Game {
                 model: Mat4::from_rotation_translation(face_x, lane.register),
                 tint: white,
             });
-            out.push(MeshDraw {
-                mesh: MeshId::Chair as usize,
-                model: Mat4::from_rotation_translation(face_x, lane.seat),
-                tint: Vec4::new(0.55, 0.55, 0.6, 0.0),
-            });
-            // Kassierer:in nur an der offenen Kasse
-            if Some(lane.seat) == open {
-                // Dienstkleidung: Mannequin in Uniform-Blau (sitzende Pose gibt es nur fuer das Mannequin)
-                let uniform = vec3(0.3, 0.6, 0.92);
-                let tint = if self.tipped {
-                    (uniform * 0.75).extend(0.08)
-                } else {
-                    uniform.extend(0.0)
-                };
+            // An der offenen Kasse steht die Kassiererin (animierte Figur, draws.rs) statt des Stuhls
+            if Some(lane.seat) != open {
                 out.push(MeshDraw {
-                    mesh: MeshId::Cashier as usize,
-                    model: Mat4::from_rotation_translation(
-                        face_x,
-                        lane.seat + vec3(0.02, 0.18, 0.0),
-                    ),
-                    tint,
+                    mesh: MeshId::Chair as usize,
+                    model: Mat4::from_rotation_translation(face_x, lane.seat),
+                    tint: Vec4::new(0.55, 0.55, 0.6, 0.0),
                 });
             }
             // Zigaretten-Rollo: im gekippten Markt hochgezogen, dahinter Zigaretten
@@ -344,21 +323,10 @@ impl Game {
     /// Absperrband vor dem Kassenbereich, solange der Zettel nicht komplett ist:
     /// (x von, x bis, z Nordseite, z Suedseite).
     pub fn checkout_barrier(&self) -> Option<(f32, f32, f32, f32)> {
-        let lanes = &self.world.lanes;
-        if !self.tipped || self.paid || lanes.is_empty() || self.list_complete() {
+        if !self.tipped || self.paid || self.list_complete() {
             return None;
         }
-        let xs: Vec<f32> = lanes.iter().map(|l| l.belt_start.x).collect();
-        let spacing = if xs.len() > 1 {
-            (xs[1] - xs[0]).abs()
-        } else {
-            4.0
-        };
-        let lo = xs.iter().copied().fold(f32::MAX, f32::min) - spacing * 0.5;
-        let hi = xs.iter().copied().fold(f32::MIN, f32::max) + spacing * 0.5;
-        let z0 = lanes[0].belt_start.z - 0.15 - BARRIER_GAP;
-        let z1 = z0 + BARRIER_GAP * 2.0 + 3.0;
-        Some((lo.max(0.05), hi, z0, z1))
+        self.world.checkout_zone()
     }
 
     /// Haelt Spieler (und geschobenen Wagen) aus dem abgesperrten Kassenbereich heraus.

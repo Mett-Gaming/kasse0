@@ -12,7 +12,8 @@ Analog/liminaler Horror, 3D First-Person, kurze Runs mit zufälligem Seed, damit
 2. **Schwelle Getränkeabteilung:** Betreten und wieder Verlassen kippt den Markt. Er ist dann leer, die Neonröhren brummen und flackern, die Gänge sind länger, und draußen hinter der Glastür ist es schwarz.
 3. Den **Zettel abarbeiten** und die Waren in den Einkaufswagen legen.
 4. **Der Warenwert im Wagen (€) bestimmt die Eskalation**, nicht die Anzahl der Artikel.
-5. An der **Kasse** beginnt das **Kassen-Minispiel**: Ware richtig aufs Band, die Fragen der gesichtslosen Kassiererin beantworten, am **Kartenterminal** die Karte durchziehen und die PIN eintippen, ohne ihr aufzufallen. Dann den Laden verlassen. Damit ist der Run gewonnen.
+5. An der **Kasse** beginnt das **Kassen-Minispiel**: Ware richtig aufs Band, die Fragen der gesichtslosen Kassiererin beantworten, am **Kartenterminal** die Karte durchziehen und die PIN eintippen (oder manchmal bar und passend zahlen), ohne ihr aufzufallen.
+6. **Flucht:** Nach dem Bezahlen „Kunde 0 hat ein Gesicht“, der Alarm geht los, alle rennen auf einen zu. Wer den Ausgang erreicht, hat den Run gewonnen.
 
 ## Kunden (uncanny)
 - Sie roleplayen das Einkaufen und greifen immer nur zu einer Sorte **abgelaufenem Tomatensaft**.
@@ -81,24 +82,34 @@ Neue Wände werden nur gebaut, wenn danach Getränkeraum, Kassen, Wagenbox und a
 - Im gekippten Markt sind 6 % der Zettel-Ware falsch beschriftet (verdrehter Name, unsinniger Preis).
 
 ## Kasse
-- Band mit Warentrennern, Scannerfenster, Ablage, Kartenterminal auf der Stange, sitzende Kassiererin (Quaternius-Mannequin, Pose `Driving_Loop`), Schrank mit Zigaretten-Rollo, Überwachungskamera, Quengelware.
+- Band mit Warentrennern, Scannerfenster, Ablage, Kartenterminal auf der Stange, Kassiererin (gesichtslose Personal-Figur aus dem Modular-Pack, fest aus dem Seed gewählt; greift beim Scannen zum Band, dreht sich im gekippten Markt sonst immer zum Spieler; der Stuhl steht nur an geschlossenen Kassen), Schrank mit Zigaretten-Rollo, Überwachungskamera, Quengelware.
+- **Kassenbereich gesperrt für NPCs:** Gassen plus 0,4 m Rand davor und dahinter (dort hängt auch das Flatterband). Im Navigationsraster sind diese Zellen für NPCs gesperrt (`NavGrid::npc_walkable`); wer trotzdem hineingeschoben würde, wird zurückgesetzt. Steht der Spieler drin, warten sie am Rand.
 - Ablauf: Ware Stück für Stück aus dem Wagen (Mausrad wählt) oder aus der Hand aufs Band legen; Band 0,45 m/s; Scannen 0,9 s pro Ware, nur solange man an der Kasse steht; falsche Ware wird aussortiert; bezahlen am Terminal (Karte + PIN), wenn der ganze Zettel gescannt ist.
 
 ## Kassen-Minispiel (v0.5, `src/game/till.rs`)
 Die Kasse ist ein eigenes Minispiel. Es beginnt mit der ersten Ware auf dem Band und endet mit dem Bezahlen.
 - **NPCs harmlos:** Solange das Minispiel läuft und man höchstens 3,5 m von der Kasse entfernt ist, können Kunden nicht erwischen und Mitarbeiter sprechen einen nicht an. Im übrigen Markt bleibt alles wie bisher.
-- **Misstrauen der Kassiererin** (0–100 %, Balken unten links statt der Auffälligkeit) und **drei Kassen-Leben**, getrennt von den drei Leben im Markt. Bei 100 % ist ein Leben weg und der Balken startet wieder bei 0. Nach dem dritten ist der Run vorbei ("Die Kassiererin hat dich durchschaut.").
+- **Drei Kassen-Leben**, getrennt von den drei Leben im Markt. Nach dem dritten ist der Run vorbei ("Die Kassiererin hat dich durchschaut.").
+- **Direkte Fehler kosten sofort ein Leben** (rote Vignette, Schock). **Weiche Fehler** füllen nur das **Misstrauen** (0–100 %, Balken unten links statt der Auffälligkeit). Ist es voll, ist ebenfalls ein Leben weg, und der Balken startet wieder bei 0.
 
 | Handlung | Regel | Fehler kostet |
 |---|---|---|
-| Ware aufs Band | Getränke zuerst (Getränk nach anderer Ware) | 35 % |
-| | falsch beschriftete Ware wird beim Scannen aussortiert | 30 % |
-| Fragen (2 pro Einkauf, 7 s Zeit, 1/2/3) | gut: nichts, neutral, schlecht, Schweigen | 0 / 20 / 45 / 35 % |
-| Karte durchziehen (Maus nach unten, Blick steht still) | ganz durchziehen in mindestens 0,45 s | 25 % |
-| PIN (4 Ziffern, 2,5 s angezeigt, 10 s zum Tippen) | falsche Ziffer / Zeit abgelaufen, danach wird sie wieder angezeigt | 30 / 20 % |
+| Ware aufs Band | Getränke zuerst (Getränk nach anderer Ware) | 1 Leben |
+| | falsch beschriftete Ware wird beim Scannen aussortiert | 1 Leben |
+| Fragen (2 pro Einkauf, 7 s Zeit, 1/2/3) | schlechte Antwort / neutrale Antwort / Schweigen | 1 Leben / 20 % / 35 % |
+| Karte durchziehen (Maus nach unten, Blick steht still) | ganz durchziehen in mindestens 0,45 s | 1 Leben |
+| PIN (4 Ziffern, 2,5 s angezeigt, 10 s zum Tippen) | falsche Ziffer / Zeit abgelaufen, danach wird sie wieder angezeigt | 1 Leben / 20 % |
+| Barzahlung (in 40 % der Einkäufe statt Karte, 25 s) | genau passend hinlegen; zu viel = alles zurück / Zeit abgelaufen = alles zurück, neue 25 s | 1 Leben / 25 % |
 | An der Kasse bleiben | weiter als 3,5 m weg: steigt laufend, und man ist nicht mehr geschützt | 8 % pro Sekunde |
 
 Die Fragen kommen nach der 1.–2. gescannten Ware und 2–3 Waren später. Hat man weniger Ware, stellt sie die restlichen am Ende, bevor man bezahlen darf. Im Kollaps wandert die Kasse nicht, solange das Minispiel läuft.
+
+**Geldbörse** (`src/game/till/cash.rs`): 50/20/10/5 €-Scheine, 2/1 €- und 50/20/10/5/2/1-ct-Münzen. Sie enthält immer genug, um passend zu zahlen, dazu 3–6 zufällige Extra-Stücke. Wählen mit A/D oder dem Mausrad, E (Linksklick) legt hin, F nimmt das zuletzt Hingelegte zurück. Anzeige: oben groß „NOCH OFFEN“, darunter je eine Reihe Kacheln für Scheine und Münzen (Wert und Anzahl, die gewählte gelb umrandet, leere grau).
+
+Cheats (F1) zum Testen: „Kasse: direkt zur Kartenzahlung“ bzw. „… zur Barzahlung“. Sie kippen den Markt, legen den Zettel als gescannt hin, überspringen die Fragen und stellen dich ans Terminal.
+
+## Flucht zum Ausgang (`src/game/escape.rs`)
+Direkt nach dem Bezahlen: Durchsage „ACHTUNG: Kunde 0 hat ein Gesicht. Schnappt ihn!“, Sirene alle 1,3 s, rote Blinkschrift „ALARM - LAUF ZUM AUSGANG!“. Alle Kunden und Mitarbeiter rennen mit 2,05 m/s auf einen zu (Gehen 1,5, Rennen 2,56 m/s mit 5 s Ausdauer), egal ob man hinsieht. Wer beim Alarm näher als 10 m ist, startet an seinem Regal bzw. an einem Platz mindestens 10 m entfernt. Auch Mitarbeiter packen jetzt zu. Erwischt = sofort Game Over, ohne Aufwachen („Sie haben Kunde 0 geschnappt“). In den Kassenbereich kommen sie weiterhin nicht. Gewonnen ist, wer durch die Tür hinaus ist.
 - Gekippt: alle Kassen zeigen "0 Kasse", das Rollo ist offen (Zigaretten), die Kameras folgen dem Spieler.
 
 ## Umsetzung im Detail

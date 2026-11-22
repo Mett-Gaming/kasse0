@@ -343,6 +343,7 @@ fn full_run_checkout_and_exit_wins() {
     put_all_on_belt(&mut g);
     assert!(g.cart.is_empty(), "Wagen nicht ausgeraeumt");
     assert!(g.till_active(), "Kassen-Minispiel startet nicht");
+    g.till.as_mut().unwrap().cash = false; // Kartenzahlung (bar: till/tests.rs)
     scan_and_answer(&mut g);
     assert!(g.belt.is_empty(), "Band nicht leer");
     assert_eq!(g.scanned.len(), n);
@@ -652,7 +653,7 @@ fn held_item_goes_on_belt_and_fakes_are_rejected() {
     assert!(g.belt.is_empty());
     assert!(g.scanned.is_empty(), "falsche Ware wurde gescannt");
     // An der Kasse merkt sich das die Kassiererin (nicht die Kundschaft)
-    assert!(g.till.as_ref().unwrap().doubt > 0.0);
+    assert_eq!(g.till.as_ref().unwrap().lives, till::TILL_LIVES - 1);
     assert!(g.suspicion <= before);
     // Wertstufe zaehlt Band und Gescanntes mit
     g.held = Some(ItemData::from_shelf(&g.world.items[i]));

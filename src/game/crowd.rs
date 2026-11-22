@@ -18,7 +18,7 @@ impl Game {
         for _ in 0..400 {
             let x = self.rng.gen_range(0..nav.w);
             let z = self.rng.gen_range(0..nav.h);
-            if !nav.is_walkable(x, z) {
+            if !nav.npc_walkable(x, z) {
                 continue;
             }
             let p = nav.center(x, z);
@@ -190,9 +190,19 @@ impl Game {
             self.player_field = npc::bfs(&self.world.nav, self.player.pos);
             self.field_timer = 0.3;
         }
+        // Wo alle vorher standen: wer in den Kassenbereich geraten ist (auch durch Schubsen),
+        // muss zurueck
+        let before: Vec<Vec3> = self
+            .customers
+            .iter()
+            .map(|c| c.pos)
+            .chain(self.employees.iter().map(|e| e.pos))
+            .chain(self.shoppers.iter().map(|s| s.pos))
+            .collect();
         self.update_shoppers(dt);
         self.update_customers(dt);
         self.update_employees(dt, input);
+        self.keep_npcs_out_of_checkout(&before);
         self.update_whispers(dt);
         // Gangart: Animationszeit an die zurueckgelegte Strecke koppeln (Fuesse rutschen nicht)
         for c in &mut self.customers {
@@ -206,6 +216,24 @@ impl Game {
         for s in &mut self.shoppers {
             s.gait
                 .advance(s.pos, dt, crate::people::PEOPLE[s.variant].1);
+        }
+    }
+
+    /// NPCs, die in diesem Bild in den Kassenbereich geraten sind, zurueck an ihren alten Platz.
+    fn keep_npcs_out_of_checkout(&mut self, before: &[Vec3]) {
+        let w = &self.world;
+        let mut old = before.iter();
+        let positions = self
+            .customers
+            .iter_mut()
+            .map(|c| &mut c.pos)
+            .chain(self.employees.iter_mut().map(|e| &mut e.pos))
+            .chain(self.shoppers.iter_mut().map(|s| &mut s.pos));
+        for pos in positions {
+            let Some(&prev) = old.next() else { break };
+            if w.in_checkout_zone(*pos, 0.0) && !w.in_checkout_zone(prev, 0.0) {
+                *pos = prev;
+            }
         }
     }
 
@@ -243,6 +271,7 @@ impl Game {
         let base = self.tier.customer_speed();
         let running = self.player.vel.length() > WALK_SPEED * 1.3;
         let noticed = self.suspicion >= 1.0;
+        let chase = self.chasing();
         for i in 0..self.customers.len() {
             let chest = self.customers[i].pos + vec3(0.0, 1.25, 0.0);
             let head = self.customers[i].pos + vec3(0.0, 1.6, 0.0);
@@ -252,7 +281,8 @@ impl Game {
             c.moving = false;
             c.bump_cd -= dt;
             // Verfolger kommen naeher, sobald man wegsieht (oder immer, wenn man aufgefallen ist)
-            let hunting = c.stalker && (!seen || noticed);
+            // Nach dem Alarm rennen alle, ob man hinsieht oder nicht
+            let hunting = c.stalker && (!seen || noticed || chase);
             if !hunting {
                 // Wer nicht verfolgt: kauft ein, solange man hinsieht. Sieht man weg, bleibt er
                 // stehen und starrt herueber - dreht man sich um, schauen einen alle an.
@@ -270,7 +300,9 @@ impl Game {
                 * (1.0 + c.angry)
                 * if self.paid { 1.4 } else { 1.0 };
             // Rennen faellt auf: dann holen sie deutlich schneller auf
-            let s = if seen {
+            let s = if chase {
+                super::escape::CHASE_SPEED
+            } else if seen {
                 speed * 0.4
             } else if running {
                 speed * RUN_CHASE
@@ -378,7 +410,7 @@ impl Game {
             let Some((x, z)) = nav.cell_of(p) else {
                 continue;
             };
-            if !nav.is_walkable(x, z) {
+            if !nav.npc_walkable(x, z) {
                 continue;
             }
             let c = nav.center(x, z);
@@ -440,6 +472,13 @@ impl Game {
                     e.yaw = npc::yaw_towards(e.pos, player);
                     continue;
                 }
+            }
+            if self.chasing() {
+                self.chase_employee(i, dt);
+                if self.outcome != Outcome::Running {
+                    return;
+                }
+                continue;
             }
             if self.employees[i].carrying {
                 self.carry_step(i, dt);
@@ -508,7 +547,7 @@ impl Game {
                             let nav = &self.world.nav;
                             let x = self.rng.gen_range(0..nav.w);
                             let z = self.rng.gen_range(0..nav.h);
-                            if nav.is_walkable(x, z) {
+                            if nav.npc_walkable(x, z) {
                                 target = nav.center(x, z);
                                 break;
                             }

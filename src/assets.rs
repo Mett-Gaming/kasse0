@@ -27,6 +27,9 @@ pub enum MeshId {
     Register,
     WetFloorSign,
     Can,
+    /// Mannequin in Sitzpose: frueher die Kassiererin, jetzt steht dort eine Personal-Figur
+    /// (people.rs). Bleibt geladen, damit die Reihenfolge der Modelle gleich bleibt.
+    #[allow(dead_code)]
     Cashier,
     Chair,
     Shutter,

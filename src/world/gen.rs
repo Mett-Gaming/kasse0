@@ -1349,6 +1349,8 @@ pub fn generate(params: &WorldParams) -> World {
         corral,
     };
     world.index_items();
+    // In den Kassenbereich kommen keine NPCs (der Spieler schon)
+    world.block_checkout_for_npcs();
     // Neue Waende duerfen nichts Wichtiges unerreichbar machen
     // Neue Waende, Loecher und Riesenwaren duerfen nichts Wichtiges unerreichbar machen
     if !world.all_reachable() {
