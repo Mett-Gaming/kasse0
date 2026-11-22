@@ -164,7 +164,9 @@ Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `ce
 - **Eskalation erreichbar:** Stufe = Maximum aus Warenwert (10/25/50 €), Zettel-Fortschritt (40 %/70 %/komplett) und Zeit im gekippten Markt (3/6/9 min). Der komplette Zettel löst den Kollaps aus: der Weg zur Kasse ist das Finale.
 - **Füße rutschen nicht mehr:** Die Lauf- und Rennanimation läuft mit der zurückgelegten Strecke (`people::Gait`, gemessene Schrittgeschwindigkeit: Männer 1,21 m/s gehend, 2,5 m/s rennend; Frauen 0,97 bzw. 2,0 m/s). Ab 1,7 m/s rennen Figuren. Bodenkontakt aller Clips gemessen: Sohle höchstens 3 cm über bzw. 2 cm unter dem Boden.
 
-## Jumpscares (v0.7)
+## Jumpscares (v0.7, schneller und creepier seit v0.11)
+**Schreck-Effekt (v0.11):** Jeder Schreck lässt 0,55 s lang das Bild im Negativ flackern (Farbumkehr-Stroboskop, 18 Hz), das Licht grell ausschlagen (Überbelichtung) und das Sichtfeld ruckartig um bis zu 30 % zusammenziehen. Ab „falsch“ zucken alle 14–30 s einzelne unterschwellige Negativ-Blitze (0,09 s) durchs Bild. Tempo: 18–32 s Ruhe zwischen Schrecken, 1,2 s Stille davor, Verfolger 1,2 m hinter dir, Stromausfall 1 s, Geisterwagen rollt mit 1,6 m/s heran und knallt vor dir zum Stehen, Monitor-Gestalt schlägt nach 0,8 s zu.
+**Cheats:** Im Cheat-Menü (F1, rechte Spalte) lässt sich jeder Schreck einzeln auslösen; der Cheat teleportiert an eine passende Stelle.
 Aus den Spielregeln heraus, nie zwei direkt hintereinander: nach einem Schreck 25–45 s Ruhe (Start: 15 s nach dem Kippen). Kleine Schrecken sobald der Markt gekippt ist, große ab „unruhig“ (v0.8: deutlich häufiger als in v0.7). Vor angekündigten Schrecken wird es kurz still (Musik `hush`).
 - **Tod:** das leere Gesicht des Fängers kurz in Großaufnahme, dann kippt das Bild weg.
 - **Umdrehen:** Wer abgelenkt ist (Zettel offen, Blick ins Regal: 60 %/s, sonst 4 %/s), hat bald einen Verfolger 1,6 m hinter sich, der wartet, bis man sich umdreht.

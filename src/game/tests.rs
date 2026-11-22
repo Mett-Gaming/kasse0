@@ -492,7 +492,7 @@ fn employee_tidies_up_unattended_cart_to_corral() {
 #[test]
 fn talking_to_carrier_releases_cart() {
     let mut g = Game::new(15);
-    g.cheat(CHEATS.len() - 1); // Mitarbeiter nimmt den Wagen mit
+    g.cheat(FIRST_SCARE_CHEAT - 1); // Mitarbeiter nimmt den Wagen mit
     g.customers.clear();
     assert!(g.employees.last().unwrap().carrying);
     let i = g.employees.len() - 1;
@@ -1265,4 +1265,47 @@ fn jumpscares_come_regularly() {
         g.tier = Tier::Uneasy;
     }
     assert!(scares >= 3, "nur {scares} Schrecken in 4 Minuten");
+}
+
+#[test]
+fn scare_inverts_colors_flashes_and_zooms() {
+    let mut g = scary_game(3, Tier::Uneasy);
+    g.customers.clear();
+    g.scare_cd = 1e6;
+    g.fire_scare(1.0);
+    let (mut inverted, mut normal, mut flash, mut zoom) = (false, false, 0.0f32, 1.0f32);
+    for _ in 0..20 {
+        g.update(1.0 / 60.0, &mut Input::default());
+        inverted |= g.scare_invert() > 0.5;
+        normal |= g.scare_invert() < 0.5;
+        flash = flash.max(g.scare_flash());
+        zoom = zoom.min(g.scare_zoom());
+    }
+    assert!(inverted && normal, "kein Farbumkehr-Stroboskop");
+    assert!(flash > 0.3, "kein Lichtblitz");
+    assert!(zoom < 0.85, "kein Zoom-Ruck");
+    step(&mut g, 1.0, Input::default());
+    assert_eq!(g.scare_flash(), 0.0);
+    assert_eq!(g.scare_zoom(), 1.0);
+}
+
+#[test]
+fn subliminal_flashes_only_late() {
+    let mut g = scary_game(4, Tier::Uneasy);
+    g.customers.clear();
+    g.scare_cd = 1e6;
+    let mut seen = false;
+    for _ in 0..(40 * 60) {
+        g.update(1.0 / 60.0, &mut Input::default());
+        seen |= g.scare_invert() > 0.5;
+        g.tier = Tier::Uneasy;
+    }
+    assert!(!seen, "Blitze schon auf Stufe unruhig");
+    g.tier = Tier::Wrong;
+    for _ in 0..(40 * 60) {
+        g.update(1.0 / 60.0, &mut Input::default());
+        seen |= g.scare_invert() > 0.5;
+        g.tier = Tier::Wrong;
+    }
+    assert!(seen, "keine unterschwelligen Blitze ab falsch");
 }

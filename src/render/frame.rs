@@ -550,7 +550,7 @@ impl Renderer {
                 RENDER_WIDTH as f32,
                 RENDER_HEIGHT as f32,
             ],
-            extra: [p.fade, p.red, 0.0, 0.0],
+            extra: [p.fade, p.red, p.invert, p.flash],
         };
         d.cmd_push_constants(
             cmd,

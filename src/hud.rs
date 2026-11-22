@@ -77,7 +77,7 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
         Screen::Options { .. } => (82.0, 17.0),
         Screen::Paused => (66.0, 16.0),
         Screen::End => (205.0, 16.0),
-        Screen::Cheats => (30.0, 12.5),
+        Screen::Cheats => (38.0, 15.0),
         Screen::Playing => (0.0, 0.0),
     }
 }
@@ -94,33 +94,63 @@ pub fn menu_len(screen: Screen) -> usize {
 }
 
 /// Welche Menuezeile liegt unter dem Mauszeiger?
-pub fn menu_hit(screen: Screen, x: f32, y: f32) -> Option<usize> {
-    let (y0, step) = menu_layout(screen);
-    if !(60.0..=420.0).contains(&x) {
-        return None;
+/// Zeilen pro Spalte: das Cheat-Menue hat zwei Spalten, alle anderen eine.
+fn menu_rows(screen: Screen) -> usize {
+    let n = menu_len(screen);
+    if screen == Screen::Cheats {
+        n.div_ceil(2)
+    } else {
+        n.max(1)
     }
+}
+
+/// Mitte (x) und Oberkante (y) des Menuepunkts `i`, dazu die Spaltenbreite.
+pub fn menu_cell(screen: Screen, i: usize) -> (f32, f32, f32) {
+    let (y0, step) = menu_layout(screen);
+    let rows = menu_rows(screen);
+    if screen == Screen::Cheats {
+        let col = i / rows;
+        let half = ui::W * 0.5;
+        (
+            half * (col as f32 + 0.5),
+            y0 + (i % rows) as f32 * step,
+            half,
+        )
+    } else {
+        (ui::W * 0.5, y0 + i as f32 * step, 360.0)
+    }
+}
+
+pub fn menu_hit(screen: Screen, x: f32, y: f32) -> Option<usize> {
+    let (_, step) = menu_layout(screen);
     (0..menu_len(screen)).find(|&i| {
-        let top = y0 + i as f32 * step - 4.0;
-        y >= top && y < top + step
+        let (cx, top, w) = menu_cell(screen, i);
+        let top = top - 4.0;
+        (x - cx).abs() <= w * 0.5 && y >= top && y < top + step
     })
 }
 
 fn draw_menu(u: &mut Ui, screen: Screen, items: &[String], sel: usize, time: f32) {
-    let (y0, step) = menu_layout(screen);
     for (i, label) in items.iter().enumerate() {
-        let y = y0 + i as f32 * step;
+        let (cx, y, _) = menu_cell(screen, i);
+        let shown = if i == sel {
+            format!("▶ {label}")
+        } else {
+            label.clone()
+        };
+        let x = cx - Ui::text_width(&shown, 1.0) * 0.5;
         if i == sel {
             let w = Ui::text_width(label, 1.0) + 24.0;
             u.rect(
-                (ui::W - w) * 0.5,
+                cx - w * 0.5,
                 y - 4.0,
                 w,
                 16.0,
                 [0.95, 0.95, 0.92, 0.12 + 0.05 * (time * 4.0).sin()],
             );
-            u.text_center(y, &format!("▶ {label}"), YELLOW, 1.0);
+            u.text_s(x, y, &shown, YELLOW, 1.0);
         } else {
-            u.text_center(y, label, WHITE, 1.0);
+            u.text_s(x, y, &shown, WHITE, 1.0);
         }
     }
 }

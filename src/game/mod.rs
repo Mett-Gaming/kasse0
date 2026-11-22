@@ -7,7 +7,9 @@ mod death;
 mod draws;
 pub mod escape;
 mod monitor;
+mod scare_cheats;
 mod scares;
+pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
 pub use cheats::CHEATS;
@@ -255,6 +257,15 @@ pub struct Game {
     monitor_ghost: Option<f32>,
     /// Stromausfall-Schreck: (Sekunden seit Beginn, Kundin, die im Dunkeln vor einen gestellt wurde)
     blackout: Option<(f32, Option<usize>)>,
+    /// Cheat: naechste Fata Morgana dreht sich garantiert um
+    mirage_force_scary: bool,
+    /// Schreck-Effekt (Restzeit, Staerke) und unterschwellige Blitze (Fortschritt, Wartezeit)
+    scare_fx: f32,
+    scare_fx_strength: f32,
+    subliminal: f32,
+    subliminal_wait: f32,
+    /// Cheat: das Menue soll den Troll-Jumpscare zeigen (main.rs holt das ab)
+    troll_request: bool,
     pub holograms: Vec<mirage::Hologram>,
     mirage_timer: f32,
     tipped_time: f32,
@@ -423,6 +434,12 @@ impl Game {
             monitor_watch: 0.0,
             monitor_ghost: None,
             blackout: None,
+            mirage_force_scary: false,
+            scare_fx: 0.0,
+            scare_fx_strength: 0.0,
+            subliminal: -1.0,
+            subliminal_wait: 0.0,
+            troll_request: false,
             holograms: Vec::new(),
             mirage_timer: 12.0,
             tipped_time: 0.0,
@@ -764,7 +781,8 @@ impl Game {
 
     pub fn view_proj(&self, aspect: f32) -> Mat4 {
         let view = Mat4::look_to_rh(self.eye(), self.view_dir(), Vec3::Y);
-        let proj = Mat4::perspective_rh(self.fov_deg.to_radians(), aspect, 0.05, 140.0);
+        let fov = self.fov_deg * self.scare_zoom();
+        let proj = Mat4::perspective_rh(fov.to_radians(), aspect, 0.05, 140.0);
         proj * view
     }
 

@@ -2,24 +2,36 @@
 
 use super::*;
 
+/// Kurze Namen: das Menue hat zwei Spalten (je hoechstens 26 Zeichen).
+/// Ab `FIRST_SCARE_CHEAT` folgen die Jumpscares (scare_cheats.rs).
 pub const CHEATS: &[&str] = &[
     "Unverwundbar an/aus",
     "Markt kippen",
-    "Zettel auffüllen (billig, in den Wagen)",
-    "+10 € Warenwert (nächste Stufe)",
+    "Zettel füllen (billig)",
+    "+10 € (nächste Stufe)",
     "Auffälligkeit 0 %",
     "Auffälligkeit 100 %",
-    "Zur Kasse teleportieren (mit Wagen)",
-    "Zur Getränkeabteilung teleportieren",
-    "Mitarbeiter herrufen (Dialog)",
-    "Kunden und Mitarbeiter entfernen",
+    "Zur Kasse (mit Wagen)",
+    "Zur Getränkeabteilung",
+    "Mitarbeiter herrufen",
+    "Alle Leute entfernen",
     "Durchsage auslösen",
     "Markt umbauen",
-    "Kasse: direkt zur Kartenzahlung",
-    "Kasse: direkt zur Barzahlung",
-    "Leben wieder auffüllen (Markt und Kasse)",
+    "Kasse: Kartenzahlung",
+    "Kasse: Barzahlung",
+    "Leben auffüllen (alle)",
     "Tutorial überspringen",
-    "Mitarbeiter nimmt deinen Wagen mit",
+    "Wagen wird mitgenommen",
+    "Schreck: Hinter dir",
+    "Schreck: Stromausfall",
+    "Schreck: Kassiererin",
+    "Schreck: Geisterwagen",
+    "Schreck: Fata Morgana",
+    "Schreck: Deckenkabel",
+    "Schreck: Kopfüber",
+    "Schreck: Monitor",
+    "Schreck: Tod (Gesicht)",
+    "Schreck: Troll-Option",
 ];
 
 impl Game {
@@ -144,6 +156,7 @@ impl Game {
                     "Kartenzahlung.".into()
                 }
             }
+            i if i >= FIRST_SCARE_CHEAT => self.scare_cheat(i - FIRST_SCARE_CHEAT),
             _ => {
                 // Wagen 2 m vor dir abstellen, ein Mitarbeiter schnappt ihn sich
                 self.tip();
@@ -172,7 +185,7 @@ mod tests {
     #[test]
     fn every_cheat_runs_and_does_its_job() {
         let mut g = Game::new(55);
-        for i in 0..CHEATS.len() {
+        for i in 0..FIRST_SCARE_CHEAT {
             g.cheat(i);
             let mut inp = Input::default();
             for _ in 0..30 {
@@ -215,5 +228,45 @@ mod tests {
         g.spawn_customer_at(g.player.pos + vec3(0.3, 0.0, 0.0));
         g.update(1.0 / 60.0, &mut Input::default());
         assert_eq!(g.outcome, Outcome::Running);
+    }
+
+    #[test]
+    fn every_scare_cheat_scares() {
+        for i in FIRST_SCARE_CHEAT..CHEATS.len() {
+            let mut g = Game::new(56);
+            g.cheat(i);
+            let mut scared = false;
+            let mut troll = false;
+            for k in 0..60 * 12 {
+                let mut inp = Input::default();
+                // Fata Morgana: vorgehen; Hinter dir: nach 1 s umdrehen
+                if CHEATS[i].contains("Fata") {
+                    inp.forward = true;
+                }
+                if CHEATS[i].contains("Hinter") && k == 60 {
+                    g.player.yaw += std::f32::consts::PI;
+                }
+                g.update(1.0 / 60.0, &mut inp);
+                scared |= g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Scare));
+                troll |= g.take_troll_request();
+                g.sfx.clear();
+                if scared || troll {
+                    break;
+                }
+            }
+            assert!(
+                scared || troll,
+                "Cheat {:?} loest keinen Schreck aus",
+                CHEATS[i]
+            );
+            assert_eq!(g.deaths, 0, "Cheat {:?} kostet ein Leben", CHEATS[i]);
+        }
+    }
+
+    #[test]
+    fn cheat_labels_fit_two_columns() {
+        for c in CHEATS {
+            assert!(c.chars().count() <= 26, "{c} zu lang");
+        }
     }
 }

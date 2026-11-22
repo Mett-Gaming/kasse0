@@ -25,7 +25,7 @@ pub struct Hologram {
 const REVEAL_DIST: f32 = 3.0;
 const REVEAL_TIME: f32 = 0.8;
 /// So lange bleibt eine "unheimliche" Fata Morgana nach dem Umdrehen noch scheinbar echt
-pub(super) const SCARY_HOLD: f32 = 0.35;
+pub(super) const SCARY_HOLD: f32 = 0.2;
 
 impl Game {
     pub(super) fn update_mirages(&mut self, dt: f32) {
@@ -37,7 +37,8 @@ impl Game {
         // Aus der Naehe entpuppt sie sich: flackert kurz als Hologramm und ist weg
         let player = self.player.pos;
         let mut revealed_now = false;
-        let scary_now = self.tier >= Tier::Uneasy && self.rng.gen_bool(0.6);
+        let scary_now =
+            self.mirage_force_scary || (self.tier >= Tier::Uneasy && self.rng.gen_bool(0.6));
         let mut scared = false;
         self.holograms.retain_mut(|h| {
             h.life -= dt;
@@ -59,6 +60,9 @@ impl Game {
         if revealed_now {
             self.glitch = self.glitch.max(0.35);
             self.sfx.push((Sfx::Blip, 0.3));
+        }
+        if scared {
+            self.mirage_force_scary = false;
         }
         if scared && self.can_scare(false) {
             self.fire_scare(0.7);

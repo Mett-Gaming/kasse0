@@ -54,7 +54,7 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 | 0–9 | PIN am Kartenterminal |
 | A / D oder Mausrad, E, F (beim Barzahlen) | Schein oder Münze wählen, hinlegen, zurücknehmen |
 | Esc / P | Pause (mit Tastenübersicht) |
-| F1 | Cheat-Menü zum Testen (u. a. "Mitarbeiter nimmt deinen Wagen mit") |
+| F1 | Cheat-Menü zum Testen (zwei Spalten, Links/Rechts wechselt): u. a. jeden Jumpscare einzeln auslösen |
 | F12 | Screenshot (Ordner *Bilder*) |
 
 Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Überspringen kannst du es mit dem Haken **„Tutorial überspringen“** im Hauptmenü (gleiche Einstellung wie in den Optionen) oder mitten im Spiel per Cheat. Zum Ausräumen aufs Band muss der Wagen an der Kasse stehen. Unterwegs kannst du ihn aber parken und Waren zu Fuß holen.
@@ -109,7 +109,7 @@ Mit dem Auto-Screenshot-Durchlauf rendert das Spiel automatisch alle Screens (Ti
 $env:KASSE0_AUTOSHOT = "$PWD\shots"; cargo run --release -- 1994
 ```
 
-Das Cheat-Menü (**F1**) kippt den Markt, füllt den Zettel, erhöht den Warenwert, teleportiert, ruft Mitarbeiter, springt direkt zur Karten- oder Barzahlung, füllt die Leben wieder auf (Markt und Kasse), überspringt das Tutorial usw. Für Validation-Layer im Debug-Build das LunarG Vulkan SDK installieren.
+Das Cheat-Menü (**F1**, zwei Spalten) kippt den Markt, füllt den Zettel, erhöht den Warenwert, teleportiert, ruft Mitarbeiter, springt direkt zur Karten- oder Barzahlung, füllt die Leben wieder auf (Markt und Kasse), überspringt das Tutorial usw. Die rechte Spalte („Schreck: …“) teleportiert an eine passende Stelle und löst genau einen Jumpscare aus (Hinter dir, Stromausfall, Kassiererin, Geisterwagen, Fata Morgana, Deckenkabel, Kopfüber, Monitor, Tod ohne Lebensverlust, Troll-Option). Für Validation-Layer im Debug-Build das LunarG Vulkan SDK installieren.
 
 ### Modelle neu konvertieren
 Waren (Katalog `tools/catalog.json`, Quell-Packs in `assets_src/packs`):
