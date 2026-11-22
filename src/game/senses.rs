@@ -49,6 +49,15 @@ pub struct Brain {
     pub flank_cd: f32,
     /// war im letzten Bild auf der Jagd
     pub hunting: bool,
+    /// erstarrt (Sekunden): ertappt oder ahmt den stillstehenden Spieler nach
+    pub freeze: f32,
+    /// greift gerade mit ins Regal, weil der Spieler es tut (Sekunden)
+    pub mimic_pick: f32,
+    /// holt zum Zupacken aus (Sekunden)
+    pub grab: f32,
+    /// Personal: raeumt kniend ein (Sekunden), mit Blick zum Regal
+    pub restock: f32,
+    pub restock_face: Option<Vec3>,
 }
 
 impl Default for Brain {
@@ -64,6 +73,11 @@ impl Default for Brain {
             detour: None,
             flank_cd: 0.0,
             hunting: false,
+            freeze: 0.0,
+            mimic_pick: 0.0,
+            grab: 0.0,
+            restock: 0.0,
+            restock_face: None,
         }
     }
 }

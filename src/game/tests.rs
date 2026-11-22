@@ -154,6 +154,8 @@ fn caught_when_stalker_reaches_player() {
     g.customers[0].stalker = true;
     g.trolley.pushing = false;
     for hit in 1..=3 {
+        // nach jedem Tod gibt der Director 20 s Ruhe; hier geht es nur ums Fangen
+        g.director = Default::default();
         let p = g.player.pos;
         g.customers[0].pos = vec3(p.x, 0.0, p.z - 1.5);
         g.customers[0].home = g.customers[0].pos + vec3(0.0, 0.0, -30.0);
@@ -204,9 +206,13 @@ fn ordinary_customers_only_shop_and_never_catch() {
         lerp_angle(0.0, c.yaw - to_player, 1.0).abs() < 0.3,
         "starrt nicht herueber"
     );
-    // hinsehen: kauft wieder ein
+    // hinsehen: kauft wieder ein (Spieler bleibt dabei in Bewegung, sonst ahmen sie das
+    // Stillstehen nach und erstarren, siehe brain.rs)
     g.player.yaw = 0.0;
-    step(&mut g, 8.0, Input::default());
+    for _ in 0..(8 * 60) {
+        g.player_still = 0.0;
+        g.update(1.0 / 60.0, &mut Input::default());
+    }
     assert_eq!(g.outcome, Outcome::Running);
     assert!(
         (g.customers[0].pos - start).length() > 0.3,
@@ -1545,5 +1551,36 @@ fn perf_update_in_collapse() {
     println!(
         "Kollaps: {} Kunden, {} Mitarbeiter, {ms:.3} ms pro Update",
         n.0, n.1
+    );
+}
+
+#[test]
+fn after_a_death_the_stalkers_hold_back_for_a_while() {
+    let mut g = Game::new(5);
+    g.tip();
+    g.employees.clear();
+    g.customers.truncate(1);
+    g.scare_cd = 1e6;
+    g.customers[0].stalker = true;
+    // einmal sterben lassen
+    let at = g.customers[0].pos;
+    g.caught_by(at, 0);
+    step(&mut g, 3.0, Input::default());
+    assert!(g.dying.is_none(), "kein Aufwachen");
+    assert_eq!(g.director.phase, director::Phase::Relax);
+    // Verfolger 6 m hinter dem Spieler, weiss genau, wo er ist
+    let spot = g.world.collide(g.player.pos + vec3(0.0, 0.0, 6.0), 0.25);
+    g.customers[0].pos = spot;
+    g.player.yaw = 0.0;
+    g.player.pitch = -1.4;
+    let d0 = (spot - g.player.pos).length();
+    for _ in 0..(12 * 60) {
+        g.customers[0].brain.notice(g.player.pos, true);
+        g.update(1.0 / 60.0, &mut Input::default());
+    }
+    let d = (g.customers[0].pos - g.player.pos).length();
+    assert!(
+        d > d0 - 0.3,
+        "rueckt trotz Ruhephase heran: {d0:.1} -> {d:.1}"
     );
 }

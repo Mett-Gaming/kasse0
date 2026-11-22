@@ -87,6 +87,8 @@ impl Game {
     }
 
     fn respawn(&mut self) {
+        // danach Ruhe: niemand rueckt heran (director.rs)
+        self.director.calm_down(super::director::CALM_AFTER_DEATH);
         let death_pos = self.player.pos;
         self.dying = None;
         self.catcher = None;

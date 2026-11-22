@@ -64,6 +64,7 @@ impl Game {
             && self.dialog.is_none()
             && !self.paid
             && !self.till_paying()
+            && self.director.allows_scares()
     }
 
     /// Schreck ausloesen: harter Klang, Bildriss, kurzer roter Blitz, danach Abklingzeit.
@@ -75,6 +76,10 @@ impl Game {
         self.scare_cd = self.rng.gen_range(SCARE_COOLDOWN.0..SCARE_COOLDOWN.1);
         self.scare_fx = SCARE_FX;
         self.scare_fx_strength = strength;
+        // nach einem grossen Schrecken kurz Ruhe
+        if strength >= 0.9 {
+            self.director.calm_down(super::director::CALM_AFTER_SCARE);
+        }
     }
 
     /// 0..1 wie weit der Schreck-Effekt noch laeuft (1 = gerade ausgeloest)

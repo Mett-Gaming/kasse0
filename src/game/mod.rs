@@ -1,10 +1,12 @@
 //! Ein Run: Einkaufen, Kippen, Kunden, Mitarbeiter, Kasse, Ausgang.
 
+mod brain;
 mod cheats;
 mod checkout;
 mod corridor;
 mod crowd;
 mod death;
+pub mod director;
 mod draws;
 pub mod escape;
 mod monitor;
@@ -328,6 +330,11 @@ pub struct Game {
     player_field: Vec<u16>,
     /// Geraeusche dieses Bilds: (Ort, Hoerweite)
     noises: Vec<(Vec3, f32)>,
+    /// Spannungskurve (director.rs)
+    pub director: director::Director,
+    /// wie lange der Spieler schon stillsteht; hat er gerade ins Regal gegriffen?
+    player_still: f32,
+    player_reached: bool,
     /// Weg des rollenden Geisterwagens zum Spieler (ohne die engen Regal-Durchgaenge)
     cart_field: Vec<u16>,
     cart_field_timer: f32,
@@ -506,6 +513,9 @@ impl Game {
             rng,
             player_field: Vec::new(),
             noises: Vec::new(),
+            director: Default::default(),
+            player_still: 0.0,
+            player_reached: false,
             cart_field: Vec::new(),
             cart_field_timer: 0.0,
             field_timer: 0.0,

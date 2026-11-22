@@ -14,6 +14,8 @@ const RUN_CHASE: f32 = 1.6;
 const FLANK_FROM: f32 = 6.0;
 /// So breit ist der Streifen um den Weg des ersten Verfolgers, den der Flankierer meidet
 const FLANK_WIDTH: f32 = 1.2;
+/// Verfolger, die laut Director gerade nicht heranruecken, lauern auf diesem Abstand
+const STALK_DIST: f32 = 9.0;
 /// Mindestabstand zwischen Menschen, zum Spieler und zum abgestellten Wagen
 const PERSON_GAP: f32 = 0.55;
 const PLAYER_GAP: f32 = 0.45;
@@ -226,37 +228,48 @@ impl Game {
             .chain(self.shoppers.iter().map(|s| s.pos))
             .collect();
         self.update_senses(dt);
+        let paused = self.dialog.is_some() || !self.tipped;
+        self.director.update(dt, paused);
         self.update_shoppers(dt);
         self.update_customers(dt);
         self.update_employees(dt, input);
+        self.update_mimicry(dt);
         self.separate_people();
         self.keep_npcs_out_of_checkout(&before);
         self.update_whispers(dt);
         // Gangart: Animationszeit an die zurueckgelegte Strecke koppeln (Fuesse rutschen nicht)
-        // im Gespraech: Kunden-Posen eingefroren (Animationszeit steht)
-        if self.dialog.is_none() {
-            for c in &mut self.customers {
-                c.gait
-                    .advance(c.pos, dt, crate::people::PEOPLE[c.variant].1);
-                let still = if c.pose == Pose::Reach {
-                    Clip::Reach
-                } else {
-                    Clip::Idle
-                };
-                let clip = gait_clip(&c.gait, still);
-                c.anim.update(clip, c.gait.t + c.seed, dt, BLEND);
+        // im Gespraech (oder erstarrt): Kunden-Posen eingefroren (Animationszeit steht)
+        let talking = self.dialog.is_some();
+        for i in 0..self.customers.len() {
+            if talking || self.customers[i].brain.freeze > 0.0 {
+                continue;
+            }
+            let female = crate::people::PEOPLE[self.customers[i].variant].1;
+            let c = &mut self.customers[i];
+            c.gait.advance(c.pos, dt, female);
+            let clip = self.customer_clip(&self.customers[i]);
+            let c = &mut self.customers[i];
+            c.anim.update(clip, c.gait.t + c.seed, dt, BLEND);
+            // dieselbe Ware immer wieder nehmen
+            if clip == Clip::PickUp && c.anim.finished(crate::people::anims(female).duration(clip))
+            {
+                c.anim.restart();
             }
         }
-        for e in &mut self.employees {
-            e.gait
-                .advance(e.pos, dt, crate::people::PEOPLE[e.variant].1);
-            let clip = gait_clip(&e.gait, Clip::Idle);
+        for i in 0..self.employees.len() {
+            let female = crate::people::PEOPLE[self.employees[i].variant].1;
+            let e = &mut self.employees[i];
+            e.gait.advance(e.pos, dt, female);
+            let clip = self.employee_clip(&self.employees[i]);
+            let e = &mut self.employees[i];
             e.anim.update(clip, e.gait.t + e.seed, dt, BLEND);
         }
-        for s in &mut self.shoppers {
-            s.gait
-                .advance(s.pos, dt, crate::people::PEOPLE[s.variant].1);
-            let clip = gait_clip(&s.gait, Clip::Idle);
+        for i in 0..self.shoppers.len() {
+            let female = crate::people::PEOPLE[self.shoppers[i].variant].1;
+            let s = &mut self.shoppers[i];
+            s.gait.advance(s.pos, dt, female);
+            let clip = self.shopper_clip(&self.shoppers[i]);
+            let s = &mut self.shoppers[i];
             s.anim.update(clip, s.gait.t + s.seed, dt, BLEND);
         }
     }
@@ -321,6 +334,7 @@ impl Game {
         // Im Gespraech mit einem Mitarbeiter steht die Welt still: kein Kunde rueckt naeher
         let talking = self.dialog.is_some();
         let flankers = self.flankers();
+        let pushers = self.pushers();
         for i in 0..self.customers.len() {
             let chest = self.customers[i].pos + vec3(0.0, 1.25, 0.0);
             let head = self.customers[i].pos + vec3(0.0, 1.6, 0.0);
@@ -332,6 +346,10 @@ impl Game {
             if talking {
                 // eingefroren; nur der Blick wandert langsam zu einem herueber
                 c.yaw = lerp_angle(c.yaw, npc::yaw_towards(c.pos, player), (dt * 1.5).min(1.0));
+                continue;
+            }
+            // erstarrt (ertappt oder ahmt den Stillstand nach): keine Bewegung, Pose steht
+            if c.brain.freeze > 0.0 {
                 continue;
             }
             // starrt (nach "hinter dir"): steht nur da, schaut her, tut nichts
@@ -352,6 +370,12 @@ impl Game {
                 // Jagd vorbei: nicht zum alten Ziel zurueck, sondern hier weiterbummeln
                 c.field.clear();
                 c.wait = 0.0;
+                // beim Heranschleichen ertappt: erstarrt mitten im Schritt
+                if seen {
+                    c.brain.freeze = super::brain::FREEZE_CAUGHT;
+                    c.brain.hunting = false;
+                    continue;
+                }
             }
             c.brain.hunting = hunting;
             if !hunting {
@@ -385,6 +409,19 @@ impl Game {
             } else {
                 speed
             };
+            let dist_now = vec3(c.pos.x - player.x, 0.0, c.pos.z - player.z).length();
+            // Director: wer nicht heranruecken darf, lauert auf Abstand und beobachtet
+            let held = !omniscient && c.brain.fresh() && !pushers.contains(&i);
+            if held && dist_now < STALK_DIST {
+                c.moving = false;
+                c.yaw = lerp_angle(c.yaw, npc::yaw_towards(c.pos, player), (dt * 4.0).min(1.0));
+                continue;
+            }
+            // Zupacken: auf den letzten Metern ein Ausfallschritt
+            if dist_now < super::brain::GRAB_FROM && c.brain.grab <= 0.0 && !held {
+                c.brain.grab = super::brain::GRAB_TIME;
+            }
+            let s = if c.brain.grab > 0.0 { s * 1.3 } else { s };
             let old = c.pos;
             let fresh = omniscient || c.brain.fresh();
             let flank_of = flankers
@@ -554,6 +591,21 @@ impl Game {
             }
         }
         None
+    }
+
+    /// Welche Verfolger gerade wirklich heranruecken duerfen (Director): die naechsten.
+    pub(super) fn pushers(&self) -> Vec<usize> {
+        let player = self.player.pos;
+        let mut hunters: Vec<(f32, usize)> = self
+            .customers
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.stalker && c.brain.fresh())
+            .map(|(i, c)| ((c.pos - player).length(), i))
+            .collect();
+        hunters.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let k = self.director.pushers(hunters.len());
+        hunters.iter().take(k).map(|h| h.1).collect()
     }
 
     /// Welche jagenden Verfolger flankieren, und wer vor ihnen jagt: nach Entfernung sortiert
@@ -825,15 +877,50 @@ impl Game {
                 }
             } else {
                 self.employees[i].state = EmpState::Patrol;
+                // kniet am Regal und raeumt ein
+                let e = &mut self.employees[i];
+                if e.brain.restock > 0.0 {
+                    e.brain.restock -= dt;
+                    e.moving = false;
+                    if let Some(f) = e.brain.restock_face {
+                        e.yaw = lerp_angle(e.yaw, f.x.atan2(f.z), (dt * 4.0).min(1.0));
+                    }
+                    continue;
+                }
+                let e = &self.employees[i];
+                let arrived = !e.field.is_empty() && (e.pos - e.target).length() < 0.7;
+                if arrived && e.brain.restock_face.is_some() {
+                    // am Regal angekommen: einraeumen (im spaeten Markt endlos)
+                    let (lo, hi) = if self.tipped && self.tier >= Tier::Wrong {
+                        super::brain::RESTOCK_UNCANNY
+                    } else {
+                        super::brain::RESTOCK_TIME
+                    };
+                    let t = self.rng.gen_range(lo..hi);
+                    let e = &mut self.employees[i];
+                    e.brain.restock = t;
+                    e.field.clear();
+                    e.retarget = 0.0;
+                    continue;
+                }
                 let e = &self.employees[i];
                 if e.retarget <= 0.0 || e.field.is_empty() || (e.pos - e.target).length() < 0.7 {
                     // Manchmal gezielt zum herrenlosen Wagen
+                    let mut face = None;
                     let target = if unattended
                         && !someone_carrying
                         && e.cart_cd <= 0.0
                         && self.rng.gen_bool(0.5)
                     {
                         self.trolley.pos
+                    } else if !self.world.spots.is_empty()
+                        && self.rng.gen_bool(super::brain::RESTOCK_SHARE)
+                    {
+                        // zu einem Regal, dort einraeumen
+                        let k = self.rng.gen_range(0..self.world.spots.len());
+                        let spot = &self.world.spots[k];
+                        face = Some(spot.facing);
+                        spot.pos
                     } else {
                         let mut target = e.pos;
                         for _ in 0..60 {
@@ -855,6 +942,7 @@ impl Game {
                     e.retarget = 12.0;
                     e.target = target;
                     e.field = field;
+                    e.brain.restock_face = face;
                     continue;
                 }
                 let e = &mut self.employees[i];

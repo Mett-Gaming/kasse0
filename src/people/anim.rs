@@ -400,6 +400,11 @@ impl Animator {
             .filter(|b| b.2 > 0.0)
     }
 
+    /// Einmal-Clip von vorn (z. B. dieselbe Ware immer wieder nehmen).
+    pub fn restart(&mut self) {
+        self.start = self.now;
+    }
+
     /// Ist ein Einmal-Clip durchgelaufen?
     pub fn finished(&self, duration: f32) -> bool {
         !is_loop_idle(self.clip) && !self.clip.locomotion() && self.now - self.start >= duration

@@ -78,6 +78,13 @@ Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Übers
 - **Mitarbeiter** sehen nur nach vorne (bis 9 m, ganz nah immer). Hören sie Lärm, gehen sie zur Geräuschquelle und sehen sich um.
 - Niemand läuft mehr durch andere hindurch, Wege werden geglättet, und wer irgendwo hängen bleibt, sucht sich einen neuen Weg.
 
+### Wie sich die NPCs verhalten
+- Kunden tun im Stehen etwas: ins Regal greifen, **dieselbe Ware immer wieder nehmen**, telefonieren, Arme verschränken, reden. Im gekippten Markt folgt ihr Kopf dir.
+- Sie **ahmen dich nach**: Stehst du still, erstarren sie. Greifst du ins Regal, greifen sie mit. Starrst du eine an, dreht sie sich weg.
+- Erwischst du einen Verfolger beim Heranschleichen, **erstarrt er mitten im Schritt**. Ab „falsch“ schleichen Verfolger geduckt, im Kollaps wie Untote. Auf den letzten Metern holen sie zum Griff aus.
+- Mitarbeiter **räumen kniend Regale ein** (später endlos dieselbe Lücke), schieben deinen Wagen weg und reden mit dir.
+- Ein **Director** steuert die Spannung: Erst rücken einzelne Verfolger heran, dann alle, dann ist eine Weile Ruhe, und die anderen lauern nur auf Abstand. Nach einem Tod sind 20 s Ruhe, auf dem Höhepunkt gibt es keine Scares.
+
 ### Gespräche
 - Während eines Gesprächs bewegt sich kein Kunde (alle frieren in ihrer Pose ein und schauen nur langsam zu dir), auch der Geisterwagen hält an. Danach hast du noch 2,5 s Schonfrist.
 - Rennst du an einem Mitarbeiter vorbei, kann er dich nicht ansprechen. Das fällt aber auf (+20 %), und er folgt dir.

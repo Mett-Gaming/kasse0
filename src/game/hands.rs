@@ -475,6 +475,7 @@ impl Game {
         if it.taken {
             return;
         }
+        self.player_reached = true;
         it.taken = true;
         let data = ItemData::from_shelf(it);
         self.statics_dirty = true;
