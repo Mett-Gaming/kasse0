@@ -234,6 +234,39 @@ fn monitor_face(in: VsOut) -> vec3<f32> {
     return max(col, vec3<f32>(0.0)) * in.extra.z;
 }
 
+// Spiegel am Ende des Fluchtkorridors: Bild der zweiten Kamera (vom gespiegelten Auge aus),
+// seitenverkehrt, in Farbe, alt und fleckig. In der Kamera selbst bleibt er dunkel.
+fn mirror_face(in: VsOut) -> vec3<f32> {
+    let dark = vec3<f32>(0.05, 0.05, 0.055);
+    if (pc.cam_pos.w > 1.5) {
+        return dark;
+    }
+    let c = cos(in.yaw);
+    let s = sin(in.yaw);
+    let d = in.world_pos - in.center;
+    let l = vec3<f32>(d.x * c - d.z * s, d.y, d.x * s + d.z * c);
+    let n = vec3<f32>(in.normal.x * c - in.normal.z * s, in.normal.y, in.normal.x * s + in.normal.z * c);
+    if (n.z > -0.5) {
+        return dark;
+    }
+    let h = in.half_ext;
+    let u = 0.5 - l.x / (2.0 * h.x);
+    let v = 0.5 - l.y / (2.0 * h.y);
+    let t = pc.params.x;
+    // ganz leichtes Wabern, als ob das Glas nicht ganz eben waere
+    let wob = sin(v * 23.0 + t * 1.3) * 0.002;
+    let src = textureSampleLevel(monitor_tex, sign_samp, vec2<f32>(clamp(1.0 - u + wob, 0.0, 1.0), clamp(v, 0.0, 1.0)), 0.0).rgb;
+    var col = src * vec3<f32>(0.92, 0.95, 0.97) * 1.15;
+    // blinde Flecken und Kratzer im Silber
+    let blot = hash11(floor(u * 24.0) * 3.1 + floor(v * 14.0) * 17.3);
+    col = col * (0.85 + 0.15 * blot);
+    let scratch = select(0.0, 0.12, abs(fract(u * 3.0 + v * 7.0) - 0.5) < 0.004);
+    col = col + vec3<f32>(scratch);
+    let edge = min(min(u, 1.0 - u), min(v, 1.0 - v));
+    col = col * mix(0.35, 1.0, smoothstep(0.0, 0.12, edge));
+    return max(col, vec3<f32>(0.0)) * in.extra.z;
+}
+
 fn grid_line(v: f32, cell: f32, width: f32) -> f32 {
     let f = fract(v / cell);
     return select(0.0, 1.0, min(f, 1.0 - f) < width);
@@ -245,6 +278,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let p = in.world_pos;
     var base = in.color.rgb;
 
+    // Spiegel (Material 7): Bild der zweiten Kamera, seitenverkehrt
+    if (material > 6.5) {
+        return vec4<f32>(mirror_face(in), 1.0);
+    }
     // Ueberwachungsmonitor (Material 6): Bild der Deckenkamera, grau, mit Zeilen und Rauschen
     if (material > 5.5) {
         return vec4<f32>(monitor_face(in), 1.0);

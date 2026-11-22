@@ -7,8 +7,8 @@ use super::*;
 
 /// Scheine und Muenzen in Cent (gross nach klein)
 pub const DENOMS: [i64; 12] = [5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
-/// So oft muss man bar zahlen
-pub const CASH_CHANCE: f64 = 0.4;
+/// So oft muss man bar zahlen (sonst mit Karte): halbe-halbe
+pub const CASH_CHANCE: f64 = 0.5;
 /// So lange hat man, um passend hinzulegen
 pub const CASH_TIME: f32 = 25.0;
 /// Zu langsam ist nur ein weicher Fehler (Misstrauen); zu viel kostet sofort ein Leben

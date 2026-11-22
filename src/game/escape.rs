@@ -12,6 +12,14 @@ const ALARM_EVERY: f32 = 1.3;
 /// Wer beim Alarm naeher dran ist, startet weiter weg (sonst kaeme man nie hinaus)
 pub const HEAD_START: f32 = 10.0;
 
+/// Schritte der Verfolger: ab dieser Entfernung hoerbar, bis hier "in der Naehe" (dichter),
+/// Abstand zwischen zwei Schritten eines einzelnen Laeufers
+pub const STEPS_HEAR: f32 = 28.0;
+const STEPS_NEAR: f32 = 12.0;
+const STEP_EVERY: f32 = 0.32;
+/// Herzschlag: ab hier schneller (von 1 s bis 0,38 s zwischen zwei Schlaegen)
+const HEART_RANGE: f32 = 15.0;
+
 pub const CHASE_ANNOUNCEMENT: &str = "ACHTUNG: Kunde 0 hat ein Gesicht. Schnappt ihn!";
 
 impl Game {
@@ -71,22 +79,68 @@ impl Game {
             self.red = self.red.max(0.35);
             self.glitch = self.glitch.max(0.3);
         }
+        self.update_chase_sounds(dt);
+    }
+
+    /// Abstand zum naechsten Verfolger und wie viele in der Naehe sind.
+    pub fn pursuers_near(&self) -> (f32, usize) {
+        let p = self.player.pos;
+        let dists = self
+            .customers
+            .iter()
+            .map(|c| c.pos)
+            .chain(self.employees.iter().map(|e| e.pos))
+            .map(|q| vec3(q.x - p.x, 0.0, q.z - p.z).length());
+        let mut nearest = f32::MAX;
+        let mut close = 0;
+        for d in dists {
+            nearest = nearest.min(d);
+            if d < STEPS_NEAR {
+                close += 1;
+            }
+        }
+        (nearest, close)
+    }
+
+    /// Schritte der Meute (je naeher, desto lauter; je mehr, desto dichter) und der eigene
+    /// Herzschlag, der schneller wird, wenn sie aufholen.
+    fn update_chase_sounds(&mut self, dt: f32) {
+        let (d, n) = self.pursuers_near();
+        if d < STEPS_HEAR {
+            let interval = STEP_EVERY / (1.0 + 0.35 * n.min(8) as f32);
+            self.step_acc += dt;
+            if self.step_acc >= interval {
+                self.step_acc = self.rng.gen_range(-0.04..0.04);
+                let vol = (1.0 - d / STEPS_HEAR).clamp(0.08, 1.0) * self.rng.gen_range(0.75..1.0);
+                self.play(Sfx::Stomp, vol);
+            }
+        }
+        let close = (1.0 - d / HEART_RANGE).clamp(0.0, 1.0);
+        let every = 1.0 - 0.62 * close;
+        self.heart_acc += dt;
+        if self.heart_acc >= every {
+            self.heart_acc = 0.0;
+            self.play(Sfx::Heartbeat, 0.35 + 0.5 * close);
+        }
+    }
+
+    /// Tempo der Verfolger: im engen Fluchtkorridor etwas langsamer als im Markt.
+    pub(super) fn chase_speed_at(&self, p: Vec3) -> f32 {
+        if self.world.corridor.is_some_and(|c| c.contains(p)) {
+            super::corridor::CORRIDOR_CHASE_SPEED
+        } else {
+            CHASE_SPEED
+        }
     }
 
     /// Mitarbeiter in der Flucht: rennen hinterher und koennen jetzt selbst zupacken.
     pub(super) fn chase_employee(&mut self, i: usize, dt: f32) {
         let player = self.player.pos;
+        let speed = self.chase_speed_at(self.employees[i].pos);
         let e = &mut self.employees[i];
         e.state = EmpState::Approach;
         let old = e.pos;
-        e.pos = npc::step_along(
-            &self.world,
-            &self.player_field,
-            e.pos,
-            player,
-            CHASE_SPEED,
-            dt,
-        );
+        e.pos = npc::step_along(&self.world, &self.player_field, e.pos, player, speed, dt);
         e.moving = (e.pos - old).length_squared() > 1e-8;
         e.yaw = npc::yaw_towards(e.pos, player);
         let d = vec3(e.pos.x - player.x, 0.0, e.pos.z - player.z).length();
@@ -130,6 +184,46 @@ mod tests {
                 "Kunde startet {d} m entfernt"
             );
         }
+    }
+
+    #[test]
+    fn footsteps_get_louder_and_heart_faster_when_they_come_close() {
+        // zaehlt Schritte und ihre Lautstaerke in 3 s mit einem Verfolger in `dist` Metern
+        let listen = |dist: f32| {
+            let mut g = paid_game(45);
+            g.employees.clear();
+            g.customers.truncate(1);
+            let p = g.player.pos;
+            g.customers[0].pos = vec3(p.x + dist, 0.0, p.z);
+            g.god = true;
+            g.sfx.clear();
+            let (mut steps, mut loud, mut beats) = (0, 0.0f32, 0);
+            for _ in 0..180 {
+                // der Verfolger bleibt, wo er ist (nur das Geraeusch zaehlt)
+                g.customers[0].pos = vec3(p.x + dist, 0.0, p.z);
+                g.player.pos = p;
+                g.update(1.0 / 60.0, &mut Input::default());
+                for (s, v) in g.sfx.drain(..) {
+                    match s {
+                        Sfx::Stomp => {
+                            steps += 1;
+                            loud = loud.max(v);
+                        }
+                        Sfx::Heartbeat => beats += 1,
+                        _ => {}
+                    }
+                }
+            }
+            (steps, loud, beats)
+        };
+        let (near_steps, near_loud, near_beats) = listen(3.0);
+        let (far_steps, far_loud, far_beats) = listen(22.0);
+        let (none_steps, _, _) = listen(STEPS_HEAR + 10.0);
+        assert!(near_steps > 5, "keine Schritte zu hoeren");
+        assert!(near_loud > far_loud, "nahe Schritte nicht lauter");
+        assert!(far_steps > 0, "von weitem gar nichts");
+        assert_eq!(none_steps, 0, "Schritte durch den ganzen Markt");
+        assert!(near_beats > far_beats, "Herz schlaegt nicht schneller");
     }
 
     #[test]

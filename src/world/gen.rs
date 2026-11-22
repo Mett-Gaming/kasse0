@@ -1,7 +1,10 @@
 //! Generator fuer KAUF NULL: Discounter-Grundriss mit Abteilungen und echten Waren.
 
+mod corridor;
 mod decay;
 mod fixtures;
+
+pub use corridor::{Corridor, POSTER_TEXTS};
 
 use super::layout::{self, Layout};
 use super::material::*;
@@ -198,7 +201,23 @@ pub fn generate(params: &WorldParams) -> World {
     } else {
         (vec3(0.85, 0.9, 0.95), 1.3)
     };
-    if params.door_open {
+    // Nach dem Bezahlen im gekippten Markt: hinter der Tuer beginnt der Fluchtkorridor
+    let mut corridor = None;
+    let mut exit_zone = Aabb {
+        min: vec3(door_x0, 0.0, depth + 1.2),
+        max: vec3(door_x1, h, depth + 7.0),
+    };
+    if params.door_open && tipped {
+        let (c, exit) = corridor::build(
+            &mut g.b,
+            params.corridor_seed,
+            door_x0,
+            door_x1,
+            depth + WALL_T * 2.0,
+        );
+        corridor = Some(c);
+        exit_zone = exit;
+    } else if params.door_open {
         g.b.add(
             vec3(door_cx, -0.05, depth + 3.0),
             vec3(1.6, 0.05, 3.0),
@@ -1337,7 +1356,9 @@ pub fn generate(params: &WorldParams) -> World {
         ceiling_holes,
         ..
     } = g;
-    let nav = build_nav(&b.solids, &b.obbs, width, depth);
+    // Das Navigationsraster reicht bis ans Ende des Korridors (Verfolger rennen hinterher)
+    let nav_depth = corridor.map_or(depth, |c| c.z1 + 0.5);
+    let nav = build_nav(&b.solids, &b.obbs, width, nav_depth);
     let mut world = World {
         instances: b.instances,
         lights: b.lights,
@@ -1362,7 +1383,8 @@ pub fn generate(params: &WorldParams) -> World {
         aisle_x1: aisles_x1,
         lanes,
         door_center: vec3(door_cx, 0.0, depth),
-        exit_z: depth + 1.2,
+        exit_zone,
+        corridor,
         spots,
         nav,
         signs,

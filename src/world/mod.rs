@@ -7,6 +7,7 @@ mod gen;
 pub mod layout;
 
 pub use gen::generate;
+pub use gen::POSTER_TEXTS;
 
 use crate::catalog::catalog;
 use crate::render::MeshDraw;
@@ -30,6 +31,8 @@ pub mod material {
     pub const SIGN: f32 = 5.0;
     /// Ueberwachungsmonitor: zeigt das Bild der Kassenkamera (extra.z = Helligkeit)
     pub const MONITOR: f32 = 6.0;
+    /// Spiegel am Ende des Fluchtkorridors: Bild der zweiten Kamera, gespiegelt und in Farbe
+    pub const MIRROR: f32 = 7.0;
 }
 
 #[repr(C)]
@@ -157,6 +160,8 @@ pub struct WorldParams {
     pub giants: u32,
     /// Verfallsstufe 0..3 (Fliesen, Ameisen, Ratten, Blut; siehe gen/decay.rs)
     pub decay: u8,
+    /// Zufall fuer die Hindernisse im Fluchtkorridor (wird bei jedem Bezahlen neu gewuerfelt)
+    pub corridor_seed: u64,
 }
 
 impl WorldParams {
@@ -177,6 +182,7 @@ impl WorldParams {
             rot: 0.0,
             giants: 0,
             decay: 0,
+            corridor_seed: 0,
         }
     }
 }
@@ -374,8 +380,10 @@ pub struct World {
     pub aisle_x1: f32,
     pub lanes: Vec<Lane>,
     pub door_center: Vec3,
-    /// z-Wert hinter der Tuer, ab dem der Spieler draussen ist
-    pub exit_z: f32,
+    /// Bereich, in dem der Spieler draussen ist (Ende des Korridors bzw. hinter der Tuer)
+    pub exit_zone: Aabb,
+    /// Fluchtkorridor hinter der Tuer (nur nach dem Bezahlen im gekippten Markt)
+    pub corridor: Option<gen::Corridor>,
     pub spots: Vec<Spot>,
     pub nav: NavGrid,
     /// Deko: Warnschilder "Rutschgefahr"

@@ -21,7 +21,8 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 5. Die **Kunden** kaufen ganz normal ein, solange du hinsiehst. Siehst du weg, starren sie herüber, und einige verfolgen dich: Sie schleichen sich an und holen deutlich auf, wenn du rennst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
 7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort steht die Kassiererin). Zieh den Wagen heran und leg die Ware **Stück für Stück mit E aufs Band** (Mausrad wählt, welche). Dann beginnt das **Kassen-Minispiel** (siehe unten). Bezahlt ist, wenn die Karte durchgezogen und die PIN eingetippt ist (oder du bar und passend gezahlt hast).
-8. **Flucht:** Kaum hast du bezahlt, kommt die Durchsage *"Kunde 0 hat ein Gesicht. Schnappt ihn!"*. Der Alarm geht los, und alle Kunden und Mitarbeiter rennen auf dich zu. Lauf zum Ausgang! Wer dich jetzt erwischt, beendet den Einkauf sofort.
+8. **Flucht:** Kaum hast du bezahlt, kommt die Durchsage *"Kunde 0 hat ein Gesicht. Schnappt ihn!"*. Der Alarm geht los, und alle Kunden und Mitarbeiter rennen auf dich zu. Du hörst ihre Schritte immer näher kommen und dein Herz immer schneller schlagen. Lauf zur Tür! Wer dich jetzt erwischt, beendet den Einkauf sofort.
+9. **Der Korridor:** Hinter der Tür wartet ein langer, enger Gang mit rot flackernden Röhren. Weich den Kistenstapeln, umgekippten Regalen und Paletten aus. Sie liegen bei jedem Lauf woanders. An den Wänden hängen Poster: *NICHT UMDREHEN*. Das ist ernst gemeint: **Wer sich umdreht, ist sofort tot**, und was dann direkt vor dir steht, willst du nicht sehen (schon beim Seitenblick färbt sich das Bild rot). Was hinter dir los ist, siehst du nur im großen Spiegel am Ende des Gangs. Der Ausgang liegt kurz davor links.
 
 ### Das Kassen-Minispiel
 In den **Kassenbereich kommen keine NPCs** hinein. Sobald die erste Ware auf dem Band liegt, sind **Kunden und Mitarbeiter harmlos**, solange du an der Kasse bleibst. Dafür beobachtet dich jetzt die **Kassiererin**. Unten links zeigt ein Balken ihr Misstrauen, daneben stehen deine **drei Kassen-Leben**.
@@ -54,7 +55,7 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 | 0–9 | PIN am Kartenterminal |
 | A / D oder Mausrad, E, F (beim Barzahlen) | Schein oder Münze wählen, hinlegen, zurücknehmen |
 | Esc / P | Pause (mit Tastenübersicht) |
-| F1 | Cheat-Menü zum Testen (zwei Spalten, Links/Rechts wechselt): u. a. jeden Jumpscare einzeln auslösen |
+| F1 | Cheat-Menü zum Testen, nach Kategorien: Spieler, Markt & Einkauf, Kasse & Flucht, Leute, Schrecken. Enter oder Rechts öffnet eine Kategorie, Esc oder Links geht zurück |
 | F12 | Screenshot (Ordner *Bilder*) |
 
 Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Überspringen kannst du es mit dem Haken **„Tutorial überspringen“** im Hauptmenü (gleiche Einstellung wie in den Optionen) oder mitten im Spiel per Cheat. Zum Ausräumen aufs Band muss der Wagen an der Kasse stehen. Unterwegs kannst du ihn aber parken und Waren zu Fuß holen.

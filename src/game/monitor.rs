@@ -25,6 +25,10 @@ const CAM_FOV: f32 = 68.0;
 impl Game {
     /// Kamera fuer das Monitorbild: (view_proj, Position). None = kein Monitor im Markt.
     pub fn monitor_view(&self, aspect: f32) -> Option<(Mat4, Vec3)> {
+        // Im Fluchtkorridor filmt die zweite Kamera das Spiegelbild (corridor.rs)
+        if let Some(mirror) = self.mirror_view() {
+            return Some(mirror);
+        }
         let lane = self.open_lane()?;
         let pos = lane.camera - vec3(0.0, 0.32, 0.0);
         // im gekippten Markt folgt die Kamera dem Spieler (wie das Modell in checkout.rs)

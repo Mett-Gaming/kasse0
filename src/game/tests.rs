@@ -366,13 +366,30 @@ fn full_run_checkout_and_exit_wins() {
     type_pin(&mut g);
     assert!(g.paid, "nicht bezahlt");
     assert_eq!(g.till.as_ref().unwrap().lives, till::TILL_LIVES);
-    // zur Tuer und raus
+    // durch die Tuer in den Fluchtkorridor ...
+    g.customers.clear();
+    g.employees.clear();
     g.player.pos = g.world.door_center - vec3(0.0, 0.0, 0.8);
     g.player.yaw = std::f32::consts::PI; // nach Sueden
     g.player.pitch = 0.0;
     step(
         &mut g,
-        4.0,
+        2.0,
+        Input {
+            forward: true,
+            ..Default::default()
+        },
+    );
+    assert!(g.in_corridor(), "nicht im Korridor angekommen");
+    assert_eq!(g.outcome, Outcome::Running);
+    // ... bis kurz vor den Ausgang am Ende, dann links hinaus
+    let exit = g.world.exit_zone;
+    let c = g.world.corridor.unwrap();
+    g.player.pos = vec3(c.x1 - 0.5, 0.0, (exit.min.z + exit.max.z) * 0.5);
+    g.player.yaw = std::f32::consts::FRAC_PI_2; // nach +x
+    step(
+        &mut g,
+        3.0,
         Input {
             forward: true,
             ..Default::default()

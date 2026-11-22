@@ -7,6 +7,7 @@
 //! - Kassiererin steht nach dem letzten gescannten Artikel ruckartig auf
 //! - der abgestellte Wagen ist weg und rollt dann quietschend von selbst heran
 //! - Deckenloch: Kabel stuerzen funkensprühend herab; im Kollaps haengt jemand kopfueber darin
+//! - Fluchtkorridor: wer sich umdreht, dem rast ein Gesicht ins Bild (corridor.rs)
 //! (Tod mit Gesicht in Grossaufnahme: death.rs, Fata Morgana: mirage.rs,
 //! Ueberwachungsmonitor: monitor.rs, "Jumpscares aus" im Menue: main.rs menu_scare)
 
@@ -528,6 +529,13 @@ impl Game {
             if k < 0.22 {
                 out.push(self.face_in_view(v, 0.42));
             }
+        }
+        // Im Fluchtkorridor umgedreht: das Gesicht rast zitternd heran (corridor.rs)
+        if let Some((v, dist, shake)) = self.turn_scare_face() {
+            let mut face = self.face_in_view(v, dist);
+            face.pos += shake;
+            face.tint = Vec4::new(0.9, 0.85, 0.85, 0.35);
+            out.push(face);
         }
     }
 
