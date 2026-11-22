@@ -78,13 +78,23 @@ impl Game {
             ghost: false,
         };
 
+        // Gangart -> Clip: Gehen/Rennen laufen mit der Strecke mit, sonst Stehen (oder Greifen)
+        let moving_clip = |g: &crate::people::Gait, still: Clip| {
+            if !g.moving {
+                still
+            } else if g.run {
+                Clip::Run
+            } else {
+                Clip::Walk
+            }
+        };
+
         // Normale Kundschaft: geht zum naechsten Regal, wartet dort
         for (i, s) in self.shoppers.iter().enumerate() {
-            let clip = if s.wait > 0.0 { Clip::Idle } else { Clip::Walk };
             out.push(person(
                 s.variant,
-                clip,
-                t + phase(i, 1.0),
+                moving_clip(&s.gait, Clip::Idle),
+                s.gait.t + phase(i, 1.0),
                 s.pos,
                 s.yaw,
                 s.tint.extend(0.0),
@@ -93,9 +103,7 @@ impl Game {
 
         // Uncanny Kunden: greifen immer wieder ins Regal; wenn man wegsieht, kommen sie naeher
         for (i, c) in self.customers.iter().enumerate() {
-            let clip = if c.moving {
-                Clip::Walk
-            } else if c.pose == Pose::Reach {
+            let still = if c.pose == Pose::Reach {
                 Clip::Reach
             } else {
                 Clip::Idle
@@ -103,30 +111,20 @@ impl Game {
             // leicht fahles Eigenleuchten: Silhouetten bleiben im Dunkeln erkennbar
             out.push(person(
                 c.variant,
-                clip,
-                t + phase(i, 2.0),
+                moving_clip(&c.gait, still),
+                c.gait.t + phase(i, 2.0),
                 c.pos,
                 c.yaw,
                 c.tint.extend(0.1),
             ));
         }
 
-        // Gesichtsloses Personal; wer einem folgt, wird schneller
+        // Gesichtsloses Personal
         for (i, e) in self.employees.iter().enumerate() {
-            let clip = match (e.moving, e.follow > 0.0 || e.carrying) {
-                (false, _) => Clip::Idle,
-                (true, false) => Clip::Walk,
-                (true, true) => Clip::Walk,
-            };
-            let speedup = if e.follow > 0.0 && e.moving {
-                1.35
-            } else {
-                1.0
-            };
             out.push(person(
                 e.variant,
-                clip,
-                (t + phase(i, 3.0)) * speedup,
+                moving_clip(&e.gait, Clip::Idle),
+                e.gait.t + phase(i, 3.0),
                 e.pos,
                 e.yaw,
                 // Personal leuchtet leicht: im dunklen Markt sofort vom Publikum zu unterscheiden

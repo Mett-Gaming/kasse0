@@ -20,7 +20,7 @@ use crate::catalog::{catalog, misspell};
 use crate::render::MeshDraw;
 use crate::world::{self, World, WorldParams};
 use dialog::{verdict, DialogState, Verdict, ANSWER_TIME, QUESTIONS};
-use escalation::{tier_for_value, Tier};
+use escalation::{tier_for_progress, tier_for_time, tier_for_value, Tier};
 use glam::{vec3, Mat4, Quat, Vec3, Vec4};
 use npc::{Customer, EmpState, Employee, Pose, Shopper};
 use rand::seq::SliceRandom;
@@ -553,7 +553,11 @@ impl Game {
         if !self.tipped {
             return;
         }
-        let new = tier_for_value(self.cart_value() as u32);
+        // Es zaehlt das Schlimmste aus Warenwert, Zettel-Fortschritt und Zeit im gekippten Markt
+        let done = self.list.iter().filter(|&&l| self.list_done(l)).count();
+        let new = tier_for_value(self.cart_value() as u32)
+            .max(tier_for_progress(done, self.list.len()))
+            .max(tier_for_time(self.tipped_time));
         if new <= self.tier {
             return;
         }
@@ -785,6 +789,8 @@ impl Game {
         self.update_loose(dt);
         self.update_mirages(dt);
         self.update_spark_sounds();
+        // Zeit im gekippten Markt kann die Stufe auch ohne Einkauf anheben
+        self.check_tier();
         self.update_belt(dt);
         self.update_npcs(dt, input);
         self.update_suspicion(dt, input);

@@ -144,6 +144,8 @@ pub struct Customer {
     pub bump_cd: f32,
     /// Pause bis zum naechsten Fluestern
     pub whisper_cd: f32,
+    /// Animationszeit, an die Laufstrecke gekoppelt
+    pub gait: crate::people::Gait,
     /// Verfolger: schleicht sich an, sobald man wegsieht. Alle anderen kaufen nur ein.
     pub stalker: bool,
     /// Einkaufsbummel: Ziel, Wegfeld dorthin, Wartezeit am Ziel
@@ -161,6 +163,7 @@ pub enum EmpState {
 
 pub struct Employee {
     pub pos: Vec3,
+    pub gait: crate::people::Gait,
     /// Figur in Dienstkleidung (Index in assets::PEOPLE)
     pub variant: usize,
     pub yaw: f32,
@@ -187,6 +190,7 @@ impl Employee {
     pub fn new(pos: Vec3) -> Self {
         Self {
             pos,
+            gait: Default::default(),
             variant: 0,
             yaw: 0.0,
             state: EmpState::Patrol,
@@ -220,6 +224,7 @@ pub struct Shopper {
     pub variant: usize,
     pub wait: f32,
     pub whisper_cd: f32,
+    pub gait: crate::people::Gait,
 }
 
 #[cfg(test)]

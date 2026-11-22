@@ -239,3 +239,87 @@ mod tests {
         }
     }
 }
+
+/// Schrittgeschwindigkeit der Animationen (gemessen: so schnell wandert der aufgesetzte
+/// Fuss nach hinten). Laeuft eine Figur mit anderem Tempo, wird die Animation entsprechend
+/// schneller oder langsamer abgespielt, damit die Fuesse nicht rutschen.
+pub fn stride_speed(female: bool, run: bool) -> f32 {
+    match (female, run) {
+        (false, false) => 1.21,
+        (true, false) => 0.97,
+        (false, true) => 2.5,
+        (true, true) => 2.0,
+    }
+}
+
+/// Ab diesem Tempo (m/s) rennt eine Figur statt zu gehen.
+pub const RUN_FROM: f32 = 1.7;
+
+/// Gangart einer Figur: Animationszeit, die beim Gehen an die zurueckgelegte Strecke
+/// gekoppelt ist (Fuesse rutschen nicht), im Stehen normal weiterlaeuft.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Gait {
+    last: Option<Vec3>,
+    /// Animationszeit (Sekunden Clip-Zeit)
+    pub t: f32,
+    pub moving: bool,
+    pub run: bool,
+}
+
+impl Gait {
+    pub fn advance(&mut self, pos: Vec3, dt: f32, female: bool) {
+        let d = self
+            .last
+            .map_or(0.0, |l| vec3_flat(pos - l).length())
+            .min(0.25); // Sprung (Teleport, Respawn) nicht als Laufen werten
+        self.last = Some(pos);
+        let speed = if dt > 0.0 { d / dt } else { 0.0 };
+        self.moving = d > 1e-4;
+        if self.moving {
+            self.run = speed > RUN_FROM;
+            self.t += d / stride_speed(female, self.run);
+        } else {
+            self.run = false;
+            self.t += dt;
+        }
+    }
+}
+
+fn vec3_flat(v: Vec3) -> Vec3 {
+    Vec3::new(v.x, 0.0, v.z)
+}
+
+#[cfg(test)]
+mod gait_tests {
+    use super::*;
+
+    #[test]
+    fn walking_animation_follows_the_distance() {
+        // Wer mit halber Schrittgeschwindigkeit geht, spielt die Animation halb so schnell ab
+        let mut g = Gait::default();
+        let v = stride_speed(false, false) * 0.5;
+        let mut p = Vec3::ZERO;
+        g.advance(p, 1.0 / 60.0, false);
+        let t0 = g.t;
+        for _ in 0..60 {
+            p.z += v / 60.0;
+            g.advance(p, 1.0 / 60.0, false);
+        }
+        assert!(g.moving && !g.run);
+        assert!(
+            ((g.t - t0) - 0.5).abs() < 0.02,
+            "Animationszeit {}",
+            g.t - t0
+        );
+        // schnell: Rennanimation
+        for _ in 0..10 {
+            p.z += 2.2 / 60.0;
+            g.advance(p, 1.0 / 60.0, false);
+        }
+        assert!(g.run);
+        // Teleport zaehlt nicht als Laufen
+        let before = g.t;
+        g.advance(p + Vec3::new(30.0, 0.0, 0.0), 1.0 / 60.0, false);
+        assert!(g.t - before < 0.3);
+    }
+}

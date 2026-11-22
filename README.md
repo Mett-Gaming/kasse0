@@ -16,7 +16,7 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 ## So spielst du
 1. Hol das **Wasser** aus der Getränkeabteilung (hinten rechts, blaues Schild "Getränke & Pfand").
 2. Wenn du sie verlässt, ist der Markt **gekippt**. Arbeite den Einkaufszettel ab (**TAB**).
-3. Jeder Artikel existiert **billig** (schwer erreichbar, unten oder oben, tief im Gang) und **teuer** (gut sichtbar). Der **Warenwert** im Wagen bestimmt, wie schlimm es wird (ab 10 €, 25 € und 50 €).
+3. Jeder Artikel existiert **billig** (schwer erreichbar, unten oder oben, tief im Gang) und **teuer** (gut sichtbar). Wie schlimm es wird, bestimmt das Schlimmste aus drei Dingen: **Warenwert** im Wagen (ab 10 €, 25 €, 50 €), **Fortschritt auf dem Zettel** (ab 40 %, 70 %, komplett) und **Zeit** im gekippten Markt (ab 3, 6, 9 Minuten). Wer billig einkauft, kommt also auch ans Ende, nur langsamer.
 4. Falsch beschriftete Ware ("Mlich", unsinnige Preise) gehört nicht auf den Zettel.
 5. Die **Kunden** kaufen ganz normal ein, solange du hinsiehst. Siehst du weg, starren sie herüber, und einige verfolgen dich: Sie schleichen sich an und holen deutlich auf, wenn du rennst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
