@@ -79,6 +79,10 @@ impl Builder {
         });
         hw
     }
+    /// Flach auf dem Boden Liegendes: folgt beim Verbiegen nur der Hoehenwelle (Markierung seed = -1).
+    pub(super) fn add_floor(&mut self, c: Vec3, h: Vec3, yaw: f32, color: Vec3, material: f32) {
+        self.add_rot_ex(c, h, yaw, color, material, -1.0, 0.0, 0.0);
+    }
     pub(super) fn solid(&mut self, c: Vec3, h: Vec3) {
         self.solids.push(Aabb::from_center(c, h));
     }
@@ -195,6 +199,10 @@ pub(super) struct Gen<'a> {
     pub(super) missing: std::collections::HashSet<usize>,
     /// riesige Waren (Verfall)
     pub(super) giants: Vec<Giant>,
+    /// bewegte Verfallsdetails (zeichnet das Spiel)
+    pub(super) ant_trails: Vec<(Vec3, Vec3)>,
+    pub(super) rat_runs: Vec<(Vec3, Vec3)>,
+    pub(super) drips: Vec<Vec3>,
 }
 
 impl Gen<'_> {

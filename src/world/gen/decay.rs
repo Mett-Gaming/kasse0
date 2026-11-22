@@ -105,7 +105,7 @@ impl Gen<'_> {
                 yaw,
                 VOID,
                 EMISSIVE,
-                0.0,
+                -1.0,
                 0.0,
                 0.0,
             );
@@ -115,7 +115,7 @@ impl Gen<'_> {
             let a = k as f32 / 7.0 * std::f32::consts::TAU + self.weird.gen_range(-0.3..0.3);
             let p = c + vec3(a.cos(), 0.0, a.sin()) * (r * 0.95);
             let size = self.weird.gen_range(0.06..0.14);
-            self.b.add_rot(
+            self.b.add_floor(
                 p + vec3(0.0, self.weird.gen_range(0.008..0.03), 0.0),
                 vec3(size, 0.008, size * 0.7),
                 self.weird.gen_range(0.0..std::f32::consts::TAU),
@@ -171,13 +171,178 @@ impl Gen<'_> {
                 self.weird.gen_range(-r..r),
             );
             let size = self.weird.gen_range(0.12..0.3);
-            self.b.add_rot(
+            self.b.add_floor(
                 p,
                 vec3(size, 0.01, size * 0.8),
                 self.weird.gen_range(0.0..std::f32::consts::TAU),
                 vec3(0.7, 0.7, 0.68),
                 PLAIN,
             );
+        }
+    }
+
+    /// Fehlende Fliese: nackter Estrich, etwas tiefer als der Boden wirkt.
+    fn missing_tile(&mut self, c: Vec3) {
+        let shade = self.weird.gen_range(0.85..1.1);
+        self.b.add_floor(
+            c + vec3(0.0, 0.002, 0.0),
+            vec3(0.3, 0.002, 0.3),
+            0.0,
+            vec3(0.3, 0.29, 0.26) * shade,
+            PLAIN,
+        );
+        // Kleberreste
+        for _ in 0..self.weird.gen_range(2..5) {
+            let p = c + vec3(
+                self.weird.gen_range(-0.22..0.22),
+                0.003,
+                self.weird.gen_range(-0.22..0.22),
+            );
+            self.b.add_floor(
+                p,
+                vec3(0.04, 0.002, 0.012),
+                self.weird.gen_range(0.0..std::f32::consts::TAU),
+                vec3(0.2, 0.19, 0.16),
+                PLAIN,
+            );
+        }
+    }
+
+    /// Gesprungene Fliese: Scherben mit dunklen Fugen dazwischen.
+    fn broken_tile(&mut self, c: Vec3, floor: Vec3) {
+        self.b.add_floor(
+            c + vec3(0.0, 0.0015, 0.0),
+            vec3(0.3, 0.0015, 0.3),
+            0.0,
+            vec3(0.08, 0.08, 0.07),
+            PLAIN,
+        );
+        for _ in 0..self.weird.gen_range(3..6) {
+            let p = c + vec3(
+                self.weird.gen_range(-0.17..0.17),
+                0.004,
+                self.weird.gen_range(-0.17..0.17),
+            );
+            let s = self.weird.gen_range(0.07..0.13);
+            self.b.add_floor(
+                p,
+                vec3(s, 0.003, s * self.weird.gen_range(0.5..1.0)),
+                self.weird.gen_range(0.0..std::f32::consts::TAU),
+                floor * self.weird.gen_range(0.75..0.95),
+                PLAIN,
+            );
+        }
+    }
+
+    /// Stapel herausgerissener Fliesen (Hindernis).
+    fn tile_stack(&mut self, c: Vec3, floor: Vec3) {
+        let n = self.weird.gen_range(4..10);
+        for k in 0..n {
+            self.b.add_floor(
+                c + vec3(
+                    self.weird.gen_range(-0.03..0.03),
+                    0.007 + k as f32 * 0.013,
+                    self.weird.gen_range(-0.03..0.03),
+                ),
+                vec3(0.3, 0.006, 0.3),
+                self.weird.gen_range(-0.15..0.15),
+                floor * self.weird.gen_range(0.7..0.95),
+                PLAIN,
+            );
+        }
+        self.b.solid(c + vec3(0.0, 0.3, 0.0), vec3(0.33, 0.3, 0.33));
+    }
+
+    /// Blut tropft von der Decke: Fleck oben, Lache unten (die Tropfen zeichnet das Spiel).
+    fn blood(&mut self, c: Vec3) {
+        let red = vec3(0.24, 0.01, 0.01);
+        self.b.add(
+            vec3(c.x, CEILING_HEIGHT - 0.003, c.z),
+            vec3(0.18, 0.003, 0.14),
+            red * 0.8,
+            PLAIN,
+        );
+        for _ in 0..3 {
+            let off = vec3(
+                self.weird.gen_range(-0.15..0.15),
+                0.0,
+                self.weird.gen_range(-0.15..0.15),
+            );
+            let s = self.weird.gen_range(0.12..0.32);
+            self.b.add_floor(
+                c + off + vec3(0.0, 0.004, 0.0),
+                vec3(s, 0.002, s * self.weird.gen_range(0.6..1.0)),
+                self.weird.gen_range(0.0..std::f32::consts::TAU),
+                red,
+                PLAIN,
+            );
+        }
+        self.drips.push(vec3(c.x, CEILING_HEIGHT - 0.01, c.z));
+    }
+
+    /// Strecke auf freiem Boden (fuer Ameisen und Ratten).
+    fn floor_run(&mut self, a: &DecayArea, len: (f32, f32)) -> Option<(Vec3, Vec3)> {
+        for _ in 0..20 {
+            let p = self.free_spot(a, 0.25)?;
+            let yaw = self.weird.gen_range(0.0..std::f32::consts::TAU);
+            let l = self.weird.gen_range(len.0..len.1);
+            let q = p + vec3(yaw.sin(), 0.0, yaw.cos()) * l;
+            let mid = (p + q) * 0.5;
+            let free = |b: &Builder| {
+                !b.solids.iter().any(|s| {
+                    s.max.y >= 0.2
+                        && [p, mid, q].iter().any(|x| {
+                            x.x > s.min.x - 0.2
+                                && x.x < s.max.x + 0.2
+                                && x.z > s.min.z - 0.2
+                                && x.z < s.max.z + 0.2
+                        })
+                })
+            };
+            if free(&self.b) {
+                return Some((p, q));
+            }
+        }
+        None
+    }
+
+    /// Boden und Decke verfallen in sinnvoller Reihenfolge (Stufe 1: Fliesen, Ameisen;
+    /// Stufe 2: Fliesenstapel, Ratten, Deckenloecher; Stufe 3: Blut von der Decke).
+    pub(super) fn floor_and_ceiling_decay(&mut self, a: &DecayArea, floor: Vec3) {
+        let lv = self.params.decay.min(3) as usize;
+        if !self.params.tipped || lv == 0 {
+            return;
+        }
+        let count = |t: [usize; 4]| t[lv];
+        for _ in 0..count([0, 6, 14, 24]) {
+            if let Some(p) = self.free_spot(a, 0.35) {
+                self.missing_tile(p);
+            }
+        }
+        for _ in 0..count([0, 4, 10, 16]) {
+            if let Some(p) = self.free_spot(a, 0.35) {
+                self.broken_tile(p, floor);
+            }
+        }
+        for _ in 0..count([0, 2, 4, 7]) {
+            if let Some(run) = self.floor_run(a, (1.5, 3.5)) {
+                self.ant_trails.push(run);
+            }
+        }
+        for _ in 0..count([0, 0, 2, 4]) {
+            if let Some(p) = self.free_spot(a, 0.5) {
+                self.tile_stack(p, floor);
+            }
+        }
+        for _ in 0..count([0, 0, 2, 5]) {
+            if let Some(run) = self.floor_run(a, (2.0, 4.5)) {
+                self.rat_runs.push(run);
+            }
+        }
+        for _ in 0..count([0, 0, 0, 7]) {
+            if let Some(p) = self.free_spot(a, 0.4) {
+                self.blood(p);
+            }
         }
     }
 

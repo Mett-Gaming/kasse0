@@ -236,6 +236,11 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         1.0,
     );
 
+    // Auffaelligkeit (nur im gekippten Markt): Balken unten links, gruen -> gelb -> rot
+    if g.tipped {
+        suspicion_meter(u, g.suspicion, time);
+    }
+
     // Fadenkreuz
     u.rect(
         ui::W * 0.5 - 1.0,
@@ -545,4 +550,21 @@ mod tests {
         assert!(u.verts.len() > 100);
         assert_eq!(u.verts.len() % 6, 0);
     }
+}
+
+/// Auffaelligkeits-Meter: schmaler Balken unten links, blinkt bei 100 %.
+fn suspicion_meter(u: &mut Ui, s: f32, time: f32) {
+    let s = s.clamp(0.0, 1.0);
+    let (x, y, w, h) = (12.0, 250.0, 72.0, 5.0);
+    let color = if s < 0.5 {
+        let k = s / 0.5;
+        [0.3 + 0.65 * k, 0.85, 0.3 - 0.1 * k, 0.9]
+    } else {
+        let k = (s - 0.5) / 0.5;
+        [0.95, 0.85 - 0.7 * k, 0.2 - 0.1 * k, 0.9]
+    };
+    let blink = s >= 1.0 && (time * 4.0).fract() < 0.5;
+    u.text_s(x, y - 11.0, "AUFFÄLLIG", if blink { RED } else { DIM }, 1.0);
+    u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.0, 0.0, 0.0, 0.6]);
+    u.rect(x, y, w * s, h, if blink { RED } else { color });
 }

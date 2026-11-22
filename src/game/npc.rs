@@ -53,7 +53,9 @@ pub fn nearest_walkable(nav: &NavGrid, p: Vec3) -> Option<(usize, usize)> {
     if nav.is_walkable(cx, cz) {
         return Some((cx, cz));
     }
-    for r in 1..4i32 {
+    // bis etwa 1,5 m Umkreis absuchen (unabhaengig von der Zellgroesse)
+    let max_r = (1.5 / nav.cell).ceil() as i32;
+    for r in 1..=max_r {
         for dz in -r..=r {
             for dx in -r..=r {
                 let (x, z) = (cx as i32 + dx, cz as i32 + dz);

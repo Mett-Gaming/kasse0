@@ -64,7 +64,7 @@ fn vs_main(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> 
     let material = inst.extra.x;
     let sw = sway(wp);
     let lift = sw.y * (1.0 - smoothstep(2.6, 3.4, wp.y));
-    if ((material > 0.5 && material < 1.5) || inst.center.y < 0.05) {
+    if ((material > 0.5 && material < 1.5) || inst.extra.y < -0.5) {
         // Boden und alles, was flach darauf liegt (Lochraender, Truemmer)
         wp.y = wp.y + sw.y;
     } else if (!(material > 1.5 && material < 2.5) && max(inst.half_ext.x, inst.half_ext.z) < 3.0) {

@@ -171,6 +171,18 @@ fn ordinary_customers_only_shop_and_never_catch() {
     let start = g.customers[0].pos;
     step(&mut g, 8.0, Input::default());
     assert_eq!(g.outcome, Outcome::Running);
+    // unbeobachtet: bleibt stehen und starrt herueber
+    let c = &g.customers[0];
+    assert!((c.pos - start).length() < 0.05, "kommt naeher");
+    let to_player = npc::yaw_towards(c.pos, g.player.pos);
+    assert!(
+        lerp_angle(0.0, c.yaw - to_player, 1.0).abs() < 0.3,
+        "starrt nicht herueber"
+    );
+    // hinsehen: kauft wieder ein
+    g.player.yaw = 0.0;
+    step(&mut g, 8.0, Input::default());
+    assert_eq!(g.outcome, Outcome::Running);
     assert!(
         (g.customers[0].pos - start).length() > 0.3,
         "bummelt nicht herum"
@@ -651,4 +663,108 @@ fn chosen_item_comes_out_of_the_cart() {
     g.update(1.0 / 60.0, &mut inp);
     assert_eq!(g.held.as_ref().map(|h| h.name.clone()), Some(name));
     assert_eq!(g.cart.len(), 2);
+}
+
+#[test]
+fn npcs_walk_through_narrow_passages() {
+    let mut checked = 0;
+    for seed in 0..20 {
+        let mut p = world::WorldParams::normal(seed);
+        p.tipped = true;
+        p.stretch = 2.0;
+        p.warp = 1.0;
+        let w = world::generate(&p);
+        for &(c, n) in &w.passages {
+            let a = w.collide(c + n * 1.1, 0.25);
+            let b = w.collide(c - n * 1.1, 0.25);
+            if (a - b).length() < 1.8 {
+                continue; // Seite blockiert (z. B. Wand), nicht aussagekraeftig
+            }
+            let field = npc::bfs(&w.nav, b);
+            let mut pos = a;
+            // 2,2 m bei 1 m/s: mit Durchgang in 5 s, aussen herum nie
+            for _ in 0..(5.0 * 60.0) as usize {
+                pos = npc::step_along(&w, &field, pos, b, 1.0, 1.0 / 60.0);
+            }
+            assert!(
+                (pos - b).length() < 0.6,
+                "seed {seed}: NPC kommt nicht durch den Durchgang bei {c:?} (steht bei {pos:?})"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 3, "kaum Durchgaenge geprueft: {checked}");
+}
+
+#[test]
+fn stalkers_catch_up_faster_when_you_run() {
+    let travelled = |run: bool| {
+        let mut g = Game::new(99);
+        g.tip();
+        g.customers.truncate(1);
+        g.employees.clear();
+        let p = g.player.pos;
+        let c = &mut g.customers[0];
+        c.pos = vec3(p.x, 0.0, p.z - 8.0);
+        c.stalker = true;
+        g.player.yaw = std::f32::consts::PI; // wegsehen
+        if run {
+            g.player.vel = vec3(0.0, 0.0, 3.0);
+        }
+        let d0 = (g.customers[0].pos - g.player.pos).length();
+        for _ in 0..60 {
+            if run {
+                g.player.vel = vec3(0.0, 0.0, 3.0); // rennt auf der Stelle (Geschwindigkeit zaehlt)
+            }
+            g.player.pos = p;
+            g.update(1.0 / 60.0, &mut Input::default());
+        }
+        d0 - (g.customers[0].pos - g.player.pos).length()
+    };
+    let (walk, run) = (travelled(false), travelled(true));
+    assert!(
+        run > walk * 1.8,
+        "beim Rennen nicht schneller: {walk} vs {run}"
+    );
+}
+
+#[test]
+fn checkout_is_closed_until_the_list_is_complete() {
+    let mut g = Game::new(12);
+    g.tip();
+    g.customers.clear();
+    g.employees.clear();
+    g.trolley.pushing = false;
+    g.trolley.pos = g.world.corral;
+    let lane = g.open_lane().unwrap();
+    let (_, _, z0, _) = g.checkout_barrier().expect("keine Absperrung");
+    // von Norden in die Kassengasse laufen
+    let walk_in = |g: &mut Game| {
+        g.player.pos = g.world.collide(vec3(lane.scan_point.x, 0.0, z0 - 1.5), 0.3);
+        g.player.yaw = std::f32::consts::PI; // nach Sueden
+        g.player.pitch = 0.0;
+        step(
+            g,
+            3.0,
+            Input {
+                forward: true,
+                ..Default::default()
+            },
+        );
+    };
+    walk_in(&mut g);
+    assert!(
+        g.player.pos.z < z0,
+        "trotz Absperrung in der Kasse: {:?}",
+        g.player.pos
+    );
+    // Zettel komplett: Absperrung weg
+    g.fill_list_cheap();
+    assert!(g.checkout_barrier().is_none());
+    walk_in(&mut g);
+    assert!(
+        g.player.pos.z > z0 + 0.5,
+        "kommt nicht in die Kasse: {:?}",
+        g.player.pos
+    );
 }

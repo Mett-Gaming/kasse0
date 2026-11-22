@@ -5,6 +5,10 @@ use super::*;
 /// Einkaufsbummel der Kunden: Umkreis um den aktuellen Platz und Tempo
 const BROWSE_RADIUS: f32 = 7.0;
 const BROWSE_SPEED: f32 = 0.75;
+/// Ab dieser Entfernung starren unbeobachtete Kunden herueber
+const STARE_RANGE: f32 = 16.0;
+/// So viel schneller kommen Verfolger, wenn man rennt
+const RUN_CHASE: f32 = 2.2;
 
 impl Game {
     // --------------------------------------------------------------- Spawns
@@ -215,6 +219,7 @@ impl Game {
     pub(super) fn update_customers(&mut self, dt: f32) {
         let player = self.player.pos;
         let base = self.tier.customer_speed();
+        let running = self.player.vel.length() > WALK_SPEED * 1.3;
         let noticed = self.suspicion >= 1.0;
         for i in 0..self.customers.len() {
             let chest = self.customers[i].pos + vec3(0.0, 1.25, 0.0);
@@ -227,6 +232,14 @@ impl Game {
             // Verfolger kommen naeher, sobald man wegsieht (oder immer, wenn man aufgefallen ist)
             let hunting = c.stalker && (!seen || noticed);
             if !hunting {
+                // Wer nicht verfolgt: kauft ein, solange man hinsieht. Sieht man weg, bleibt er
+                // stehen und starrt herueber - dreht man sich um, schauen einen alle an.
+                let near = (c.pos - player).length() < STARE_RANGE;
+                if !seen && near {
+                    c.pose = Pose::Idle;
+                    c.yaw = lerp_angle(c.yaw, npc::yaw_towards(c.pos, player), (dt * 3.0).min(1.0));
+                    continue;
+                }
                 self.browse_customer(i, dt);
                 continue;
             }
@@ -234,7 +247,14 @@ impl Game {
                 * (1.0 + self.suspicion * 1.2)
                 * (1.0 + c.angry)
                 * if self.paid { 1.4 } else { 1.0 };
-            let s = if seen { speed * 0.4 } else { speed };
+            // Rennen faellt auf: dann holen sie deutlich schneller auf
+            let s = if seen {
+                speed * 0.4
+            } else if running {
+                speed * RUN_CHASE
+            } else {
+                speed
+            };
             let old = c.pos;
             c.pos = npc::step_along(&self.world, &self.player_field, c.pos, player, s, dt);
             c.moving = (c.pos - old).length_squared() > 1e-8;

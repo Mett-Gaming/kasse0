@@ -20,6 +20,7 @@ impl Game {
 
         // Kassen: Kassierer:in, Band, Terminal, Rollo, Kamera
         self.collect_checkout_draws(out);
+        self.collect_barrier_draws(out);
         // Fliegen um verdorbene Ware in der Naehe
         let mut swarms = 0;
         for &i in &self.world.rotten {
@@ -51,6 +52,7 @@ impl Game {
                 break;
             }
         }
+        self.collect_vermin_draws(out);
         // Warnschilder
         for &(pos, yaw) in &self.world.signs {
             out.push(MeshDraw {
@@ -149,3 +151,98 @@ impl Game {
         }
     }
 }
+
+impl Game {
+    /// Bewegter Verfall: Ameisenstrassen, huschende Ratten, Blut, das von der Decke tropft.
+    fn collect_vermin_draws(&self, out: &mut Vec<MeshDraw>) {
+        let cube = MeshId::Cube as usize;
+        let t = self.time;
+        let w = &self.world;
+        let on_floor = |p: Vec3| p + vec3(0.0, self.sway_at(p).y, 0.0);
+        // Ameisen: 24 Punkte wandern die Strasse entlang, leicht wackelnd
+        for (i, &(a, b)) in w.ant_trails.iter().enumerate() {
+            if (a - self.player.pos).length() > 14.0 {
+                continue;
+            }
+            let side = vec3(b.z - a.z, 0.0, a.x - b.x).normalize_or_zero();
+            for k in 0..24 {
+                let s = (k as f32 / 24.0 + t * 0.06 + i as f32 * 0.37).fract();
+                let wobble = (s * 40.0 + t * 3.0 + k as f32).sin() * 0.012;
+                let p = on_floor(a.lerp(b, s) + side * wobble) + vec3(0.0, 0.004, 0.0);
+                out.push(MeshDraw {
+                    mesh: cube,
+                    model: Mat4::from_scale_rotation_translation(
+                        vec3(0.006, 0.004, 0.009),
+                        Quat::from_rotation_y((b - a).x.atan2((b - a).z)),
+                        p,
+                    ),
+                    tint: Vec4::new(0.03, 0.02, 0.02, 0.0),
+                });
+            }
+        }
+        // Ratten: huschen hin und her, halten an den Enden kurz inne
+        for (i, &(a, b)) in w.rat_runs.iter().enumerate() {
+            let len = (b - a).length().max(0.1);
+            let run = len / RAT_SPEED;
+            let cycle = 2.0 * (run + RAT_PAUSE);
+            let c = (t + i as f32 * 1.7).rem_euclid(cycle);
+            let (pos, dir, moving) = if c < run {
+                (a.lerp(b, c / run), b - a, true)
+            } else if c < run + RAT_PAUSE {
+                (b, b - a, false)
+            } else if c < 2.0 * run + RAT_PAUSE {
+                (b.lerp(a, (c - run - RAT_PAUSE) / run), a - b, true)
+            } else {
+                (a, a - b, false)
+            };
+            let hop = if moving {
+                (t * 22.0 + i as f32).sin().abs() * 0.012
+            } else {
+                0.0
+            };
+            out.push(MeshDraw {
+                mesh: MeshId::Rat as usize,
+                model: Mat4::from_rotation_translation(
+                    Quat::from_rotation_y(dir.x.atan2(dir.z)),
+                    on_floor(pos) + vec3(0.0, hop, 0.0),
+                ),
+                tint: Vec4::new(0.55, 0.5, 0.48, 0.0),
+            });
+        }
+        // Blut: Tropfen fallen von der Decke, kleiner Spritzer auf der Lache
+        for (i, &d) in w.drips.iter().enumerate() {
+            let period = 1.4 + crate::world::hash01(d) * 1.4;
+            let c = (t + i as f32 * 0.53).rem_euclid(period);
+            let fall = (2.0 * d.y / 9.81).sqrt();
+            let red = Vec4::new(0.35, 0.01, 0.01, 0.05);
+            if c < fall {
+                let y = d.y - 0.5 * 9.81 * c * c;
+                out.push(MeshDraw {
+                    mesh: cube,
+                    model: Mat4::from_scale_rotation_translation(
+                        vec3(0.012, 0.03, 0.012),
+                        Quat::IDENTITY,
+                        vec3(d.x, y.max(0.02), d.z)
+                            + vec3(0.0, self.sway_at(d).y * (1.0 - y / d.y), 0.0),
+                    ),
+                    tint: red,
+                });
+            } else if c < fall + 0.15 {
+                let k = (c - fall) / 0.15;
+                out.push(MeshDraw {
+                    mesh: cube,
+                    model: Mat4::from_scale_rotation_translation(
+                        vec3(0.05 + k * 0.08, 0.006 * (1.0 - k), 0.05 + k * 0.08),
+                        Quat::IDENTITY,
+                        on_floor(vec3(d.x, 0.01, d.z)),
+                    ),
+                    tint: red,
+                });
+            }
+        }
+    }
+}
+
+/// Ratten: Tempo (m/s) und Pause an den Enden (s)
+const RAT_SPEED: f32 = 1.6;
+const RAT_PAUSE: f32 = 1.3;

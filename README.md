@@ -18,11 +18,11 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 2. Wenn du sie verlässt, ist der Markt **gekippt**. Arbeite den Einkaufszettel ab (**TAB**).
 3. Jeder Artikel existiert **billig** (schwer erreichbar, unten oder oben, tief im Gang) und **teuer** (gut sichtbar). Der **Warenwert** im Wagen bestimmt, wie schlimm es wird (ab 10 €, 25 € und 50 €).
 4. Falsch beschriftete Ware ("Mlich", unsinnige Preise) gehört nicht auf den Zettel.
-5. Die **Kunden** kaufen ganz normal ein. Einige von ihnen verfolgen dich aber: Sie spielen Kundschaft, solange du hinsiehst, und schleichen sich an, sobald du wegsiehst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
+5. Die **Kunden** kaufen ganz normal ein, solange du hinsiehst. Siehst du weg, starren sie herüber, und einige verfolgen dich: Sie schleichen sich an und holen deutlich auf, wenn du rennst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
-7. Geh zur **geöffneten Kasse** (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und räum ihn mit **E aufs Band** (oder leg einzelne Ware aus der Hand aufs Band). Die Kassiererin scannt Stück für Stück, falsche Ware sortiert sie als "ARTIKEL UNBEKANNT" aus. Bezahl mit **E am Kartenterminal** und verlass den Laden durch die Tür.
+7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und räum ihn mit **E aufs Band** (oder leg einzelne Ware aus der Hand aufs Band). Die Kassiererin scannt Stück für Stück, falsche Ware sortiert sie als "ARTIKEL UNBEKANNT" aus. Bezahl mit **E am Kartenterminal** und verlass den Laden durch die Tür.
 
-Deine Auffälligkeit siehst du nicht als Balken, sondern an Bandstörungen im Bild.
+Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (grün → gelb → rot, blinkt bei 100 %).
 
 ## Steuerung
 | Taste | Aktion |
@@ -65,7 +65,7 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Die Gänge biegen sich zu echten S-Kurven, die Regale folgen dem Bogen. Mittendrin öffnen sich Durchgänge, wo vorher keine waren, und es stehen Wände, wo vorher keine standen.
 - Werbeposter verrotten immer weiter.
 - Die Gänge biegen sich live: Regale schwanken, der Boden hebt und senkt sich (Steigung).
-- Löcher im Boden versperren den Weg (hineinfallen kann man nicht), in der Decke klaffen Löcher mit herabhängenden Kabeln.
+- Der Boden verfällt: erst fehlende und gesprungene Fliesen und Ameisenstraßen, dann Fliesenstapel, Löcher (Hindernisse, hineinfallen kann man nicht) und Ratten. In der Decke klaffen Löcher mit Kabeln, am Ende tropft Blut von der Decke und sammelt sich am Boden.
 - Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
 - Mitarbeiter tragen kräftig blaue Dienstkleidung und leuchten im Dunkeln leicht, damit man sie von der Kundschaft unterscheiden kann.
 - Fata Morganen tauchen auf: Hologramme einer fröhlichen Kundin, eines winkenden Kassierers, eines Ausgangsschilds. Kommst du näher, verschwinden sie.

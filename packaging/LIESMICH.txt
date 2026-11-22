@@ -14,10 +14,13 @@ SO SPIELST DU
   1. Hol das Mineralwasser aus der Getränkeabteilung (hinten rechts, "Getränke & Pfand").
   2. Danach ist der Markt gekippt. Arbeite den Einkaufszettel ab (TAB halten).
   3. Je teurer dein Einkauf, desto schlimmer wird es. Billige Ware liegt ganz oben oder unten.
-  4. Die meisten Kunden kaufen nur ein. Einige verfolgen dich, sobald du wegsiehst. Nicht anrempeln, nicht anstarren,
+  4. Die meisten Kunden kaufen nur ein. Einige verfolgen dich, sobald du wegsiehst -
+     und wenn du rennst, sind sie viel schneller. Nicht anrempeln, nicht anstarren,
      nicht rennen und ihnen nicht ihren Tomatensaft wegnehmen.
   5. Die gesichtslosen Mitarbeiter sprechen dich an: unauffällig antworten (1, 2, 3).
-  6. An der offenen Kasse den Wagen aufs Band räumen (E aufs Band), warten, bis
+  6. Die Kassen sind abgesperrt, bis dein Zettel komplett ist. Unten links zeigt ein
+     Balken, wie auffällig du bist.
+  7. An der offenen Kasse den Wagen aufs Band räumen (E aufs Band), warten, bis
      alles gescannt ist, am Kartenterminal bezahlen (E) und raus durch die Tür.
 
 STEUERUNG

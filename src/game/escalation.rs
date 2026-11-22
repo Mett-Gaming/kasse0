@@ -19,7 +19,7 @@ impl Tier {
     }
     /// Wie viele uncanny Kunden im Markt sind
     pub fn customers(self) -> usize {
-        [3, 5, 7, 9][self as usize]
+        [4, 6, 8, 10][self as usize]
     }
     /// Live-Verbiegen der Gaenge: (seitlich, Hoehenwelle) in Metern
     pub fn sway(self) -> (f32, f32) {
@@ -27,10 +27,10 @@ impl Tier {
     }
     /// Loecher im Boden (Hindernisse) und in der Decke
     pub fn holes(self) -> u32 {
-        [0, 1, 3, 5][self as usize]
+        [0, 0, 2, 4][self as usize]
     }
     pub fn ceiling_holes(self) -> u32 {
-        [0, 2, 4, 7][self as usize]
+        [0, 0, 3, 6][self as usize]
     }
     /// Anteil verdorbener Ware
     pub fn rot(self) -> f32 {
@@ -42,7 +42,7 @@ impl Tier {
     }
     /// Wie viele davon Verfolger sind (der Rest kauft nur ein)
     pub fn stalkers(self) -> usize {
-        [1, 2, 3, 4][self as usize]
+        [2, 3, 5, 7][self as usize]
     }
     /// Wie viele gesichtslose Mitarbeiter unterwegs sind
     pub fn employees(self) -> usize {
@@ -50,7 +50,7 @@ impl Tier {
     }
     /// Grundtempo der Kunden (m/s), wenn man nicht hinsieht
     pub fn customer_speed(self) -> f32 {
-        [0.35, 0.45, 0.65, 0.9][self as usize]
+        [0.45, 0.6, 0.8, 1.05][self as usize]
     }
     /// Ganglaenge relativ zum normalen Markt
     pub fn stretch(self) -> f32 {

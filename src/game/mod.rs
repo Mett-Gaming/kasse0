@@ -512,6 +512,7 @@ impl Game {
         self.params.ceiling_holes = self.tier.ceiling_holes();
         self.params.rot = self.tier.rot();
         self.params.giants = self.tier.giants();
+        self.params.decay = self.tier.level();
     }
 
     pub fn cart_value(&self) -> i64 {

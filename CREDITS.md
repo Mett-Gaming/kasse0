@@ -9,6 +9,7 @@ Spiel, Engine, Code, Shader und alle Sounds (synthetisiert): eigenes Projekt.
 | Kundschaft und Personal (24 + 8 Varianten, Teile gemischt, Personal in Dienstkleidung umgefärbt und gesichtslos) | [Ultimate Modular Men Pack](https://poly.pizza/bundle/ZiH8muWqwQ), [Ultimate Modular Women Pack](https://poly.pizza/bundle/aCBDXDdTNN) | Quaternius | CC0 1.0 |
 | Kassiererin (Mannequin, Sitzpose) | Universal Animation Library 1 | Quaternius | CC0 1.0 |
 | Einkaufswagen ("Shopping cart") | [poly.pizza/m/4lhRcMbl1pw](https://poly.pizza/m/4lhRcMbl1pw) | Poly by Google | **CC-BY 3.0** |
+| Ratte ("Rat") | [poly.pizza/m/6hsesZHvcPI](https://poly.pizza/m/6hsesZHvcPI) | Poly by Google | **CC-BY 3.0** |
 | Kasse ("Cash Register 01") | [polyhaven.com/a/CashRegister_01](https://polyhaven.com/a/CashRegister_01) | Poly Haven | CC0 1.0 |
 | Warnschild ("Wet Floor Sign 01") | [polyhaven.com/a/WetFloorSign_01](https://polyhaven.com/a/WetFloorSign_01) | Poly Haven | CC0 1.0 |
 | Konservendose ("Russian Food Cans 01") | [polyhaven.com/a/russian_food_cans_01](https://polyhaven.com/a/russian_food_cans_01) | Poly Haven | CC0 1.0 |
@@ -38,7 +39,7 @@ Bezogen ueber opengameart.org, Quelldateien in `assets_src/packs/`. Kenney-Model
 | Kerzen | Candle (8apROCXjeN4) | Jarlan Perez | CC-BY 3.0 |
 | Glühbirne | Light bulb (eKaX3HRxj58) | jeremy | CC-BY 3.0 |
 
-Alle CC-BY-3.0-Modelle (Einkaufswagen, Butter, Reis, Batterien, Kekse, Kerzen, Glühbirne) müssen beim Weitergeben mit Titel, Autor und Lizenz genannt werden (https://creativecommons.org/licenses/by/3.0/).
+Alle CC-BY-3.0-Modelle (Einkaufswagen, Ratte, Butter, Reis, Batterien, Kekse, Kerzen, Glühbirne) müssen beim Weitergeben mit Titel, Autor und Lizenz genannt werden (https://creativecommons.org/licenses/by/3.0/).
 
 Der Einkaufswagen steht unter CC-BY 3.0 und muss beim Weitergeben des Spiels genannt werden: "Shopping cart" by Poly by Google, CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/).
 

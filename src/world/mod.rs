@@ -153,6 +153,8 @@ pub struct WorldParams {
     pub rot: f32,
     /// riesige Waren als Hindernisse in den Gaengen
     pub giants: u32,
+    /// Verfallsstufe 0..3 (Fliesen, Ameisen, Ratten, Blut; siehe gen/decay.rs)
+    pub decay: u8,
 }
 
 impl WorldParams {
@@ -172,6 +174,7 @@ impl WorldParams {
             ceiling_holes: 0,
             rot: 0.0,
             giants: 0,
+            decay: 0,
         }
     }
 }
@@ -179,6 +182,10 @@ impl WorldParams {
 /// Gangbereich beginnt immer hier (siehe gen.rs: aisles_x0, aisle_z0)
 pub const AISLES_X0: f32 = 2.5;
 pub const AISLES_Z0: f32 = 4.0;
+
+/// Navigationsraster der NPCs: Zellgroesse und Abstand zu Hindernissen (Meter)
+pub const NAV_CELL: f32 = 0.25;
+pub const NAV_CLEARANCE: f32 = 0.18;
 
 /// Live-Verbiegen der Gaenge (gleiche Formel im Shader, siehe _common.wgsl `sway`):
 /// x = seitliches Schwanken der Regale, y = Hoehenwelle des Bodens (Steigung).
@@ -324,6 +331,10 @@ pub struct World {
     pub giants: Vec<Giant>,
     /// verdorbene Ware (Index in items), um die Fliegen kreisen
     pub rotten: Vec<usize>,
+    /// Ameisenstrassen (von, bis), Rattenwege (von, bis), tropfendes Blut (Stelle an der Decke)
+    pub ant_trails: Vec<(Vec3, Vec3)>,
+    pub rat_runs: Vec<(Vec3, Vec3)>,
+    pub drips: Vec<Vec3>,
     /// Wagenbox am Eingang
     pub corral: Vec3,
 }
@@ -616,28 +627,48 @@ impl World {
 }
 
 fn build_nav(solids: &[Aabb], obbs: &[Obb], width: f32, depth: f32) -> NavGrid {
-    let cell = 0.5;
+    // Feines Raster: auch die schmalen Durchgaenge (0,75 m) zwischen versetzten Regalen
+    // sind fuer NPCs (Radius 0,25 m) begehbar.
+    let cell = NAV_CELL;
     let origin = Vec3::ZERO;
     let w = (width / cell).ceil() as usize;
     let h = (depth / cell).ceil() as usize;
-    let r = 0.32;
+    let r = NAV_CLEARANCE;
     let mut walkable = vec![true; w * h];
-    for z in 0..h {
-        for x in 0..w {
-            let c = vec3((x as f32 + 0.5) * cell, 0.0, (z as f32 + 0.5) * cell);
-            let blocked = solids.iter().any(|b| {
-                b.max.y >= 0.2
-                    && b.min.y <= 1.7
-                    && c.x > b.min.x - r
-                    && c.x < b.max.x + r
-                    && c.z > b.min.z - r
-                    && c.z < b.max.z + r
-            });
-            let blocked_obb = obbs.iter().any(|o| {
+    let range = |lo: f32, hi: f32, n: usize| {
+        let a = ((lo / cell) - 0.5).ceil().max(0.0) as usize;
+        let b = (((hi / cell) - 0.5).floor().max(-1.0) + 1.0) as usize;
+        (a.min(n), b.min(n))
+    };
+    // Rechteckige Hindernisse: alle Zellmitten im erweiterten Rechteck sperren
+    for s in solids {
+        if s.max.y < 0.2 || s.min.y > 1.7 {
+            continue;
+        }
+        let (x0, x1) = range(s.min.x - r + 1e-4, s.max.x + r - 1e-4, w);
+        let (z0, z1) = range(s.min.z - r + 1e-4, s.max.z + r - 1e-4, h);
+        for z in z0..z1 {
+            for x in x0..x1 {
+                walkable[z * w + x] = false;
+            }
+        }
+    }
+    // Gedrehte Hindernisse: Umriss grob, dann genau pruefen
+    for o in obbs {
+        if o.max_y() < 0.2 {
+            continue;
+        }
+        let ext = o.half.x.max(o.half.z) * 1.42 + r;
+        let (x0, x1) = range(o.center.x - ext, o.center.x + ext, w);
+        let (z0, z1) = range(o.center.z - ext, o.center.z + ext, h);
+        for z in z0..z1 {
+            for x in x0..x1 {
+                let c = vec3((x as f32 + 0.5) * cell, 0.0, (z as f32 + 0.5) * cell);
                 let l = o.to_local(c);
-                o.max_y() >= 0.2 && l.x.abs() < o.half.x + r && l.z.abs() < o.half.z + r
-            });
-            walkable[z * w + x] = !blocked && !blocked_obb;
+                if l.x.abs() < o.half.x + r && l.z.abs() < o.half.z + r {
+                    walkable[z * w + x] = false;
+                }
+            }
         }
     }
     NavGrid {

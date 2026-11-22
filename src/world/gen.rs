@@ -15,6 +15,8 @@ use rand_pcg::Pcg64;
 use std::f32::consts::{FRAC_PI_2, PI};
 
 const AISLE_PITCH: f32 = 3.4;
+/// So viel wird der Kollisionskoerper neben einem Durchgang gekuerzt (Meter)
+const PASSAGE_TRIM: f32 = 0.035;
 const GONDOLA_HALF_W: f32 = 0.6;
 const DRINKS_W: f32 = 7.0;
 const DRINKS_D: f32 = 7.0;
@@ -113,6 +115,9 @@ pub fn generate(params: &WorldParams) -> World {
             .filter(|&p| cat.products[p].list.is_some())
             .collect(),
         giants: Vec::new(),
+        ant_trails: Vec::new(),
+        rat_runs: Vec::new(),
+        drips: Vec::new(),
     };
 
     // --- Huelle ---
@@ -530,9 +535,25 @@ pub fn generate(params: &WorldParams) -> World {
                 shelf_color,
                 PLAIN,
             );
+            // Neben einem Durchgang den Kollisionskoerper etwas kuerzen: in Kurven ist die Luecke
+            // sonst keilfoermig zu eng fuer Menschen (der Wagen passt weiterhin nicht durch)
+            let cut_start = if k > 0 && gaps.contains(&(k - 1)) {
+                PASSAGE_TRIM
+            } else {
+                0.0
+            };
+            let cut_end = if gaps.contains(&(k + 1)) {
+                PASSAGE_TRIM
+            } else {
+                0.0
+            };
             g.b.solid_rot(
-                mid + vec3(0.0, 1.05, 0.0),
-                f.half(hl, GONDOLA_HALF_W + 0.02, 1.05),
+                f.pos(len * 0.5 + (cut_start - cut_end) * 0.5, 0.0, 1.05),
+                f.half(
+                    hl - (cut_start + cut_end) * 0.5,
+                    GONDOLA_HALF_W + 0.02,
+                    1.05,
+                ),
                 yaw,
             );
             for side in [-1i8, 1] {
@@ -1228,6 +1249,7 @@ pub fn generate(params: &WorldParams) -> World {
             keep_free,
         };
         g.decay(&area);
+        g.floor_and_ceiling_decay(&area, floor_c);
     }
 
     // Warnschilder "Rutschgefahr"
@@ -1255,6 +1277,9 @@ pub fn generate(params: &WorldParams) -> World {
         spots,
         layout,
         giants,
+        ant_trails,
+        rat_runs,
+        drips,
         ..
     } = g;
     let nav = build_nav(&b.solids, &b.obbs, width, depth);
@@ -1288,6 +1313,9 @@ pub fn generate(params: &WorldParams) -> World {
         signs,
         giants,
         rotten: Vec::new(),
+        ant_trails,
+        rat_runs,
+        drips,
         corral,
     };
     world.index_items();
@@ -1301,6 +1329,8 @@ pub fn generate(params: &WorldParams) -> World {
             p.holes -= 1;
         } else if p.giants > 0 {
             p.giants -= 1;
+        } else if p.decay > 0 {
+            p.decay -= 1;
         } else {
             return world;
         }

@@ -104,6 +104,9 @@ impl Game {
             }
         }
 
+        // Kassenbereich erst mit vollstaendigem Zettel
+        pos = self.keep_out_of_checkout(old, pos);
+
         let moved = (pos - old).length();
         let p = &mut self.player;
         p.pos = pos;

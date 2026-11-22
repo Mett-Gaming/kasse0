@@ -49,6 +49,8 @@ JOBS = [
     dict(name="camera", src=os.path.join(DL, "security_camera_01", "security_camera_01_1k.gltf"), size=0.4, tris=800),
     dict(name="terminal", src=os.path.join(DL, "retro_multimeter", "retro_multimeter_1k.gltf"), height=0.2, tris=600),
     dict(name="cigarettes", src=os.path.join(DL, "cigarette_pack", "cigarette_pack_1k.gltf"), height=0.09, tris=200),
+    # Ratte (Poly by Google, CC-BY 3.0)
+    dict(name="rat", src=os.path.join(DL, "rat.glb"), size=0.32, tris=600),
     dict(name="wet_floor_sign", src=os.path.join(DL, "WetFloorSign_01", "WetFloorSign_01_1k.gltf"),
          height=0.62, tris=400),
     dict(name="can", src=os.path.join(DL, "russian_food_cans_01", "russian_food_cans_01_1k.gltf"),

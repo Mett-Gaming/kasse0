@@ -296,6 +296,7 @@ fn collapsed(seed: u64) -> World {
     p.ceiling_holes = 7;
     p.rot = 0.15;
     p.giants = 3;
+    p.decay = 3;
     generate(&p)
 }
 
@@ -355,4 +356,37 @@ fn sway_bends_only_the_aisles_and_keeps_the_floor_connected() {
         z += 0.05;
     }
     assert!(max_up > 0.25, "keine Steigung: {max_up}");
+}
+
+#[test]
+fn decay_comes_in_a_sensible_order() {
+    let at = |level: u8, seed: u64| {
+        let mut p = WorldParams::normal(seed);
+        p.tipped = true;
+        p.stretch = 2.0;
+        p.warp = 1.0;
+        p.decay = level;
+        generate(&p)
+    };
+    for seed in 0..6 {
+        // Stufe 1: nur Fliesen und Ameisen, noch keine Ratten und kein Blut
+        let w1 = at(1, seed);
+        assert!(!w1.ant_trails.is_empty(), "seed {seed}: keine Ameisen");
+        assert!(w1.rat_runs.is_empty() && w1.drips.is_empty());
+        assert!(
+            w1.instances.iter().any(|i| i.extra[1] < -0.5),
+            "seed {seed}: kein Bodenverfall"
+        );
+        // Stufe 2: Ratten dazu, noch kein Blut
+        let w2 = at(2, seed);
+        assert!(!w2.rat_runs.is_empty() && w2.drips.is_empty());
+        // Stufe 3: Blut tropft von der Decke
+        let w3 = at(3, seed);
+        assert!(!w3.drips.is_empty(), "seed {seed}: kein Blut");
+        assert!(w3.drips.iter().all(|d| d.y > 3.5));
+        assert!(w3.all_reachable());
+    }
+    // normaler Markt: nichts davon
+    let n = gen(1, false);
+    assert!(n.ant_trails.is_empty() && n.rat_runs.is_empty() && n.drips.is_empty());
 }
