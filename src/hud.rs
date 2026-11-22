@@ -18,7 +18,27 @@ pub enum Screen {
     Cheats,
 }
 
-pub const TITLE_ITEMS: &[&str] = &["Neuer Einkauf", "Optionen", "Beenden"];
+pub const TITLE_ITEMS: &[&str] = &[
+    "Neuer Einkauf",
+    "Tutorial überspringen",
+    "Optionen",
+    "Beenden",
+];
+
+/// Hauptmenue-Zeilen; der zweite Punkt ist ein Haken (Tutorial ueberspringen).
+pub fn title_rows(tutorial: bool) -> Vec<String> {
+    TITLE_ITEMS
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            if i == 1 {
+                format!("[{}] {s}", if tutorial { " " } else { "x" })
+            } else {
+                s.to_string()
+            }
+        })
+        .collect()
+}
 pub const PAUSE_ITEMS: &[&str] = &[
     "Weiter",
     "Optionen",
@@ -56,7 +76,7 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
         Screen::Options { .. } => (82.0, 17.0),
         Screen::Paused => (66.0, 16.0),
         Screen::End => (205.0, 16.0),
-        Screen::Cheats => (40.0, 15.0),
+        Screen::Cheats => (38.0, 15.0),
         Screen::Playing => (0.0, 0.0),
     }
 }
@@ -145,13 +165,12 @@ fn timestamp(secs: f32) -> String {
     format!("SP {}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60)
 }
 
-pub fn draw_title(u: &mut Ui, sel: usize, time: f32, seed_hint: u64) {
+pub fn draw_title(u: &mut Ui, sel: usize, time: f32, seed_hint: u64, tutorial: bool) {
     u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.35]);
     osd(u, time, "PLAY");
     u.text_center(52.0, "KASSE 0", WHITE, 4.0);
     u.text_center(92.0, "ein ganz normaler Einkauf", DIM, 1.0);
-    let items: Vec<String> = TITLE_ITEMS.iter().map(|s| s.to_string()).collect();
-    draw_menu(u, Screen::Title, &items, sel, time);
+    draw_menu(u, Screen::Title, &title_rows(tutorial), sel, time);
     u.text_s(12.0, 252.0, &format!("Band #{seed_hint}"), DIM, 1.0);
     u.text_s(
         ui::W - 12.0 - Ui::text_width(&timestamp(time), 1.0),
@@ -608,7 +627,9 @@ mod tests {
     fn hud_draws_for_all_screens() {
         let mut g = Game::new(1);
         let mut u = Ui::default();
-        draw_title(&mut u, 0, 1.0, 1);
+        draw_title(&mut u, 0, 1.0, 1, true);
+        assert_eq!(title_rows(false)[1], "[x] Tutorial überspringen");
+        assert_eq!(title_rows(true)[1], "[ ] Tutorial überspringen");
         draw_options(&mut u, 2, 1.0, &Settings::default(), true);
         draw_pause(&mut u, 1, 1.0, &g);
         draw_hud(&mut u, &g, true, 1.0);

@@ -214,7 +214,12 @@ impl App {
                     let seed = self.fixed_seed.take().unwrap_or_else(random_seed);
                     self.start_game(seed);
                 }
-                1 => self.go(Screen::Options { from_pause: false }),
+                // Haken: Tutorial ueberspringen (gleiche Einstellung wie in den Optionen)
+                1 => {
+                    self.settings.tutorial = !self.settings.tutorial;
+                    self.settings.save();
+                }
+                2 => self.go(Screen::Options { from_pause: false }),
                 _ => event_loop.exit(),
             },
             Screen::Paused => match self.sel {
@@ -252,7 +257,8 @@ impl App {
                             Screen::Title
                         };
                         self.go(back);
-                        self.sel = 1;
+                        // zurueck auf "Optionen" (Pause: 2. Zeile, Hauptmenue: 3. Zeile)
+                        self.sel = if from_pause { 1 } else { 2 };
                         return;
                     }
                 }
@@ -298,7 +304,7 @@ impl App {
                 } else {
                     Screen::Title
                 });
-                self.sel = 1;
+                self.sel = if from_pause { 1 } else { 2 };
             }
             Screen::Cheats => self.go(Screen::Playing),
             Screen::End | Screen::Title => {}
@@ -415,7 +421,13 @@ impl App {
         // UI aufbauen
         self.ui.clear();
         match self.screen {
-            Screen::Title => hud::draw_title(&mut self.ui, self.sel, self.clock, self.game.seed),
+            Screen::Title => hud::draw_title(
+                &mut self.ui,
+                self.sel,
+                self.clock,
+                self.game.seed,
+                self.settings.tutorial,
+            ),
             Screen::Playing => hud::draw_hud(&mut self.ui, &self.game, self.show_list, self.clock),
             Screen::Paused => hud::draw_pause(&mut self.ui, self.sel, self.clock, &self.game),
             Screen::Options { from_pause } => hud::draw_options(

@@ -19,6 +19,8 @@ pub const CHEATS: &[&str] = &[
     "Markt umbauen",
     "Kasse: Kartenzahlung",
     "Kasse: Barzahlung",
+    "Leben auffüllen (alle)",
+    "Tutorial überspringen",
     "Wagen wird mitgenommen",
     "Schreck: Hinter dir",
     "Schreck: Stromausfall",
@@ -131,6 +133,20 @@ impl Game {
                 self.glitch = 0.7;
                 "Markt umgebaut.".into()
             }
+            14 => {
+                // Markt: keine Tode mehr, rote Vignette weg; Kasse: drei Leben, kein Misstrauen
+                self.deaths = 0;
+                self.red = 0.0;
+                if let Some(t) = &mut self.till {
+                    t.lives = till::TILL_LIVES;
+                    t.doubt = 0.0;
+                }
+                "Leben aufgefüllt.".into()
+            }
+            15 => {
+                self.tutorial = None;
+                "Tutorial übersprungen.".into()
+            }
             12 | 13 => {
                 let cash = i == 13;
                 self.debug_jump_to_pay(cash);
@@ -181,6 +197,33 @@ mod tests {
         assert!(g.list_complete(), "Zettel nicht aufgefuellt");
         assert!(g.tier >= Tier::Uneasy, "Warenwert-Cheat ohne Wirkung");
         assert!(g.customers.is_empty());
+        assert!(g.tutorial.is_none());
+    }
+
+    #[test]
+    fn refill_lives_cheat_restores_market_and_till_lives() {
+        let mut g = Game::new(56);
+        g.debug_jump_to_pay(false);
+        g.deaths = 2;
+        let t = g.till.as_mut().unwrap();
+        t.lives = 1;
+        t.doubt = 0.7;
+        let i = CHEATS.iter().position(|c| c.starts_with("Leben")).unwrap();
+        g.cheat(i);
+        assert_eq!(g.deaths, 0);
+        assert_eq!(g.death_vignette(), 0.0);
+        let t = g.till.as_ref().unwrap();
+        assert_eq!(t.lives, till::TILL_LIVES);
+        assert_eq!(t.doubt, 0.0);
+
+        let mut g = Game::new(57);
+        g.tutorial = Some(tutorial::Tutorial::default());
+        let i = CHEATS
+            .iter()
+            .position(|c| c.starts_with("Tutorial"))
+            .unwrap();
+        g.cheat(i);
+        assert!(g.tutorial.is_none());
         // Unverwundbar: Kunde direkt neben dem Spieler erwischt ihn nicht
         g.spawn_customer_at(g.player.pos + vec3(0.3, 0.0, 0.0));
         g.update(1.0 / 60.0, &mut Input::default());

@@ -6,7 +6,7 @@ use super::scares::CartGhost;
 use super::*;
 
 /// Index des ersten Schreck-Cheats in `CHEATS`
-pub const FIRST_SCARE_CHEAT: usize = 15;
+pub const FIRST_SCARE_CHEAT: usize = 17;
 
 impl Game {
     pub(super) fn scare_cheat(&mut self, k: usize) -> String {
