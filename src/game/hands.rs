@@ -477,7 +477,9 @@ impl Game {
         }
         self.player_reached = true;
         it.taken = true;
+        let item_pos = it.pos;
         let data = ItemData::from_shelf(it);
+        self.maybe_shelf_face(item_pos);
         self.statics_dirty = true;
         self.play(Sfx::Pickup, 0.5);
         self.held = Some(data);

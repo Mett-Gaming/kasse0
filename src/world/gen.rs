@@ -115,6 +115,7 @@ pub fn generate(params: &WorldParams) -> World {
         layout: lay,
         items: Vec::new(),
         spots: Vec::new(),
+        freezers: Vec::new(),
         missing: (0..cat.products.len())
             .filter(|&p| cat.products[p].list.is_some())
             .collect(),
@@ -466,6 +467,7 @@ pub fn generate(params: &WorldParams) -> World {
             let hl = len * 0.5 + 0.02;
             if freezer_row {
                 // Kuehltruhen: niedrig, man sieht darueber hinweg
+                g.freezers.push((mid, yaw, len));
                 let fl = &g.layout.freezer;
                 let sub = fl[((t * fl.len() as f32) as usize).min(fl.len() - 1)];
                 let white = if tipped {
@@ -1347,6 +1349,7 @@ pub fn generate(params: &WorldParams) -> World {
         b,
         items,
         spots,
+        freezers,
         layout,
         giants,
         ant_trails,
@@ -1386,6 +1389,7 @@ pub fn generate(params: &WorldParams) -> World {
         exit_zone,
         corridor,
         spots,
+        freezers,
         nav,
         signs,
         giants,

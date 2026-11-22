@@ -981,7 +981,7 @@ fn scary_game(seed: u64, tier: Tier) -> Game {
 }
 
 fn scared(g: &Game) -> bool {
-    g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Scare))
+    !g.scares.is_empty()
 }
 
 #[test]
@@ -1283,11 +1283,8 @@ fn jumpscares_come_regularly() {
         for _ in 0..6 {
             g.update(1.0 / 60.0, &mut inp);
         }
-        scares += g
-            .sfx
-            .iter()
-            .filter(|(s, _)| matches!(s, Sfx::Scare))
-            .count();
+        scares += g.scares.len();
+        g.scares.clear();
         g.sfx.clear();
         g.sfx_at.clear();
         if g.outcome != Outcome::Running {
@@ -1591,4 +1588,24 @@ fn after_a_death_the_stalkers_hold_back_for_a_while() {
         d > d0 - 0.3,
         "rueckt trotz Ruhephase heran: {d0:.1} -> {d:.1}"
     );
+}
+
+#[test]
+fn staff_stays_human_even_in_the_collapse() {
+    let mut g = Game::new(23);
+    g.tip();
+    g.tier = Tier::Collapse;
+    g.customers.clear();
+    g.employees.truncate(1);
+    let p = g.player.pos;
+    g.employees[0].pos = g.world.collide(p + vec3(0.0, 0.0, 3.0), 0.3);
+    let mut out = Vec::new();
+    g.collect_people(&mut out);
+    let staff = crate::people::people_of(true);
+    for d in out.iter().filter(|d| staff.contains(&d.variant)) {
+        assert_eq!(d.fx.stretch, 0.0, "Personal gestreckt");
+        assert_eq!(d.fx.twitch, 0.0, "Personal zuckt");
+        assert_eq!(d.fx.distort, 0.0, "Personal zerreisst");
+        assert!(d.fx.look_limit <= 1.2, "Personal dreht den Kopf zu weit");
+    }
 }

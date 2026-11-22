@@ -69,7 +69,7 @@ impl Game {
                 return;
             }
             if before < GHOST_STRIKE && now >= GHOST_STRIKE {
-                self.fire_scare(0.8);
+                self.fire_scare_kind(super::scare_kinds::ScareKind::Monitor, 0.8);
             }
             return;
         }
@@ -79,7 +79,9 @@ impl Game {
         } else {
             0.0
         };
-        if self.monitor_watch > WATCH_TIME && self.can_scare(false) {
+        if self.monitor_watch > WATCH_TIME
+            && self.can_scare_kind(false, super::scare_kinds::ScareKind::Monitor)
+        {
             self.monitor_ghost = Some(0.0);
             self.hush_t = HUSH_TIME_MONITOR;
         }

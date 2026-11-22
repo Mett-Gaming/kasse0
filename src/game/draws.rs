@@ -129,14 +129,11 @@ impl Game {
                 // Personal leuchtet leicht: im dunklen Markt sofort vom Publikum zu unterscheiden
                 Vec4::new(1.0, 1.0, 1.0, 0.22),
             );
-            // gesichtsloses Personal: dreht nur den Kopf zu dir, notfalls ganz nach hinten
+            // Personal bleibt menschlich: schaut einen an, aber nur so weit, wie ein Mensch
+            // den Kopf drehen kann (keine Verformung, kein Verdrehen)
             if self.tipped && (e.pos - self.player.pos).length() < STAFF_LOOK_DIST {
                 d.look_at = Some(eye);
-                d.fx.look_limit = std::f32::consts::PI;
-            }
-            if self.tipped && self.tier >= Tier::Collapse {
-                d.fx.stretch = 0.4;
-                d.fx.twitch = 0.3;
+                d.fx.look_limit = STAFF_LOOK_LIMIT;
             }
             out.push(d);
         }
@@ -347,6 +344,8 @@ impl Game {
 /// So nah schauen Kunden bzw. Mitarbeiter einem mit dem Kopf hinterher (Meter)
 const CUSTOMER_LOOK_DIST: f32 = 14.0;
 const STAFF_LOOK_DIST: f32 = 9.0;
+/// so weit dreht das Personal den Kopf (Radiant, menschlich)
+const STAFF_LOOK_LIMIT: f32 = 1.1;
 
 impl Game {
     /// Wie weit eine Kundin an `pos` den Kopf nach dir drehen darf (None = gar nicht).

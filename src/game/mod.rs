@@ -11,6 +11,7 @@ mod draws;
 pub mod escape;
 mod monitor;
 mod scare_cheats;
+pub mod scare_kinds;
 mod scares;
 mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
@@ -332,6 +333,13 @@ pub struct Game {
     noises: Vec<(Vec3, f32)>,
     /// Spannungskurve (director.rs)
     pub director: director::Director,
+    /// Schrecken dieses Bilds (main.rs leert die Liste) und die letzten Arten
+    pub scares: Vec<scare_kinds::ScareKind>,
+    recent_scares: Vec<scare_kinds::ScareKind>,
+    /// Stil des laufenden Schrecks (Klang, Bildwirkung)
+    scare_style: scare_kinds::ScareStyle,
+    /// Zusatz-Schrecken (Decke, Kuehltruhe, Wagen, ...)
+    extra: scare_kinds::ExtraScares,
     /// Geraeusche mit Ort: (Klang, Lautstaerke, Ort); main.rs verteilt sie im Stereobild
     pub sfx_at: Vec<(Sfx, f32, Vec3)>,
     /// Cheat: Zustand der NPCs ueber ihren Koepfen anzeigen
@@ -518,6 +526,10 @@ impl Game {
             player_field: Vec::new(),
             noises: Vec::new(),
             director: Default::default(),
+            scares: Vec::new(),
+            recent_scares: Vec::new(),
+            scare_style: scare_kinds::ScareKind::Generic.style(),
+            extra: Default::default(),
             sfx_at: Vec::new(),
             npc_debug: false,
             player_still: 0.0,

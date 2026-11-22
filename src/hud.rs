@@ -106,7 +106,23 @@ pub fn menu_len(screen: Screen) -> usize {
 /// Mitte (x) und Oberkante (y) des Menuepunkts `i`, dazu die Spaltenbreite.
 pub fn menu_cell(screen: Screen, i: usize) -> (f32, f32, f32) {
     let (y0, step) = menu_layout(screen);
+    if let Some(rows) = two_column_rows(screen) {
+        // lange Cheat-Kategorie: zwei Spalten
+        let half = ui::W * 0.5;
+        let col = i / rows;
+        return (
+            half * (col as f32 + 0.5),
+            y0 + (i % rows) as f32 * step,
+            half,
+        );
+    }
     (ui::W * 0.5, y0 + i as f32 * step, 360.0)
+}
+
+/// Zeilen pro Spalte, wenn ein Menue zweispaltig ist (lange Cheat-Kategorien), sonst None.
+pub fn two_column_rows(screen: Screen) -> Option<usize> {
+    let n = menu_len(screen);
+    (matches!(screen, Screen::Cheats { group: Some(_) }) && n > 12).then(|| n.div_ceil(2))
 }
 
 pub fn menu_hit(screen: Screen, x: f32, y: f32) -> Option<usize> {

@@ -385,6 +385,8 @@ pub struct World {
     /// Fluchtkorridor hinter der Tuer (nur nach dem Bezahlen im gekippten Markt)
     pub corridor: Option<gen::Corridor>,
     pub spots: Vec<Spot>,
+    /// Kuehltruhen-Stuecke: (Mitte, Laengsrichtung, Laenge)
+    pub freezers: Vec<(Vec3, f32, f32)>,
     pub nav: NavGrid,
     /// Deko: Warnschilder "Rutschgefahr"
     pub signs: Vec<(Vec3, f32)>,

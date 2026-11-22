@@ -427,6 +427,7 @@ impl App {
             for (s, v) in self.game.sfx.drain(..) {
                 a.play_vol(s, v);
             }
+            self.game.scares.clear();
             // Geraeusche mit Ort: leiser mit der Entfernung, links/rechts nach Richtung
             let eye = self.game.eye();
             let right = self
@@ -563,6 +564,13 @@ impl App {
         let g = &self.game;
         let troll = (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare);
         let mut view_proj = g.view_proj(aspect);
+        // Kamera wackelt beim Schreck (je nach Art)
+        let (sx, sy, sr) = g.scare_shake();
+        if sx != 0.0 || sy != 0.0 || sr != 0.0 {
+            view_proj = glam::Mat4::from_translation(glam::vec3(sx, sy, 0.0))
+                * glam::Mat4::from_rotation_z(sr)
+                * view_proj;
+        }
         if let Some(e) = troll {
             // Bild wackelt und kippt (stark beim Einschlag, danach weniger)
             let k = if e < hud::MENU_SCARE_FACE { 1.0 } else { 0.35 };
@@ -710,6 +718,19 @@ impl App {
                     && self.sel < game::cheat_groups().len() =>
             {
                 self.activate(event_loop, 1)
+            }
+            // lange Kategorie (zwei Spalten): links/rechts wechselt die Spalte
+            KeyCode::ArrowRight | KeyCode::KeyD
+                if hud::two_column_rows(self.screen).is_some_and(|r| self.sel + r < n) =>
+            {
+                self.sel += hud::two_column_rows(self.screen).unwrap();
+                self.sfx(Sfx::Blip);
+            }
+            KeyCode::ArrowLeft | KeyCode::KeyA
+                if hud::two_column_rows(self.screen).is_some_and(|r| self.sel >= r) =>
+            {
+                self.sel -= hud::two_column_rows(self.screen).unwrap();
+                self.sfx(Sfx::Blip);
             }
             KeyCode::ArrowLeft | KeyCode::KeyA
                 if matches!(self.screen, Screen::Cheats { group: Some(_) }) =>
