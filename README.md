@@ -27,7 +27,7 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 In den **Kassenbereich kommen keine NPCs** hinein. Sobald die erste Ware auf dem Band liegt, sind **Kunden und Mitarbeiter harmlos**, solange du an der Kasse bleibst. Dafür beobachtet dich jetzt die **Kassiererin**. Unten links zeigt ein Balken ihr Misstrauen, daneben stehen deine **drei Kassen-Leben**.
 - **Ware richtig aufs Band:** Getränke (schwer) zuerst. Falsch beschriftete Ware sortiert sie als "ARTIKEL UNBEKANNT" aus, und das fällt auf.
 - **Fragen beantworten (1, 2, 3):** Während sie scannt, fragt sie zweimal etwas ("Sammeln Sie Punkte?"). Antworte unauffällig. Schweigen fällt auch auf.
-- **Karte durchziehen:** E am Kartenterminal, dann die Maus ruhig nach unten ziehen. Zu schnell, und die Karte wird nicht gelesen.
+- **Karte durchziehen:** E am Kartenterminal öffnet den Kartenleser. Mit E nimmst du die SCAMCART aus dem Portemonnaie, dann ziehst du sie mit der Maus **gleichmäßig nach rechts** durch den Leser. Das Display meldet „ZU SCHNELL“ (kostet ein Leben) oder „ZU LANGSAM“ (macht sie misstrauisch; auch, wenn du unterwegs anhältst). Dann noch mal. Bei „ANGENOMMEN“ geht es weiter zur PIN.
 - **PIN eintippen (0–9):** Das Terminal zeigt die PIN kurz an. Merk sie dir und tipp sie ein, bevor die Zeit abläuft.
 - **Manchmal nur bar:** *"Kartenzahlung geht heute nicht."* Dann öffnet sich deine Geldbörse. Wähle Scheine und Münzen mit A/D oder dem Mausrad, leg sie mit E hin (F nimmt zurück) und zahl **genau passend**, bevor die Zeit abläuft. Zu viel fällt auf.
 - **Nicht weggehen:** Entfernst du dich von der Kasse, steigt ihr Misstrauen, und die Verfolger können dich wieder erwischen.
@@ -44,13 +44,13 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 | WASD / Pfeile | Gehen |
 | Shift | Rennen (fällt auf, kostet Ausdauer; die Leiste erscheint, wenn sie nicht voll ist) |
 | Maus | Umsehen |
-| E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: die gewählte Ware aus dem Wagen aufs Band; am Kartenterminal: Karte durchziehen (nochmal E bricht ab) |
+| E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: die gewählte Ware aus dem Wagen aufs Band; am Kartenterminal: Kartenleser öffnen, dann Karte aus dem Portemonnaie nehmen (F bricht ab) |
 | Q (oder E auf den Wagen) | Wagen stehen lassen / wieder schieben |
 | F (am Wagen) | Ware wieder herausnehmen: die anvisierte (sie leuchtet auf), sonst die zuletzt eingelegte |
 | Mausrad (am Wagen oder Band) | Andere Ware im Wagen anwählen |
-| Maus nach unten (am Terminal) | Karte durchziehen, ruhig und nicht zu schnell |
+| Maus nach rechts (am Kartenleser) | Karte durchziehen: gleichmäßig, nicht zu schnell, nicht zu langsam |
 | TAB (halten) | Einkaufszettel und Warenwert |
-| 1 / 2 / 3 | Antwort im Gespräch und an der Kasse |
+| 1 / 2 / 3 | Antwort im Gespräch und an der Kasse. Sonst völlig nutzlos: **1** zündet eine Zigarette an, **2** führt sie zum Mund und nimmt einen Zug (sie wird jedes Mal kürzer), **3** schnippt sie weg (die Kippe glimmt am Boden weiter). Nach dem 4. Zug wirfst du sie von allein weg |
 | 0–9 | PIN am Kartenterminal |
 | A / D oder Mausrad, E, F (beim Barzahlen) | Schein oder Münze wählen, hinlegen, zurücknehmen |
 | Esc / P | Pause (mit Tastenübersicht) |

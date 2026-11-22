@@ -37,10 +37,12 @@ pub enum MeshId {
     Terminal,
     Cigarettes,
     Rat,
+    /// einzelne Zigarette (smoke.rs): 8,5 cm laengs z, Filter bei -z, Glutspitze bei +z
+    Cigarette,
 }
 
 /// Anzahl fester Modelle (danach folgen die Waren aus dem Katalog)
-pub const FIXED_COUNT: usize = MeshId::Rat as usize + 1;
+pub const FIXED_COUNT: usize = MeshId::Cigarette as usize + 1;
 
 mod gen {
     include!(concat!(env!("OUT_DIR"), "/products_gen.rs"));
@@ -61,6 +63,7 @@ const SOURCES: [&[u8]; FIXED_COUNT - 1] = [
     include_bytes!("../assets/terminal.k0m"),
     include_bytes!("../assets/cigarettes.k0m"),
     include_bytes!("../assets/rat.k0m"),
+    include_bytes!("../assets/cigarette.k0m"),
 ];
 
 /// Alle Modelle: feste (Index = MeshId) gefolgt von den Waren (Index = FIXED_COUNT + Katalog-Mesh).

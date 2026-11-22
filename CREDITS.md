@@ -10,6 +10,7 @@ Spiel, Engine, Code, Shader und alle Sounds (synthetisiert): eigenes Projekt.
 | Mannequin in Sitzpose (frühere Kassiererin, noch in den Spieldateien; die Kassiererin ist jetzt eine Personal-Figur aus dem Modular-Pack oben) | Universal Animation Library 1 | Quaternius | CC0 1.0 |
 | Einkaufswagen ("Shopping cart") | [poly.pizza/m/4lhRcMbl1pw](https://poly.pizza/m/4lhRcMbl1pw) | Poly by Google | **CC-BY 3.0** |
 | Ratte ("Rat") | [poly.pizza/m/6hsesZHvcPI](https://poly.pizza/m/6hsesZHvcPI) | Poly by Google | **CC-BY 3.0** |
+| Zigarette ("Cigarette") | [poly.pizza/m/2RL6h8MbDPb](https://poly.pizza/m/2RL6h8MbDPb) | Zgeal | **CC-BY 3.0** |
 | Kasse ("Cash Register 01") | [polyhaven.com/a/CashRegister_01](https://polyhaven.com/a/CashRegister_01) | Poly Haven | CC0 1.0 |
 | Warnschild ("Wet Floor Sign 01") | [polyhaven.com/a/WetFloorSign_01](https://polyhaven.com/a/WetFloorSign_01) | Poly Haven | CC0 1.0 |
 | Konservendose ("Russian Food Cans 01") | [polyhaven.com/a/russian_food_cans_01](https://polyhaven.com/a/russian_food_cans_01) | Poly Haven | CC0 1.0 |

@@ -97,16 +97,21 @@ Die Kasse ist ein eigenes Minispiel. Es beginnt mit der ersten Ware auf dem Band
 | Ware aufs Band | Getränke zuerst (Getränk nach anderer Ware) | 1 Leben |
 | | falsch beschriftete Ware wird beim Scannen aussortiert | 1 Leben |
 | Fragen (2 pro Einkauf, 7 s Zeit, 1/2/3) | schlechte Antwort / neutrale Antwort / Schweigen | 1 Leben / 20 % / 35 % |
-| Karte durchziehen (Maus nach unten, Blick steht still) | ganz durchziehen in mindestens 0,45 s | 1 Leben |
+| Karte durchziehen (Kartenleser: E nimmt die Karte aus dem Portemonnaie, dann Maus nach rechts, Blick steht still, F bricht ab) | zu schnell (unter 0,45 s) / zu langsam (über 1,3 s oder unterwegs 0,35 s angehalten); danach noch mal. Das Display zeigt KARTE EINFÜHREN, BITTE DURCHZIEHEN, LESE ..., ZU SCHNELL, ZU LANGSAM, ANGENOMMEN | 1 Leben / 20 % |
 | PIN (4 Ziffern, 2,5 s angezeigt, 10 s zum Tippen) | falsche Ziffer / Zeit abgelaufen, danach wird sie wieder angezeigt | 1 Leben / 20 % |
 | Barzahlung (in 40 % der Einkäufe statt Karte, 25 s) | genau passend hinlegen; zu viel = alles zurück / Zeit abgelaufen = alles zurück, neue 25 s | 1 Leben / 25 % |
 | An der Kasse bleiben | weiter als 3,5 m weg: steigt laufend, und man ist nicht mehr geschützt | 8 % pro Sekunde |
 
-Die Fragen kommen nach der 1.–2. gescannten Ware und 2–3 Waren später. Hat man weniger Ware, stellt sie die restlichen am Ende, bevor man bezahlen darf. Im Kollaps wandert die Kasse nicht, solange das Minispiel läuft.
+Es gibt 15 Fragen, davon 9 absurd-lustige („Wieso Kondome und eine Gurke?“, „Haben Sie Kleingeld? Ich sammle Zähne.“, „Haben Sie Ihr Gesicht selbst ausgesucht?“). Die Ware, nach der sie fragt, gibt es im Laden gar nicht. Die gute Antwort ist immer die langweilige. Die Fragen kommen nach der 1.–2. gescannten Ware und 2–3 Waren später. Hat man weniger Ware, stellt sie die restlichen am Ende, bevor man bezahlen darf. Im Kollaps wandert die Kasse nicht, solange das Minispiel läuft.
 
 **Geldbörse** (`src/game/till/cash.rs`): 50/20/10/5 €-Scheine, 2/1 €- und 50/20/10/5/2/1-ct-Münzen. Sie enthält immer genug, um passend zu zahlen, dazu 3–6 zufällige Extra-Stücke. Wählen mit A/D oder dem Mausrad, E (Linksklick) legt hin, F nimmt das zuletzt Hingelegte zurück. Anzeige: oben groß „NOCH OFFEN“, darunter je eine Reihe Kacheln für Scheine und Münzen (Wert und Anzahl, die gewählte gelb umrandet, leere grau).
 
+**Die Karte** (`src/hud/till.rs`, beim Durchziehen groß zu sehen): „SCAMCART“, Nummer 0000 0000 0666, „KUNDE 0“, gültig bis 01/89, roter Stempel „ABGELAUFEN“. Kränklicher Farbverlauf von Lila nach Gallengrün, dessen Bänder leicht wabern, ein Auge, das sich umsieht und manchmal blinzelt, ein Riss, und der Schriftzug flackert ab und zu rot. Abgelaufen ist sie nur zum Spaß, die Zahlung klappt trotzdem.
+
 Cheats (F1) zum Testen: „Kasse: direkt zur Kartenzahlung“ bzw. „… zur Barzahlung“. Sie kippen den Markt, legen den Zettel als gescannt hin, überspringen die Fragen und stellen dich ans Terminal.
+
+## Die nutzlose Zigarette (`src/game/smoke.rs`, Anzeige `src/hud/smoke.rs`)
+Ohne jeden Spielzweck. Die Zigarette ist ein 3D-Modell (Zgeal, CC-BY 3.0) vor der Kamera, unten rechts, die Glut zeigt schräg nach vorn. **1** zündet an (Feuerzeug-Ratschen). **2** nimmt einen Zug: Sie wird in 1,2 s zum Mund geführt (Filter an die Lippen), die Glut leuchtet auf und knistert, danach wird Rauch übers Bild ausgeatmet. Jeder Zug macht sie sichtbar kürzer (das Modell wird von der Glutseite her gekürzt). **3** schnippt sie weg: Sie überschlägt sich im Bogen, und die Kippe liegt 2,2 m vor einem am Boden, glimmt 12 s und verschwindet nach 40 s. **Nach dem 4. Zug** fliegt sie von allein weg. Unbenutzt brennt sie langsam von allein ab. Eine Rauchfahne steigt an der Glut auf. Während eines Gesprächs, einer Frage der Kassiererin oder beim Bezahlen gehören die Zifferntasten den Antworten bzw. der PIN, dann passiert mit der Zigarette nichts.
 
 ## Flucht zum Ausgang (`src/game/escape.rs`)
 Direkt nach dem Bezahlen: Durchsage „ACHTUNG: Kunde 0 hat ein Gesicht. Schnappt ihn!“, Sirene alle 1,3 s, rote Blinkschrift „ALARM - LAUF ZUM AUSGANG!“. Alle Kunden und Mitarbeiter rennen mit 2,05 m/s auf einen zu (Gehen 1,5, Rennen 2,56 m/s mit 5 s Ausdauer), egal ob man hinsieht. Wer beim Alarm näher als 10 m ist, startet an seinem Regal bzw. an einem Platz mindestens 10 m entfernt. Auch Mitarbeiter packen jetzt zu. Erwischt = sofort Game Over, ohne Aufwachen („Sie haben Kunde 0 geschnappt“). In den Kassenbereich kommen sie weiterhin nicht. Gewonnen ist, wer durch die Tür hinaus ist.

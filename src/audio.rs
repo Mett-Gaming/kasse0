@@ -30,6 +30,12 @@ pub enum Sfx {
     Alarm,
     /// Muenze oder Schein auf den Tresen
     Coin,
+    /// Feuerzeug: Reibrad und Flamme
+    Lighter,
+    /// Zug an der Zigarette: Knistern der Glut
+    Puff,
+    /// Rauch ausatmen
+    Exhale,
     /// Jumpscare: greller, schiefer Akkord mit Rauschstoss
     Scare,
     /// Troll-Jumpscare im Menue: verzerrter Schrei, Metallkreischen, Basseinschlag
@@ -286,6 +292,42 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 ((phase.sin() + 0.5 * (phase * 3.0).sin()) * 1.6).tanh() * 0.22 * env
             })
         }
+        Sfx::Lighter => {
+            // ratschendes Reibrad, dann leises Fauchen der Flamme
+            let mut lp = 0.0;
+            gen(0.7, &mut |t| {
+                let n = rng.next();
+                lp += (n - lp) * 0.2;
+                let strike = if t < 0.08 {
+                    (((t * 180.0).fract() < 0.3) as i32 as f32) * n * 0.6
+                } else {
+                    0.0
+                };
+                let flame = if t > 0.1 {
+                    lp * 0.35 * (1.0 - (t - 0.1) / 0.6)
+                } else {
+                    0.0
+                };
+                (strike + flame) * 0.5
+            })
+        }
+        Sfx::Puff => {
+            // Glut knistert beim Ziehen
+            gen(0.9, &mut |t| {
+                let crack = (rng.next() > 0.93) as i32 as f32 * rng.next();
+                let hiss = rng.next() * 0.05;
+                (crack * 0.35 + hiss) * (t * 4.0).min(1.0) * (1.0 - t / 0.9)
+            })
+        }
+        Sfx::Exhale => {
+            // langes, weiches Ausatmen: tief gefiltertes Rauschen, an- und abschwellend
+            let mut lp = 0.0;
+            gen(1.4, &mut |t| {
+                lp += (rng.next() - lp) * 0.08;
+                let env = (t * 5.0).min(1.0) * (1.0 - t / 1.4).powf(1.5);
+                lp * 0.9 * env
+            })
+        }
         Sfx::Coin => gen(0.18, &mut |t| {
             let ring = (TAU * 2600.0 * t).sin() + 0.6 * (TAU * 3900.0 * t).sin();
             ring * 0.12 * (-t * 22.0).exp() + rng.next() * 0.05 * (-t * 90.0).exp()
@@ -327,6 +369,9 @@ impl Audio {
             Sfx::Whisper,
             Sfx::Alarm,
             Sfx::Coin,
+            Sfx::Lighter,
+            Sfx::Puff,
+            Sfx::Exhale,
             Sfx::Scare,
             Sfx::Shriek,
         ]
@@ -414,6 +459,9 @@ mod tests {
             Sfx::Whisper,
             Sfx::Alarm,
             Sfx::Coin,
+            Sfx::Lighter,
+            Sfx::Puff,
+            Sfx::Exhale,
             Sfx::Scare,
             Sfx::Shriek,
         ] {

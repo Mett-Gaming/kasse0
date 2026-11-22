@@ -283,12 +283,20 @@ pub(super) fn scan_and_answer(g: &mut Game) {
     }
 }
 
-/// Karte durchziehen; `secs` = wie lange das Durchziehen dauert.
+/// Karte aus dem Portemonnaie nehmen (falls noch nicht) und gleichmaessig nach rechts
+/// durchziehen; `secs` = wie lange das Durchziehen dauert.
 pub(super) fn swipe(g: &mut Game, secs: f32) {
+    let in_wallet = matches!(
+        g.till.as_ref().map(|t| t.pay),
+        Some(till::Pay::Swipe { ready: false, .. })
+    );
+    if in_wallet {
+        press_e(g);
+    }
     let frames = (secs * 60.0) as usize;
     let per_rad = 1.0 / (BASE_SENSITIVITY * g.sensitivity) * till::SWIPE_TRAVEL;
     for _ in 0..frames + 2 {
-        g.look(0.0, per_rad / frames as f32);
+        g.look(per_rad / frames as f32, 0.0);
         g.update(1.0 / 60.0, &mut Input::default());
     }
 }

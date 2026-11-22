@@ -30,9 +30,10 @@ DAS KASSEN-MINISPIEL
   Fall ihr nicht auf:
     - Getränke zuerst aufs Band, keine falsch beschriftete Ware.
     - Ihre Fragen unauffällig beantworten (1, 2, 3), nicht schweigen.
-    - Am Kartenterminal (E) die Karte mit der Maus ruhig nach unten ziehen.
-      Zu schnell = Karte nicht gelesen. Dann die PIN, die das Terminal kurz
-      zeigt, eintippen (0-9).
+    - Am Kartenterminal (E) die Karte aus dem Portemonnaie nehmen (E) und
+      mit der Maus gleichmäßig nach rechts durch den Leser ziehen.
+      Zu langsam = noch mal. Zu schnell = Karte nicht gelesen (ein Leben weg).
+      Dann die PIN, die das Terminal kurz zeigt, eintippen (0-9).
     - Manchmal geht die Karte nicht: Dann zahlst du bar aus der Geldbörse,
       schnell und passend (A/D oder Mausrad wählen, E hinlegen, F zurück).
     - Nicht von der Kasse weggehen.
@@ -55,6 +56,8 @@ STEUERUNG
   F                  Ware aus dem Wagen nehmen (die anvisierte leuchtet auf)
   Mausrad            am Wagen / Band: andere Ware anwählen
   1 / 2 / 3          Antwort im Gespräch und an der Kasse
+                     sonst: Zigarette anzünden / Zug nehmen / wegschnippen
+                     (nach dem 4. Zug fliegt sie von allein weg)
   0 - 9              PIN am Kartenterminal
   A / D, Mausrad     beim Barzahlen: Schein oder Münze wählen (E hinlegen, F zurück)
   Esc                Pause            F12     Screenshot (Ordner "Bilder")

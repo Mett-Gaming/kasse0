@@ -133,6 +133,20 @@ fn paying_cash_too_slowly_is_suspicious() {
 }
 
 #[test]
+fn till_questions_fit_on_screen_and_have_distinct_answers() {
+    assert!(TILL_QUESTIONS.len() >= 10, "zu wenig Fragen");
+    for q in TILL_QUESTIONS {
+        assert!(q.text.chars().count() <= 60, "{} zu lang", q.text);
+        assert_ne!(q.answers[0], q.answers[1]);
+        assert_ne!(q.answers[1], q.answers[2]);
+        assert_ne!(q.answers[0], q.answers[2]);
+        for a in q.answers {
+            assert!(a.chars().count() <= 40, "{a} zu lang");
+        }
+    }
+}
+
+#[test]
 fn cheats_jump_straight_to_card_or_cash_payment() {
     let mut g = Game::new(49);
     g.cheat(12);
@@ -299,6 +313,40 @@ fn swiping_too_fast_fails_and_slowly_works() {
         "langsam durchgezogen und nicht gelesen"
     );
     assert_eq!(lives(&g), TILL_LIVES - 1);
+}
+
+#[test]
+fn card_must_be_taken_out_and_swiping_too_slowly_just_retries() {
+    let mut g = ready_to_pay(51);
+    // ohne die Karte zu nehmen bewegt die Maus nichts
+    g.look(500.0, 0.0);
+    frame(&mut g, Input::default());
+    assert!(matches!(
+        g.till.as_ref().unwrap().pay,
+        Pay::Swipe {
+            ready: false,
+            progress: 0.0,
+            ..
+        }
+    ));
+    // viel zu langsam: kein Leben weg, nur Misstrauen, und man darf noch mal
+    swipe(&mut g, 2.5);
+    assert_eq!(lives(&g), TILL_LIVES, "zu langsam kostet ein Leben");
+    assert!(doubt(&g) > 0.0, "zu langsam faellt nicht auf");
+    assert!(g.swiping());
+    assert_eq!(
+        g.till.as_ref().unwrap().reader.map(|r| r.0),
+        Some("ZU LANGSAM. NOCHMAL.")
+    );
+    // F bricht ab
+    frame(
+        &mut g,
+        Input {
+            take_out: true,
+            ..Default::default()
+        },
+    );
+    assert!(!g.swiping());
 }
 
 #[test]

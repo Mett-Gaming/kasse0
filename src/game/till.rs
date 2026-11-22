@@ -12,8 +12,11 @@ pub const TILL_LIVES: u32 = 3;
 pub const TILL_RADIUS: f32 = 3.5;
 /// Antwortzeit fuer eine Frage der Kassiererin
 pub const QUESTION_TIME: f32 = 7.0;
-/// Schneller durchgezogen als das: Karte nicht gelesen
+/// Schneller durchgezogen als das: Karte nicht gelesen (kostet ein Leben)
 pub const SWIPE_MIN_TIME: f32 = 0.45;
+/// Langsamer als das, oder unterwegs laenger als SWIPE_STALL stehen geblieben: noch mal
+pub const SWIPE_MAX_TIME: f32 = 1.3;
+pub const SWIPE_STALL: f32 = 0.35;
 /// Mausbewegung (in Radiant Blickwinkel), die einmal ganz Durchziehen bedeutet
 pub const SWIPE_TRAVEL: f32 = 0.6;
 /// So lange zeigt das Terminal die PIN an
@@ -26,6 +29,7 @@ pub const PIN_TIME: f32 = 10.0;
 pub const SUS_NEUTRAL: f32 = 0.2;
 pub const SUS_SILENT: f32 = 0.35;
 pub const SUS_PIN_SLOW: f32 = 0.2;
+pub const SUS_SWIPE_SLOW: f32 = 0.2;
 /// pro Sekunde, wenn man waehrend des Kassierens weggeht
 pub const SUS_AWAY: f32 = 0.08;
 
@@ -68,6 +72,75 @@ pub const TILL_QUESTIONS: &[TillQuestion] = &[
         text: "Sind Sie Kunde Nummer 0?",
         answers: ["Nein.", "Vielleicht.", "Ja."],
     },
+    // --- absurd-lustige Fragen (die Ware gibt es im Laden gar nicht) ---
+    TillQuestion {
+        text: "Wieso Kondome und eine Gurke?",
+        answers: [
+            "Das ist für einen Salat.",
+            "Das geht Sie nichts an.",
+            "Wollen Sie es wirklich wissen?",
+        ],
+    },
+    TillQuestion {
+        text: "Sie haben 47 Tomatensäfte vergessen.",
+        answers: [
+            "Heute nicht, danke.",
+            "47? Wirklich?",
+            "Den trinken nur die anderen.",
+        ],
+    },
+    TillQuestion {
+        text: "Ist das Ihr Wagen, oder hat er Sie ausgesucht?",
+        answers: [
+            "Das ist meiner.",
+            "Gute Frage ...",
+            "Er folgt mir seit Stunden.",
+        ],
+    },
+    TillQuestion {
+        text: "Haben Sie Kleingeld? Ich sammle Zähne.",
+        answers: [
+            "Leider nicht.",
+            "Wie viele brauchen Sie?",
+            "Ihre oder meine?",
+        ],
+    },
+    TillQuestion {
+        text: "Möchten Sie für 1 Cent eine Seele dazu?",
+        answers: [
+            "Nein, danke.",
+            "Ist die noch frisch?",
+            "Ich habe schon zwei.",
+        ],
+    },
+    TillQuestion {
+        text: "Wussten Sie, dass Gurken Sie beobachten?",
+        answers: ["Ach was.", "Nur die grünen?", "Deshalb esse ich sie."],
+    },
+    TillQuestion {
+        text: "Haben Sie Ihr Gesicht selbst ausgesucht?",
+        answers: [
+            "Das ist angeboren.",
+            "Gefällt es Ihnen?",
+            "Wollen Sie es haben?",
+        ],
+    },
+    TillQuestion {
+        text: "Das Klopapier reicht für wie viele Jahre?",
+        answers: [
+            "Für ein paar Wochen.",
+            "Kommt drauf an.",
+            "Bis alles vorbei ist.",
+        ],
+    },
+    TillQuestion {
+        text: "Warum schwitzen Sie so?",
+        answers: [
+            "Es ist warm hier drin.",
+            "Tu ich das?",
+            "Weil Sie kein Gesicht haben!",
+        ],
+    },
 ];
 
 const REPLY_GOOD: &str = "Mhm.";
@@ -94,10 +167,14 @@ impl Asked {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Pay {
     Idle,
-    /// Karte durchziehen: 0..1, Zeitpunkt, ab dem sie sich bewegt hat
+    /// Karte durchziehen (wie eine Kartenleser-Aufgabe): erst aus dem Portemonnaie nehmen
+    /// (`ready`), dann mit der Maus gleichmaessig nach rechts durch den Leser ziehen.
+    /// `progress` 0..1, `started` = Beginn des Zugs, `last_move` = letzte Bewegung.
     Swipe {
         progress: f32,
         started: Option<f32>,
+        ready: bool,
+        last_move: f32,
     },
     /// Das Terminal zeigt kurz die PIN
     ShowPin(f32),
@@ -132,6 +209,8 @@ pub struct Till {
     pub sel: usize,
     /// A/D im letzten Bild gedrueckt (zum Weiterschalten)
     lr_prev: (bool, bool),
+    /// Anzeige des Kartenlesers ("ZU SCHNELL" ...) und wie lange noch
+    pub reader: Option<(&'static str, f32)>,
 }
 
 impl Till {
@@ -144,6 +223,7 @@ impl Till {
             given: Vec::new(),
             sel: 0,
             lr_prev: (false, false),
+            reader: None,
             lives: TILL_LIVES,
             doubt: 0.0,
             pin: [
@@ -207,18 +287,29 @@ impl Game {
         self.till_active() && matches!(self.till.as_ref().map(|t| t.pay), Some(Pay::Swipe { .. }))
     }
 
-    /// Mausbewegung beim Durchziehen (nach unten = positiv).
-    pub(super) fn swipe_move(&mut self, dy: f32) {
+    /// Mausbewegung beim Durchziehen (nach rechts = positiv).
+    pub(super) fn swipe_move(&mut self, dx: f32) {
         let s = BASE_SENSITIVITY * self.sensitivity;
         let now = self.time;
         if let Some(Till {
-            pay: Pay::Swipe { progress, started },
+            pay:
+                Pay::Swipe {
+                    progress,
+                    started,
+                    ready: true,
+                    last_move,
+                },
             ..
         }) = &mut self.till
         {
-            *progress = (*progress + dy * s / SWIPE_TRAVEL).max(0.0);
-            if *progress > 0.05 && started.is_none() {
-                *started = Some(now);
+            *progress = (*progress + dx * s / SWIPE_TRAVEL).max(0.0);
+            if *progress > 0.03 {
+                if started.is_none() {
+                    *started = Some(now);
+                }
+                if dx.abs() > 0.0 {
+                    *last_move = now;
+                }
             }
         }
     }
@@ -333,10 +424,13 @@ impl Game {
         t.pay = Pay::Swipe {
             progress: 0.0,
             started: None,
+            ready: false,
+            last_move: 0.0,
         };
+        t.reader = None;
         self.player.vel = Vec3::ZERO;
         self.say(
-            "Karte durchziehen: Maus ruhig nach unten. Nicht zu schnell.",
+            "Nimm die Karte [E] und zieh sie gleichmäßig nach rechts durch.",
             4.0,
         );
         self.play(Sfx::Click, 0.4);
@@ -347,30 +441,62 @@ impl Game {
         self.player.vel = Vec3::ZERO;
         let now = self.time;
         let Some(t) = &mut self.till else { return };
+        if let Some((_, left)) = &mut t.reader {
+            *left -= dt;
+            if *left <= 0.0 {
+                t.reader = None;
+            }
+        }
+        let again = Pay::Swipe {
+            progress: 0.0,
+            started: None,
+            ready: true,
+            last_move: 0.0,
+        };
         match t.pay {
             Pay::Idle => {}
             Pay::Cash(left) => self.update_cash(left, dt, input),
-            Pay::Swipe { progress, started } => {
-                if input.interact {
+            Pay::Swipe {
+                progress,
+                started,
+                ready,
+                last_move,
+            } => {
+                if input.take_out {
                     t.pay = Pay::Idle;
                     self.say("Abgebrochen.", 1.5);
                     return;
                 }
-                if progress < 1.0 {
+                // erst die Karte aus dem Portemonnaie nehmen
+                if !ready {
+                    if input.interact {
+                        t.pay = Pay::Swipe {
+                            progress: 0.0,
+                            started: None,
+                            ready: true,
+                            last_move: 0.0,
+                        };
+                        self.play(Sfx::Pickup, 0.4);
+                    }
                     return;
                 }
-                let took = started.map_or(0.0, |s| now - s);
-                if took < SWIPE_MIN_TIME {
-                    t.pay = Pay::Swipe {
-                        progress: 0.0,
-                        started: None,
-                    };
+                let Some(s) = started else { return };
+                let took = now - s;
+                if progress >= 1.0 && took < SWIPE_MIN_TIME {
+                    t.pay = again;
+                    t.reader = Some(("ZU SCHNELL. NOCHMAL.", 1.6));
                     self.till_mistake("Zu schnell! KARTE NICHT GELESEN.");
-                } else {
+                } else if progress >= 1.0 && took <= SWIPE_MAX_TIME {
                     t.pay = Pay::ShowPin(PIN_SHOW);
                     t.typed.clear();
+                    t.reader = Some(("ANGENOMMEN", 1.6));
                     self.play(Sfx::Beep, 0.5);
                     self.say("Karte gelesen. Merk dir die PIN.", 2.5);
+                } else if took > SWIPE_MAX_TIME || now - last_move > SWIPE_STALL {
+                    // zu langsam oder unterwegs stehen geblieben
+                    t.pay = again;
+                    t.reader = Some(("ZU LANGSAM. NOCHMAL.", 1.6));
+                    self.till_doubt(SUS_SWIPE_SLOW, "Zu langsam. Die Kassiererin trommelt.");
                 }
             }
             Pay::ShowPin(left) => {

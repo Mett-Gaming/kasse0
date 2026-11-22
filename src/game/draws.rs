@@ -21,6 +21,8 @@ impl Game {
         // Kassen: Kassierer:in, Band, Terminal, Rollo, Kamera
         self.collect_checkout_draws(out);
         self.collect_barrier_draws(out);
+        // Zigarette vor der Kamera und weggeschnippte Kippen
+        self.collect_cigarette_draws(out);
         // Fliegen um verdorbene Ware in der Naehe
         let mut swarms = 0;
         for &i in &self.world.rotten {

@@ -1,5 +1,6 @@
 //! HUD, Menues und End-Screens (alles im 480x270-Raster, unter dem VHS-Effekt).
 
+mod smoke;
 mod till;
 
 use crate::game::dialog::CART_OPENER;
@@ -447,6 +448,9 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
             }
         }
     }
+
+    // die nutzlose Zigarette (1/2/3)
+    smoke::draw(u, g, time);
 
     // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN, Geldboerse
     till::draw(u, g, time);

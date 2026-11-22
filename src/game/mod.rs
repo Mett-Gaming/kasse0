@@ -8,6 +8,7 @@ mod draws;
 pub mod escape;
 mod monitor;
 mod scares;
+pub mod smoke;
 mod tension;
 pub use cheats::CHEATS;
 pub mod dialog;
@@ -281,6 +282,10 @@ pub struct Game {
     pub till_caught: bool,
     /// Flucht zum Ausgang nach dem Bezahlen (Sekunden seit dem Alarm)
     pub chase: Option<f32>,
+    /// Die nutzlose Zigarette (smoke.rs), Kippen am Boden, ausgeatmeter Rauch (Sekunden)
+    pub cig: smoke::Cigarette,
+    pub butts: Vec<smoke::Butt>,
+    pub exhale: f32,
     alarm_timer: f32,
     /// Figur der Kassiererin (Personal-Variante)
     pub cashier_variant: usize,
@@ -438,6 +443,9 @@ impl Game {
             till: None,
             till_caught: false,
             chase: None,
+            cig: smoke::Cigarette::None,
+            butts: Vec::new(),
+            exhale: 0.0,
             alarm_timer: 0.0,
             // fest aus dem Seed (nicht aus dem RNG, damit sich sonst nichts verschiebt)
             cashier_variant: {
@@ -739,7 +747,7 @@ impl Game {
         }
         // Am Kartenterminal zieht die Maus die Karte durch, der Blick bleibt stehen
         if self.swiping() {
-            self.swipe_move(dy);
+            self.swipe_move(dx);
             return;
         }
         if self.till_paying() {
@@ -810,6 +818,12 @@ impl Game {
             return;
         }
         self.run_time += dt;
+        // Zifferntasten: erst Antworten und PIN, sonst die Zigarette (smoke.rs)
+        let cig_key = if self.digits_busy() {
+            None
+        } else {
+            input.digit
+        };
 
         if self.dialog.is_some() {
             self.update_dialog(dt, input);
@@ -834,6 +848,7 @@ impl Game {
         }
         // Kassen-Minispiel: Fragen, Weggehen, Misstrauen, Leben
         self.update_till(dt, input);
+        self.update_cigarette(dt, cig_key);
         input.interact = false;
         input.cart_toggle = false;
         input.take_out = false;
