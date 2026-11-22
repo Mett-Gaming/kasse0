@@ -1,0 +1,56 @@
+# Baut KASSE 0 bei jedem Push und Pull Request (Tests + Release-Build, Paket als Artefakt).
+# Ein Tag "v*" (z. B. v0.2.0) erzeugt zusaetzlich ein GitHub-Release mit dem Zip.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Tests
+        run: cargo test --release
+
+      - name: Release-Build
+        run: cargo build --release
+
+      - name: Paket schnueren
+        shell: pwsh
+        run: |
+          $dir = "dist/KASSE0"
+          New-Item -ItemType Directory -Force "$dir/Lizenzen" | Out-Null
+          Copy-Item target/release/kasse0.exe "$dir/KASSE0.exe"
+          Copy-Item packaging/LIESMICH.txt "$dir/LIESMICH.txt"
+          Copy-Item CREDITS.md "$dir/Credits.md"
+          Copy-Item assets/fonts/OFL.txt "$dir/Lizenzen/ArchivoBlack-OFL.txt"
+          $tag = "${{ github.ref_name }}" -replace '[^A-Za-z0-9._-]', '-'
+          Compress-Archive -Path $dir -DestinationPath "dist/KASSE0-$tag.zip"
+
+      - name: Artefakt hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: KASSE0-${{ github.sha }}
+          path: dist/KASSE0
+
+      - name: Release anlegen (nur bei Tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create "${{ github.ref_name }}" "dist/KASSE0-${{ github.ref_name }}.zip" `
+            --title "KASSE 0 ${{ github.ref_name }}" --generate-notes

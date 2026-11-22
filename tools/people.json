@@ -1,0 +1,71 @@
+{
+  "_info": "Kunden-Varianten aus Quaternius Ultimate Modular Men/Women (CC0). Jede Variante mischt Kopf, Oberteil, Hose und Schuhe aus Outfits desselben Geschlechts.",
+  "outfits": {
+    "m": {
+      "hoodie": "Hoodie_Character_gKLBoRsyKe.glb",
+      "casual": "Casual_Character_kZ3DmIoGip.glb",
+      "beach": "Beach_Character_DojKLcO34E.glb",
+      "business": "Business_Man_JFrLIKqvCH.glb",
+      "farmer": "Farmer_7pn3R6hPvE.glb",
+      "worker": "Worker_Yg2bQZO6Hj.glb",
+      "punk": "Punk_BTALZymknF.glb",
+      "hiker": "Adventurer_5EGWBMpuXq.glb"
+    },
+    "f": {
+      "casual": "Animated_Woman_qJ2gsTUBHL.glb",
+      "dress": "Animated_Woman_nIItLV9nxS.glb",
+      "suit": "Suit_sOUciDsoVV.glb",
+      "punk": "Punk_djXoqejw6w.glb",
+      "worker": "Worker_E8079Ahx7k.glb",
+      "explorer": "Adventurer_ZwF0K7WBmu.glb"
+    }
+  },
+  "poses": [
+    {"id": "idle", "action": "CharacterArmature|Idle_Neutral", "frame": 10},
+    {"id": "reach", "action": "CharacterArmature|Interact", "frame": 14},
+    {"id": "walk", "action": "CharacterArmature|Walk", "frame": 6}
+  ],
+  "variants": [
+    {"id": "m_hoodie",   "g": "m", "head": "hoodie",   "body": "hoodie",   "legs": "hoodie",   "feet": "hoodie"},
+    {"id": "m_casual",   "g": "m", "head": "casual",   "body": "casual",   "legs": "casual",   "feet": "casual"},
+    {"id": "m_beach",    "g": "m", "head": "beach",    "body": "beach",    "legs": "beach",    "feet": "beach"},
+    {"id": "m_business", "g": "m", "head": "business", "body": "business", "legs": "business", "feet": "business"},
+    {"id": "m_farmer",   "g": "m", "head": "farmer",   "body": "farmer",   "legs": "farmer",   "feet": "farmer"},
+    {"id": "m_worker",   "g": "m", "head": "worker",   "body": "worker",   "legs": "worker",   "feet": "worker"},
+    {"id": "m_punk",     "g": "m", "head": "punk",     "body": "punk",     "legs": "punk",     "feet": "punk"},
+    {"id": "m_hiker",    "g": "m", "head": "hiker",    "body": "hiker",    "legs": "hiker",    "feet": "hiker"},
+    {"id": "m_mix1",     "g": "m", "head": "business", "body": "hoodie",   "legs": "casual",   "feet": "hiker"},
+    {"id": "m_mix2",     "g": "m", "head": "hiker",    "body": "casual",   "legs": "business", "feet": "business"},
+    {"id": "m_mix3",     "g": "m", "head": "beach",    "body": "punk",     "legs": "farmer",   "feet": "casual"},
+    {"id": "m_mix4",     "g": "m", "head": "casual",   "body": "farmer",   "legs": "hoodie",   "feet": "worker"},
+    {"id": "f_casual",   "g": "f", "head": "casual",   "body": "casual",   "legs": "casual",   "feet": "casual"},
+    {"id": "f_dress",    "g": "f", "head": "dress",    "body": "dress",    "legs": "dress",    "feet": "dress"},
+    {"id": "f_suit",     "g": "f", "head": "suit",     "body": "suit",     "legs": "suit",     "feet": "suit"},
+    {"id": "f_punk",     "g": "f", "head": "punk",     "body": "punk",     "legs": "punk",     "feet": "punk"},
+    {"id": "f_worker",   "g": "f", "head": "worker",   "body": "worker",   "legs": "worker",   "feet": "worker"},
+    {"id": "f_explorer", "g": "f", "head": "explorer", "body": "explorer", "legs": "explorer", "feet": "explorer"},
+    {"id": "f_mix1",     "g": "f", "head": "explorer", "body": "casual",   "legs": "suit",     "feet": "suit"},
+    {"id": "f_mix2",     "g": "f", "head": "dress",    "body": "suit",     "legs": "casual",   "feet": "casual"},
+    {"id": "f_mix3",     "g": "f", "head": "suit",     "body": "punk",     "legs": "explorer", "feet": "explorer"},
+    {"id": "f_mix4",     "g": "f", "head": "punk",     "body": "casual",   "legs": "punk",     "feet": "dress"},
+    {"id": "f_mix5",     "g": "f", "head": "casual",   "body": "explorer", "legs": "casual",   "feet": "worker"},
+    {"id": "f_mix6",     "g": "f", "head": "worker",   "body": "dress",    "legs": "dress",    "feet": "casual"},
+    {"id": "s_m_polo",   "g": "m", "staff": true, "faceless": true, "head": "casual",   "body": "casual",   "legs": "business", "feet": "business",
+     "uniform": {"body": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+    {"id": "s_m_sweater","g": "m", "staff": true, "faceless": true, "head": "hoodie",   "body": "hoodie",   "legs": "casual",   "feet": "hiker",
+     "uniform": {"body": [0.21, 0.22, 0.24], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+    {"id": "s_m_jacket", "g": "m", "staff": true, "faceless": true, "head": "business", "body": "business", "legs": "business", "feet": "business",
+     "uniform": {"body": [0.21, 0.22, 0.24], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+    {"id": "s_m_vest",   "g": "m", "staff": true, "faceless": true, "head": "hiker",    "body": "worker",   "legs": "hiker",    "feet": "worker",
+     "uniform": {"body": [0.24, 0.25, 0.27], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+    {"id": "s_f_polo",   "g": "f", "staff": true, "faceless": true, "head": "casual",   "body": "casual",   "legs": "suit",     "feet": "suit",
+     "uniform": {"body": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+    {"id": "s_f_blazer", "g": "f", "staff": true, "faceless": true, "head": "suit",     "body": "suit",     "legs": "suit",     "feet": "casual",
+     "uniform": {"body": [0.3, 0.31, 0.33], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+    {"id": "s_f_polo2",  "g": "f", "staff": true, "faceless": true, "head": "explorer", "body": "casual",   "legs": "casual",   "feet": "worker",
+     "uniform": {"body": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}},
+    {"id": "s_f_cardigan","g": "f", "staff": true, "faceless": true, "head": "dress",   "body": "suit",     "legs": "suit",     "feet": "suit",
+     "uniform": {"body": [0.17, 0.18, 0.2], "accent": [0.12, 0.56, 0.86], "legs": [0.08, 0.08, 0.09], "feet": [0.06, 0.06, 0.07]}}
+
+  ]
+}

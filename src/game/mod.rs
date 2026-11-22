@@ -1,0 +1,732 @@
+//! Ein Run: Einkaufen, Kippen, Kunden, Mitarbeiter, Kasse, Ausgang.
+
+mod cheats;
+mod checkout;
+mod crowd;
+mod draws;
+mod tension;
+pub use cheats::CHEATS;
+pub mod dialog;
+pub mod escalation;
+mod hands;
+mod mirage;
+pub mod npc;
+pub mod tutorial;
+
+use crate::assets::{half_extent_idx, MeshId};
+use crate::audio::Sfx;
+use crate::catalog::{catalog, misspell};
+use crate::render::MeshDraw;
+use crate::world::{self, World, WorldParams};
+use dialog::{verdict, DialogState, Verdict, ANSWER_TIME, QUESTIONS};
+use escalation::{tier_for_value, Tier};
+use glam::{vec3, Mat4, Quat, Vec3, Vec4};
+use npc::{Customer, EmpState, Employee, Pose, Shopper};
+use rand::seq::SliceRandom;
+use rand::{Rng, SeedableRng};
+use rand_pcg::Pcg64;
+
+pub const EYE_HEIGHT: f32 = 1.62;
+const PLAYER_RADIUS: f32 = 0.3;
+const WALK_SPEED: f32 = 1.5;
+const RUN_SPEED: f32 = 3.2;
+const BASE_SENSITIVITY: f32 = 0.0022;
+const REACH: f32 = 2.3;
+const CATCH_DIST: f32 = 0.8;
+const SCAN_TIME: f32 = 0.9;
+
+#[derive(Default, Clone, Copy)]
+pub struct Input {
+    pub forward: bool,
+    pub back: bool,
+    pub left: bool,
+    pub right: bool,
+    pub run: bool,
+    /// Einkaufszettel wird gerade angezeigt (fuer das Tutorial)
+    pub list_open: bool,
+    /// Flanken (werden in update() verbraucht)
+    pub interact: bool,
+    pub cart_toggle: bool,
+    pub take_out: bool,
+    pub choice: Option<usize>,
+}
+
+pub struct Player {
+    pub pos: Vec3,
+    pub vel: Vec3,
+    pub yaw: f32,
+    pub pitch: f32,
+    bob_phase: f32,
+    step_acc: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PickupKind {
+    /// Ware aus dem Katalog; `fake` = falsch beschriftete Anomalie
+    Product { product: usize, fake: bool },
+    /// Tomatensaft eines Kunden
+    Tomato { customer: usize },
+}
+
+/// Eine konkrete Ware (in der Hand, am Boden oder im Wagen).
+#[derive(Clone, Debug)]
+pub struct ItemData {
+    pub name: String,
+    pub cents: i64,
+    pub kind: PickupKind,
+    /// globaler Modell-Index
+    pub mesh: usize,
+    pub tint: Vec3,
+}
+
+impl ItemData {
+    pub fn half(&self) -> Vec3 {
+        half_extent_idx(self.mesh)
+    }
+
+    /// Aus einer Ware im Laden.
+    pub fn from_shelf(it: &world::ShelfItem) -> Self {
+        let p = &catalog().products[it.product as usize];
+        if it.fake {
+            let seed = (it.pos.x * 31.0 + it.pos.z * 17.0) as u64;
+            ItemData {
+                name: misspell(&p.name, seed),
+                cents: fake_price(seed as u32),
+                kind: PickupKind::Product {
+                    product: it.product as usize,
+                    fake: true,
+                },
+                mesh: p.mesh,
+                tint: p.tint * vec3(0.7, 1.05, 0.85),
+            }
+        } else {
+            ItemData {
+                name: p.name.clone(),
+                cents: p.cents as i64,
+                kind: PickupKind::Product {
+                    product: it.product as usize,
+                    fake: false,
+                },
+                mesh: p.mesh,
+                tint: p.tint,
+            }
+        }
+    }
+
+    /// Zettel-Eintrag, den diese Ware erfuellt (falsche Ware zaehlt nicht).
+    pub fn list_entry(&self) -> Option<usize> {
+        match self.kind {
+            PickupKind::Product {
+                product,
+                fake: false,
+            } => catalog().products[product].list,
+            _ => None,
+        }
+    }
+}
+
+/// Unsinnige Preise fuer falsch beschriftete Ware (Anomalie).
+pub fn fake_price(seed: u32) -> i64 {
+    const P: [i64; 6] = [0, -100, 99_999, 1, 666, 4];
+    P[(seed as usize) % P.len()]
+}
+
+pub type CartItem = ItemData;
+
+/// Sonderware ausserhalb der Regale (der Tomatensaft der Kunden).
+pub struct Pickup {
+    pub data: ItemData,
+    pub pos: Vec3,
+    pub taken: bool,
+}
+
+/// Eine fallen gelassene Ware.
+pub struct Loose {
+    pub data: ItemData,
+    pub pos: Vec3,
+    pub vel: Vec3,
+    pub yaw: f32,
+}
+
+/// Der Einkaufswagen als Objekt in der Welt.
+pub struct Trolley {
+    pub pos: Vec3,
+    pub yaw: f32,
+    pub pushing: bool,
+}
+
+/// Worauf man gerade schaut.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Focus {
+    /// Ware im Regal (Index in world.items)
+    Shelf(usize),
+    Pickup(usize),
+    Loose(usize),
+    Cart,
+    /// Kassenband der offenen Kasse
+    Belt,
+    /// Kartenterminal der offenen Kasse
+    Terminal,
+    /// Mitarbeiter, der gerade den eigenen Wagen wegschiebt
+    Employee(usize),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    Running,
+    Won,
+    Caught,
+}
+
+pub use checkout::BeltItem;
+
+pub struct Game {
+    pub seed: u64,
+    pub params: WorldParams,
+    pub world: World,
+    pub player: Player,
+    pub time: f32,
+    pub run_time: f32,
+    pub glitch: f32,
+    pub red: f32,
+    pub tipped: bool,
+
+    pub list: Vec<usize>,
+    pub pickups: Vec<Pickup>,
+    /// Inhalt des Einkaufswagens
+    pub cart: Vec<CartItem>,
+    pub trolley: Trolley,
+    pub held: Option<ItemData>,
+    pub loose: Vec<Loose>,
+    pub tutorial: Option<tutorial::Tutorial>,
+    pub suspicion: f32,
+    /// Cheat: Kunden koennen einen nicht erwischen
+    pub god: bool,
+    /// Schonfrist nach einem Gespraech
+    pub grace: f32,
+    pub holograms: Vec<mirage::Hologram>,
+    mirage_timer: f32,
+    tipped_time: f32,
+    squeak_acc: f32,
+    cart_stuck: f32,
+    squeak_hinted: bool,
+    pub tier: Tier,
+    pub customers: Vec<Customer>,
+    pub employees: Vec<Employee>,
+    pub shoppers: Vec<Shopper>,
+    pub dialog: Option<DialogState>,
+    /// Ware auf dem Kassenband (vorne = Index 0) und bereits gescannte Ware
+    pub belt: Vec<BeltItem>,
+    pub scanned: Vec<ItemData>,
+    /// Wagen wird gerade aufs Band ausgeraeumt
+    pub unloading: bool,
+    unload_timer: f32,
+    scan_timer: f32,
+    pub paid: bool,
+    pub outcome: Outcome,
+    pub outcome_timer: f32,
+    pub catcher: Option<Vec3>,
+    pub message: Option<(String, f32)>,
+    pub announcement: Option<(String, f32)>,
+    pub focus: Option<Focus>,
+    /// Zeigt der Blick auf den Wagen (Ablegen moeglich)?
+    pub aim_cart: bool,
+    pub at_register: bool,
+    pub sfx: Vec<(Sfx, f32)>,
+    pub sensitivity: f32,
+    pub fov_deg: f32,
+    pub aspect: f32,
+    rng: Pcg64,
+
+    player_field: Vec<u16>,
+    field_timer: f32,
+    next_announce: f32,
+    collapse_timer: f32,
+    stare_timer: f32,
+    msg_cooldown: f32,
+    /// Wie stark man sich in letzter Zeit umgedreht hat (fuer "wenn man nicht hinsieht")
+    turn_acc: f32,
+    was_in_drinks: bool,
+    world_dirty: bool,
+    statics_dirty: bool,
+}
+
+/// Kunden im gekippten Markt: leicht fahl, die Kleidung bleibt erkennbar
+const CUSTOMER_TINTS: [Vec3; 6] = [
+    Vec3::new(0.92, 0.9, 0.86),
+    Vec3::new(0.85, 0.88, 0.9),
+    Vec3::new(0.9, 0.86, 0.86),
+    Vec3::new(0.86, 0.9, 0.84),
+    Vec3::new(0.95, 0.94, 0.9),
+    Vec3::new(0.82, 0.82, 0.86),
+];
+
+/// Normale Kundschaft: Originalfarben
+const SHOPPER_TINTS: [Vec3; 6] = [
+    Vec3::new(1.0, 1.0, 1.0),
+    Vec3::new(0.97, 0.98, 1.0),
+    Vec3::new(1.0, 0.98, 0.96),
+    Vec3::new(0.98, 1.0, 0.98),
+    Vec3::new(1.0, 1.0, 0.97),
+    Vec3::new(0.97, 0.97, 0.97),
+];
+
+pub const ANNOUNCEMENTS: &[&str] = &[
+    "Kunde Nummer 0, bitte zur Kasse 0.",
+    "Liebe Kunden, heute im Angebot: Tomatensaft.",
+    "Bitte lassen Sie Ihren Einkaufswagen nicht unbeaufsichtigt.",
+    "Der Markt schließt in Kürze. Der Markt schließt nicht.",
+    "Wir wünschen Ihnen einen angenehmen Einkauf. Bitte bleiben Sie.",
+    "Ein Mitarbeiter bitte in Gang 0.",
+    "Bitte schauen Sie nicht weg.",
+    "Kasse 0 ist jetzt für Sie geöffnet.",
+];
+
+impl Game {
+    pub fn new(seed: u64) -> Self {
+        let cat = catalog();
+        let mut rng = Pcg64::seed_from_u64(seed ^ 0x5EED_0F_CAFE);
+
+        // Einkaufszettel: Wasser + 4..6 weitere Dinge
+        let water = cat
+            .list_index("Mineralwasser")
+            .expect("Mineralwasser fehlt im Katalog");
+        let mut others: Vec<usize> = (0..cat.list.len()).filter(|&l| l != water).collect();
+        others.shuffle(&mut rng);
+        let n = rng.gen_range(4..=6);
+        let mut list = vec![water];
+        list.extend_from_slice(&others[..n]);
+
+        let mut params = WorldParams::normal(seed);
+        params.open_lane = rng.gen_range(0..4);
+        let world = world::generate(&params);
+
+        // leicht nach unten schauen, damit man den Wagen sieht
+        let player = Player {
+            pos: world.spawn,
+            vel: Vec3::ZERO,
+            yaw: world.spawn_yaw,
+            pitch: -0.32,
+            bob_phase: 0.0,
+            step_acc: 0.0,
+        };
+        let trolley = Trolley {
+            pos: world.spawn + vec3(0.0, 0.0, -hands::CART_OFFSET),
+            yaw: world.spawn_yaw,
+            pushing: true,
+        };
+        let mut g = Self {
+            seed,
+            params,
+            world,
+            player,
+            time: 0.0,
+            run_time: 0.0,
+            glitch: 0.6,
+            red: 0.0,
+            tipped: false,
+            list,
+            pickups: Vec::new(),
+            cart: Vec::new(),
+            trolley,
+            held: None,
+            loose: Vec::new(),
+            tutorial: None,
+            suspicion: 0.0,
+            god: false,
+            grace: 0.0,
+            holograms: Vec::new(),
+            mirage_timer: 12.0,
+            tipped_time: 0.0,
+            squeak_acc: 0.0,
+            cart_stuck: 0.0,
+            squeak_hinted: false,
+            tier: Tier::Calm,
+            customers: Vec::new(),
+            employees: Vec::new(),
+            shoppers: Vec::new(),
+            dialog: None,
+            belt: Vec::new(),
+            scanned: Vec::new(),
+            unloading: false,
+            unload_timer: 0.0,
+            scan_timer: 0.0,
+            paid: false,
+            outcome: Outcome::Running,
+            outcome_timer: 0.0,
+            catcher: None,
+            message: Some((
+                "Erst das Wasser holen. Getränke: hinten rechts.".into(),
+                7.0,
+            )),
+            announcement: None,
+            focus: None,
+            aim_cart: false,
+            at_register: false,
+            sfx: Vec::new(),
+            sensitivity: 1.0,
+            fov_deg: 70.0,
+            aspect: 16.0 / 9.0,
+            rng,
+            player_field: Vec::new(),
+            field_timer: 0.0,
+            next_announce: 0.0,
+            collapse_timer: 0.0,
+            stare_timer: 0.0,
+            msg_cooldown: 0.0,
+            turn_acc: 0.0,
+            was_in_drinks: false,
+            world_dirty: true,
+            statics_dirty: true,
+        };
+        g.spawn_shoppers();
+        g
+    }
+
+    /// Zettel-Eintrag "Mineralwasser"
+    pub fn water_entry(&self) -> usize {
+        self.list[0]
+    }
+
+    pub fn take_world_dirty(&mut self) -> bool {
+        std::mem::take(&mut self.world_dirty)
+    }
+
+    /// Ware im Laden hat sich geaendert (genommen oder Weltwechsel): Instanzen neu hochladen.
+    pub fn take_statics_dirty(&mut self) -> bool {
+        std::mem::take(&mut self.statics_dirty)
+    }
+
+    fn say(&mut self, text: impl Into<String>, secs: f32) {
+        self.message = Some((text.into(), secs));
+    }
+
+    /// Hinweis, der nicht dauernd wiederholt wird.
+    fn hint(&mut self, text: &str) {
+        if self.msg_cooldown <= 0.0 {
+            self.say(text, 3.0);
+            self.msg_cooldown = 6.0;
+        }
+    }
+
+    fn play(&mut self, s: Sfx, vol: f32) {
+        self.sfx.push((s, vol));
+    }
+
+    // ------------------------------------------------------------------ Welt
+
+    fn rebuild_world(&mut self) {
+        let new = world::generate(&self.params);
+        let old = std::mem::replace(&mut self.world, new);
+        let w = &self.world;
+        self.player.pos = w.collide(w.remap_from(&old, self.player.pos), PLAYER_RADIUS);
+        for c in &mut self.customers {
+            c.pos = w.collide(w.remap_from(&old, c.pos), 0.25);
+            c.home = w.remap_from(&old, c.home);
+        }
+        for e in &mut self.employees {
+            e.pos = w.collide(w.remap_from(&old, e.pos), 0.25);
+            e.retarget = 0.0;
+        }
+        for p in &mut self.pickups {
+            p.pos = w.remap_from(&old, p.pos);
+        }
+        for l in &mut self.loose {
+            l.pos = w.remap_from(&old, l.pos);
+        }
+        self.trolley.pos = w.collide(w.remap_from(&old, self.trolley.pos), 0.3);
+        self.field_timer = 0.0;
+        self.world_dirty = true;
+        self.statics_dirty = true;
+    }
+
+    /// Debug/Story: Markt kippen.
+    pub fn tip(&mut self) {
+        if self.tipped {
+            return;
+        }
+        self.tipped = true;
+        self.shoppers.clear();
+        self.tutorial = None; // ab hier ist man auf sich allein gestellt
+        self.params.tipped = true;
+        self.apply_tier_params();
+        self.rebuild_world();
+        self.was_in_drinks = self.world.drinks_zone.contains_xz(self.player.pos);
+        self.glitch = 1.0;
+        self.play(Sfx::Sting, 0.6);
+        self.next_announce = 10.0;
+        // Was man im normalen Markt eingepackt hat, ist weg - nur das Wasser bleibt
+        let water = self.water_entry();
+        let before = self.cart.len();
+        self.cart.retain(|c| c.list_entry() == Some(water));
+        if self
+            .held
+            .as_ref()
+            .is_some_and(|h| h.list_entry() != Some(water))
+        {
+            self.held = None;
+        }
+        self.spawn_customers(self.tier.customers());
+        self.spawn_employees(self.tier.employees());
+        if self.cart.len() < before {
+            self.say(
+                "Irgendwas ist anders. Dein Wagen ist leer - nur das Wasser ist noch da.",
+                5.0,
+            );
+        } else {
+            self.say("Irgendwas ist anders.", 4.0);
+        }
+        self.check_tier();
+    }
+
+    fn apply_tier_params(&mut self) {
+        self.params.stretch = self.tier.stretch();
+        self.params.darkness = self.tier.darkness();
+        self.params.warp = self.tier.warp();
+        self.params.walls = self.tier.walls();
+        self.params.mix = self.tier.mix();
+    }
+
+    pub fn cart_value(&self) -> i64 {
+        self.bought().map(|c| c.cents).sum::<i64>().max(0)
+    }
+
+    pub fn list_done(&self, item: usize) -> bool {
+        self.bought().any(|c| c.list_entry() == Some(item))
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn list_complete(&self) -> bool {
+        self.list.iter().all(|&i| self.list_done(i))
+    }
+
+    fn check_tier(&mut self) {
+        if !self.tipped {
+            return;
+        }
+        let new = tier_for_value(self.cart_value() as u32);
+        if new <= self.tier {
+            return;
+        }
+        let old = self.tier;
+        self.tier = new;
+        self.apply_tier_params();
+        self.rebuild_world();
+        self.glitch = 0.8;
+        self.play(Sfx::Sting, 0.35);
+        let extra_c = new.customers().saturating_sub(old.customers());
+        let extra_e = new.employees().saturating_sub(old.employees());
+        self.spawn_customers(extra_c);
+        self.spawn_employees(extra_e);
+        let msg = match new {
+            Tier::Uneasy => "Die Gänge sind länger geworden.",
+            Tier::Wrong => "Es wird dunkler. Sie werden schneller.",
+            Tier::Collapse => "Der Markt hält das nicht mehr aus.",
+            Tier::Calm => "",
+        };
+        self.say(msg, 4.0);
+        let (a, b) = new.announce_interval();
+        self.next_announce = self.next_announce.min(self.rng.gen_range(a..b) * 0.3);
+    }
+
+    /// Fuer Tests/Cheats: je offenem Zettelpunkt die billige Variante direkt in den Wagen.
+    pub fn fill_list_cheap(&mut self) {
+        let cat = catalog();
+        for &l in &self.list.clone() {
+            if self.list_done(l) {
+                continue;
+            }
+            let p = cat.list[l].cheap[0];
+            let prod = &cat.products[p];
+            self.cart.push(ItemData {
+                name: prod.name.clone(),
+                cents: prod.cents as i64,
+                kind: PickupKind::Product {
+                    product: p,
+                    fake: false,
+                },
+                mesh: prod.mesh,
+                tint: prod.tint,
+            });
+        }
+        self.check_tier();
+    }
+
+    /// Fuer Tests/Screenshots: alles Billige einpacken, bezahlen, vor die Tuer stellen.
+    pub fn debug_finish_shopping(&mut self) {
+        self.fill_list_cheap();
+        self.scanned.append(&mut self.cart);
+        self.customers.clear();
+        self.employees.clear();
+        self.paid = true;
+        self.params.door_open = true;
+        self.rebuild_world();
+        self.player.pos = self.world.door_center + vec3(0.0, 0.0, 2.0);
+    }
+
+    // ---------------------------------------------------------------- Sicht
+
+    pub fn eye(&self) -> Vec3 {
+        let p = &self.player;
+        let bob = p.bob_phase.sin() * 0.025 * (p.vel.length() / WALK_SPEED).min(1.0);
+        p.pos + vec3(0.0, EYE_HEIGHT + bob, 0.0)
+    }
+
+    pub fn view_dir(&self) -> Vec3 {
+        let p = &self.player;
+        vec3(
+            p.pitch.cos() * p.yaw.sin(),
+            p.pitch.sin(),
+            -p.pitch.cos() * p.yaw.cos(),
+        )
+    }
+
+    /// Ist der Punkt im Sichtfeld und nicht verdeckt?
+    pub fn sees(&self, target: Vec3) -> bool {
+        let eye = self.eye();
+        let to = target - eye;
+        let dist = to.length();
+        if dist < 0.3 {
+            return true;
+        }
+        let half_v = self.fov_deg.to_radians() * 0.5;
+        let half_h = (half_v.tan() * self.aspect).atan();
+        let fwd = self.view_dir();
+        let flat_f = vec3(fwd.x, 0.0, fwd.z).normalize_or_zero();
+        let flat_t = vec3(to.x, 0.0, to.z).normalize_or_zero();
+        let h_angle = flat_f.dot(flat_t).clamp(-1.0, 1.0).acos();
+        if h_angle > half_h + 0.08 {
+            return false;
+        }
+        let v_angle = (to.y / dist).asin() - self.player.pitch;
+        if v_angle.abs() > half_v + 0.15 {
+            return false;
+        }
+        self.world.line_of_sight(eye, target)
+    }
+
+    pub fn look(&mut self, dx: f32, dy: f32) {
+        if self.dialog.is_some() || self.outcome != Outcome::Running {
+            return;
+        }
+        let s = BASE_SENSITIVITY * self.sensitivity;
+        self.turn_acc += (dx * s).abs();
+        if let Some(t) = &mut self.tutorial {
+            t.looked += (dx * s).abs() + (dy * s).abs();
+        }
+        self.player.yaw += dx * s;
+        self.player.pitch = (self.player.pitch - dy * s).clamp(-1.45, 1.45);
+    }
+
+    pub fn view_proj(&self, aspect: f32) -> Mat4 {
+        let view = Mat4::look_to_rh(self.eye(), self.view_dir(), Vec3::Y);
+        let proj = Mat4::perspective_rh(self.fov_deg.to_radians(), aspect, 0.05, 140.0);
+        proj * view
+    }
+
+    // --------------------------------------------------------------- Update
+
+    pub fn update(&mut self, dt: f32, input: &mut Input) {
+        self.time += dt;
+        self.glitch = (self.glitch - dt * 0.6).max(0.0);
+        self.red = (self.red - dt * 1.5).max(0.0);
+        self.grace = (self.grace - dt).max(0.0);
+        self.msg_cooldown -= dt;
+        if let Some((_, t)) = &mut self.message {
+            *t -= dt;
+            if *t <= 0.0 {
+                self.message = None;
+            }
+        }
+        if let Some((_, t)) = &mut self.announcement {
+            *t -= dt;
+            if *t <= 0.0 {
+                self.announcement = None;
+            }
+        }
+
+        if self.outcome != Outcome::Running {
+            self.outcome_timer += dt;
+            if let Some(c) = self.catcher {
+                // zum Faenger drehen
+                let to = c + vec3(0.0, 1.55, 0.0) - self.eye();
+                let yaw = to.x.atan2(-to.z);
+                self.player.yaw = lerp_angle(self.player.yaw, yaw, (dt * 8.0).min(1.0));
+                self.player.pitch +=
+                    ((to.y / to.length()).asin() - self.player.pitch) * (dt * 8.0).min(1.0);
+            }
+            input.interact = false;
+            input.cart_toggle = false;
+            input.take_out = false;
+            input.choice = None;
+            return;
+        }
+        self.run_time += dt;
+
+        if self.dialog.is_some() {
+            self.update_dialog(dt, input);
+        } else {
+            self.update_movement(dt, input);
+            self.update_focus();
+            if input.interact {
+                self.interact();
+            }
+            if input.cart_toggle {
+                self.toggle_cart();
+            }
+            if input.take_out {
+                self.take_out();
+            }
+        }
+        input.interact = false;
+        input.cart_toggle = false;
+        input.take_out = false;
+        input.choice = None;
+
+        // Tutorial
+        if let Some(t) = &mut self.tutorial {
+            t.listed |= input.list_open;
+            if t.advance(dt, self.held.is_some(), self.cart.len()) {
+                self.tutorial = None;
+                self.say(
+                    "Gut. Jetzt raus aus der Getränkeabteilung und den Rest einkaufen.",
+                    5.0,
+                );
+            }
+        }
+
+        self.update_loose(dt);
+        self.update_mirages(dt);
+        self.update_belt(dt);
+        self.update_npcs(dt, input);
+        self.update_suspicion(dt, input);
+        self.update_events(dt);
+
+        // Die Schwelle: Getraenkeabteilung betreten und wieder verlassen kippt den Markt.
+        let inside = self.world.drinks_zone.contains_xz(self.player.pos);
+        if self.was_in_drinks && !inside && !self.tipped {
+            self.tip();
+        }
+        self.was_in_drinks = inside;
+
+        // Gewonnen: bezahlt und draussen
+        if self.paid && self.player.pos.z > self.world.exit_z {
+            self.outcome = Outcome::Won;
+            self.outcome_timer = 0.0;
+            self.play(Sfx::Chime, 0.6);
+        }
+    }
+}
+
+fn lerp_angle(a: f32, b: f32, t: f32) -> f32 {
+    let mut d = (b - a) % std::f32::consts::TAU;
+    if d > std::f32::consts::PI {
+        d -= std::f32::consts::TAU;
+    } else if d < -std::f32::consts::PI {
+        d += std::f32::consts::TAU;
+    }
+    a + d * t
+}
+
+#[cfg(test)]
+mod tests;

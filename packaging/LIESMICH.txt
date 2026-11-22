@@ -1,0 +1,34 @@
+KASSE 0
+=======
+Liminaler Supermarkt-Horror auf VHS. Du willst nur kurz bei KAUF NULL einkaufen.
+Du gehst in die Getränkeabteilung, kommst wieder heraus, und auf einmal ist alles komisch.
+
+STARTEN
+  KASSE0.exe doppelklicken. Keine Installation nötig.
+  Voraussetzungen: Windows 10/11 (64 Bit) und eine Grafikkarte mit Vulkan-Treiber
+  (jede halbwegs aktuelle NVIDIA-, AMD- oder Intel-Grafik mit aktuellem Treiber).
+  Windows SmartScreen warnt eventuell, weil die Datei nicht signiert ist:
+  "Weitere Informationen" -> "Trotzdem ausführen".
+
+SO SPIELST DU
+  1. Hol das Mineralwasser aus der Getränkeabteilung (hinten rechts, "Getränke & Pfand").
+  2. Danach ist der Markt gekippt. Arbeite den Einkaufszettel ab (TAB halten).
+  3. Je teurer dein Einkauf, desto schlimmer wird es. Billige Ware liegt ganz oben oder unten.
+  4. Die Kunden bewegen sich nur, wenn du wegsiehst. Nicht anrempeln, nicht anstarren,
+     nicht rennen und ihnen nicht ihren Tomatensaft wegnehmen.
+  5. Die gesichtslosen Mitarbeiter sprechen dich an: unauffällig antworten (1, 2, 3).
+  6. An der offenen Kasse den Wagen aufs Band räumen (E aufs Band), warten, bis
+     alles gescannt ist, am Kartenterminal bezahlen (E) und raus durch die Tür.
+
+STEUERUNG
+  WASD               Gehen            Shift   Rennen (fällt auf!)
+  Maus               Umsehen          TAB     Einkaufszettel
+  E / Linksklick     Ware greifen, in den Wagen / aufs Band legen, bezahlen
+  Q                  Wagen stehen lassen / schieben
+  F                  Ware wieder aus dem Wagen nehmen
+  1 / 2 / 3          Antwort im Gespräch
+  Esc                Pause            F12     Screenshot (Ordner "Bilder")
+
+Einstellungen werden unter %APPDATA%\kasse0\settings.txt gespeichert.
+
+Modelle, Schrift und Lizenzen: siehe Credits.md und den Ordner Lizenzen.

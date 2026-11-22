@@ -1,0 +1,127 @@
+# KASSE 0
+
+Liminaler Supermarkt-Horror auf VHS. Du willst nur kurz bei **KAUF NULL** einkaufen, einem ganz normalen Discounter. Du gehst in die Getränkeabteilung, kommst wieder heraus, und auf einmal ist alles komisch.
+
+Eigene Engine in Rust mit Vulkan-Renderer (ash, winit). Die Shader sind in WGSL geschrieben und werden beim Bauen per naga zu SPIR-V kompiliert. Ein Vulkan SDK ist nicht nötig. Alle Sounds werden beim Start synthetisiert.
+
+- Design: [docs/game-design.md](docs/game-design.md)
+- Credits und Lizenzen der Modelle: [CREDITS.md](CREDITS.md)
+
+## Starten
+```powershell
+cargo run --release            # Hauptmenü, zufälliges Band (Seed)
+cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #1994
+```
+
+## So spielst du
+1. Hol das **Wasser** aus der Getränkeabteilung (hinten rechts, blaues Schild "Getränke & Pfand").
+2. Wenn du sie verlässt, ist der Markt **gekippt**. Arbeite den Einkaufszettel ab (**TAB**).
+3. Jeder Artikel existiert **billig** (schwer erreichbar, unten oder oben, tief im Gang) und **teuer** (gut sichtbar). Der **Warenwert** im Wagen bestimmt, wie schlimm es wird (ab 10 €, 25 € und 50 €).
+4. Falsch beschriftete Ware ("Mlich", unsinnige Preise) gehört nicht auf den Zettel.
+5. Die **Kunden** bewegen sich nur, wenn du nicht hinsiehst. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
+6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
+7. Geh zur **geöffneten Kasse** (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und räum ihn mit **E aufs Band** (oder leg einzelne Ware aus der Hand aufs Band). Die Kassiererin scannt Stück für Stück, falsche Ware sortiert sie als "ARTIKEL UNBEKANNT" aus. Bezahl mit **E am Kartenterminal** und verlass den Laden durch die Tür.
+
+Deine Auffälligkeit siehst du nicht als Balken, sondern an Bandstörungen im Bild.
+
+## Steuerung
+| Taste | Aktion |
+|---|---|
+| WASD / Pfeile | Gehen |
+| Shift | Rennen (fällt auf!) |
+| Maus | Umsehen |
+| E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: Wagen ausräumen; am Kartenterminal: bezahlen |
+| Q (oder E auf den Wagen) | Wagen stehen lassen / wieder schieben |
+| F (am Wagen) | Letzte Ware wieder herausnehmen |
+| TAB (halten) | Einkaufszettel und Warenwert |
+| 1 / 2 / 3 | Antwort im Gespräch |
+| Esc / P | Pause (mit Tastenübersicht) |
+| F1 | Cheat-Menü zum Testen (u. a. "Mitarbeiter nimmt deinen Wagen mit") |
+| F12 | Screenshot (Ordner *Bilder*) |
+
+Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Abschalten kannst du es in den Optionen. Zum Ausräumen aufs Band muss der Wagen an der Kasse stehen. Unterwegs kannst du ihn aber parken und Waren zu Fuß holen.
+
+### Der Wagen
+- **Er quietscht.** Im gekippten Markt hören Mitarbeiter in der Nähe das Rad und kommen nachsehen. Wer schleichen will, lässt ihn stehen.
+- **Er passt nicht überall durch.** Die Gänge verbiegen sich, und zwischen versetzten Regalen öffnen sich schmale Durchgänge. Zu Fuß kommst du durch, mit dem Wagen nicht.
+- **Mitarbeiter räumen auf.** Ein unbeaufsichtigter Wagen wird zur **Wagenbox am Eingang** geschoben, eine Durchsage verrät es. Erwischst du ihn dabei: E, und du sagst *"Hey, das ist mein Wagen!"*. Danach folgt ein kurzes Gespräch, und er lässt ihn los.
+- **Zum Ausräumen aufs Band** muss der Wagen an der Kasse stehen.
+
+### Der Markt
+- Aufgebaut wie ein deutscher Discounter: Obst & Gemüse am Eingang (Stufenregal und Insel), durchgehende Kühlwand mit Kopfschildern, eine Reihe niedriger Kühltruhen (man sieht darüber hinweg), Regalgänge mit Ware in Kartons, Gitterboxen mit roten "AKTION"-Schildern, dunkelblaue Banderole mit Sprüchen.
+- **Jede Ware im Regal ist ein echtes Modell** (rund 125 Produkte in 19 Unterabteilungen) und lässt sich einzeln greifen. Gelbe Preisleisten, echte Preise.
+- Sortiert ist logisch nach Warengruppen. Mit steigender Eskalation verschieben sich die Abteilungen: erst tauschen Unterabteilungen (Fisch ↔ Käse), dann wandern ganze Abteilungen in fremde Einrichtungen, am Ende steht Ware wild durcheinander und **die Schilder lügen**.
+- Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
+
+### Gespräche
+- Während eines Gesprächs (und 2,5 s danach) können dich die Kunden nicht erwischen.
+- Rennst du an einem Mitarbeiter vorbei, kann er dich nicht ansprechen. Das fällt aber auf (+20 %), und er folgt dir.
+
+### Der Markt verändert sich
+Je teurer dein Einkauf, desto mehr verändert sich der Markt:
+- Die Gänge werden länger.
+- Röhren wechseln zufällig ihr Flacker-Muster: Stroboskop, Pulsieren, fast aus, Unterspannung.
+- Die Gänge biegen sich zu echten S-Kurven, die Regale folgen dem Bogen. Mittendrin öffnen sich Durchgänge, wo vorher keine waren, und es stehen Wände, wo vorher keine standen.
+- Werbeposter verrotten immer weiter.
+- Fata Morganen tauchen auf: Hologramme einer fröhlichen Kundin, eines winkenden Kassierers, eines Ausgangsschilds. Kommst du näher, verschwinden sie.
+
+Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen).
+
+In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
+
+## Optionen
+Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert.
+
+## Entwicklung
+```powershell
+cargo test                     # Generator, Gameplay-Regeln, UI, Audio, Assets
+```
+
+Frame-Zeit messen: `$env:KASSE0_PERF = 1` setzen, dann schreibt das Spiel alle 5 s die mittlere Frame-Zeit auf die Konsole (auch im Auto-Screenshot-Durchlauf).
+
+Mit dem Auto-Screenshot-Durchlauf rendert das Spiel automatisch alle Screens (Titel, Markt, gekippt, Dialog, Pause, Optionen, Game Over, Kassenbon …) als BMP in einen Ordner und beendet sich dann:
+
+```powershell
+$env:KASSE0_AUTOSHOT = "$PWD\shots"; cargo run --release -- 1994
+```
+
+Das Cheat-Menü (**F1**) kippt den Markt, füllt den Zettel, erhöht den Warenwert, teleportiert, ruft Mitarbeiter usw. Für Validation-Layer im Debug-Build das LunarG Vulkan SDK installieren.
+
+### Modelle neu konvertieren
+Waren (Katalog `tools/catalog.json`, Quell-Packs in `assets_src/packs`):
+```powershell
+D:AppsBlenderlender.exe -b --factory-startup -P tools/prepare_products.py -- .
+```
+Kundschaft und Personal (Varianten in `tools/people.json`, Quelle `assets_src/packs/quaternius_modular_people`):
+```powershell
+D:AppsBlenderlender.exe -b --factory-startup -P tools/prepare_people.py -- .
+```
+Figuren und Requisiten (Quaternius-Mannequins, Poly-Haven-Modelle; mit `$env:KASSE0_ONLY = "cashier,chair"` nur einzelne):
+Die Quell-Modelle liegen in `assets_src/downloads` (Web-Downloads) bzw. auf `F:\Dev\_work\source-assets\quaternius`. Das Skript reduziert die Polygone, friert die Posen ein und ersetzt Texturen durch Durchschnittsfarben:
+```powershell
+D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_assets.py -- F:\Dev\_work\source-assets\quaternius assets_src\downloads assets
+```
+
+## Aufbau
+| Pfad | Inhalt |
+|---|---|
+| `src/render/` | Vulkan: Kontext, Swapchain, Pipelines (Boxen, Meshes, UI, VHS-Post), Screenshots |
+| `src/world/` | Seedbarer Markt-Generator (`gen.rs`, Einrichtungen in `gen/fixtures.rs`), Abteilungs-Layout (`layout.rs`), Kollision, Sichtlinien, Navigationsraster |
+| `src/catalog.rs`, `tools/catalog.json` | Warenkatalog: Unterabteilungen, Modelle, Preise, Zettel-Einträge |
+| `src/signs.rs` | Schild-Atlas: alle Schriftzüge (Archivo Black) werden beim Start gerendert |
+| `src/game/` | Run-Logik, Hände und Wagen (`hands.rs`), Kasse mit Band (`checkout.rs`), NPCs (`crowd.rs`), Dialoge und Ereignisse (`tension.rs`), Eskalation |
+| `src/people.rs`, `shaders/skin.wgsl` | Animierte Figuren: Knochen-Gewichte, Animationen abtasten, Skinning |
+| `src/hud.rs`, `src/ui.rs` | Menüs, HUD, Bitmap-Text |
+| `src/audio.rs` | Synthetisierte Musik und Effekte (rodio) |
+| `shaders/` | WGSL (`_common.wgsl` wird per `#include` eingebunden) |
+| `assets/` | Konvertierte Modelle (`.k0m`, Waren in `assets/products/`) und die Schrift, fest ins Spiel eingebaut |
+
+## Builds und Releases
+GitHub Actions (`.github/workflows/build.yml`) baut bei jedem Push auf `main` und bei Pull Requests: Tests, Release-Build und das Paket (Exe, `LIESMICH.txt`, Credits, Lizenzen) als Artefakt des Laufs.
+
+Ein Release entsteht durch einen Tag:
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
+Danach liegt `KASSE0-v0.2.0.zip` unter *Releases* im Repository. Die Original-Packs (`assets_src/`) sind nicht im Repository; gebaut wird aus den konvertierten Dateien in `assets/`.
