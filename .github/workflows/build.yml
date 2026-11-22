@@ -34,6 +34,8 @@ jobs:
           $dir = "dist/KASSE0"
           New-Item -ItemType Directory -Force "$dir/Lizenzen" | Out-Null
           Copy-Item target/release/kasse0.exe "$dir/KASSE0.exe"
+          # Symbole: Absturzberichte zeigen damit Funktionsnamen und Zeilen
+          Copy-Item target/release/kasse0.pdb "$dir/kasse0.pdb"
           Copy-Item packaging/LIESMICH.txt "$dir/LIESMICH.txt"
           Copy-Item CREDITS.md "$dir/Credits.md"
           Copy-Item assets/fonts/OFL.txt "$dir/Lizenzen/ArchivoBlack-OFL.txt"
