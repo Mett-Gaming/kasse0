@@ -10,6 +10,16 @@ const BROWSE_SPEED: f32 = 0.75;
 const STARE_RANGE: f32 = 16.0;
 /// So viel schneller kommen Verfolger, wenn man rennt
 const RUN_CHASE: f32 = 1.6;
+/// Flankieren: ab dieser Entfernung, so weit vor dem Spieler wird der Weg abgeschnitten
+const FLANK_FROM: f32 = 6.0;
+/// So breit ist der Streifen um den Weg des ersten Verfolgers, den der Flankierer meidet
+const FLANK_WIDTH: f32 = 1.2;
+/// Mindestabstand zwischen Menschen, zum Spieler und zum abgestellten Wagen
+const PERSON_GAP: f32 = 0.55;
+const PLAYER_GAP: f32 = 0.45;
+const CART_GAP: f32 = 0.55;
+/// So lange sieht sich ein Mitarbeiter am Ort eines Geraeuschs um
+const LOOK_AROUND: f32 = 2.5;
 
 impl Game {
     // --------------------------------------------------------------- Spawns
@@ -58,6 +68,7 @@ impl Game {
                 gait: Default::default(),
                 anim: Default::default(),
                 seed: npc::seed_of(pos),
+                brain: Default::default(),
             });
         }
     }
@@ -102,6 +113,7 @@ impl Game {
                 gait: Default::default(),
                 anim: Default::default(),
                 seed: npc::seed_of(s.pos),
+                brain: Default::default(),
                 stare: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
@@ -145,6 +157,7 @@ impl Game {
                 gait: Default::default(),
                 anim: Default::default(),
                 seed: npc::seed_of(pos),
+                brain: Default::default(),
                 stare: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
@@ -184,6 +197,7 @@ impl Game {
             gait: Default::default(),
             anim: Default::default(),
             seed: npc::seed_of(pos),
+            brain: Default::default(),
             stare: 0.0,
             stalker: true,
             target: pos,
@@ -211,9 +225,11 @@ impl Game {
             .chain(self.employees.iter().map(|e| e.pos))
             .chain(self.shoppers.iter().map(|s| s.pos))
             .collect();
+        self.update_senses(dt);
         self.update_shoppers(dt);
         self.update_customers(dt);
         self.update_employees(dt, input);
+        self.separate_people();
         self.keep_npcs_out_of_checkout(&before);
         self.update_whispers(dt);
         // Gangart: Animationszeit an die zurueckgelegte Strecke koppeln (Fuesse rutschen nicht)
@@ -274,8 +290,9 @@ impl Game {
                 if self.shoppers[i].wait > 0.0 {
                     continue;
                 }
-                if let Some(t) = self.far_walkable_cell(0.0) {
-                    let field = npc::bfs(&self.world.nav, t);
+                let from = self.shoppers[i].pos;
+                if let Some((t, field)) = self.reachable_target(from, |g| g.far_walkable_cell(0.0))
+                {
                     let s = &mut self.shoppers[i];
                     s.target = t;
                     s.field = field;
@@ -289,6 +306,9 @@ impl Game {
             if (s.pos - old).length_squared() > 1e-6 {
                 s.yaw = lerp_angle(s.yaw, npc::yaw_towards(old, s.pos), (dt * 6.0).min(1.0));
             }
+            if s.brain.motion.stuck(s.pos, true, dt) {
+                s.field.clear(); // kommt nicht weiter: neues Ziel
+            }
         }
     }
 
@@ -300,6 +320,7 @@ impl Game {
         let chase = self.chasing();
         // Im Gespraech mit einem Mitarbeiter steht die Welt still: kein Kunde rueckt naeher
         let talking = self.dialog.is_some();
+        let flankers = self.flankers();
         for i in 0..self.customers.len() {
             let chest = self.customers[i].pos + vec3(0.0, 1.25, 0.0);
             let head = self.customers[i].pos + vec3(0.0, 1.6, 0.0);
@@ -321,8 +342,18 @@ impl Game {
                 continue;
             }
             // Verfolger kommen naeher, sobald man wegsieht (oder immer, wenn man aufgefallen ist)
-            // Nach dem Alarm rennen alle, ob man hinsieht oder nicht
-            let hunting = c.stalker && (!seen || noticed || chase);
+            // Nach dem Alarm rennen alle, ob man hinsieht oder nicht. Sonst jagen sie nur,
+            // was sie bemerkt haben (senses.rs): den Spieler selbst oder den Ort, an dem sie
+            // ihn zuletzt gesehen oder gehoert haben.
+            let omniscient = noticed || chase;
+            let knows = omniscient || c.brain.memory.is_some();
+            let hunting = c.stalker && (!seen || omniscient) && knows;
+            if c.brain.hunting && !hunting {
+                // Jagd vorbei: nicht zum alten Ziel zurueck, sondern hier weiterbummeln
+                c.field.clear();
+                c.wait = 0.0;
+            }
+            c.brain.hunting = hunting;
             if !hunting {
                 // Wer nicht verfolgt: kauft ein, solange man hinsieht. Sieht man weg, bleibt er
                 // stehen und starrt herueber - dreht man sich um, schauen einen alle an.
@@ -355,15 +386,84 @@ impl Game {
                 speed
             };
             let old = c.pos;
-            c.pos = npc::step_along(&self.world, &self.player_field, c.pos, player, s, dt);
+            let fresh = omniscient || c.brain.fresh();
+            let flank_of = flankers
+                .iter()
+                .find(|f| f.0 == i)
+                .map(|f| f.1)
+                .filter(|_| fresh && !omniscient);
+            let flank = flank_of.is_some();
+            if let Some((to, left)) = c.brain.detour {
+                // Ausweichschritt nach dem Feststecken
+                let d = vec3(to.x - c.pos.x, 0.0, to.z - c.pos.z);
+                if d.length() > 0.05 {
+                    c.pos = self
+                        .world
+                        .collide(c.pos + d.normalize() * (s * dt).min(d.length()), 0.25);
+                }
+                c.brain.detour = (left > dt).then_some((to, left - dt));
+            } else if fresh && !flank {
+                // weiss genau, wo man ist: auf kuerzestem Weg
+                c.pos = npc::step_along(&self.world, &self.player_field, c.pos, player, s, dt);
+            } else {
+                // Flankieren (Zange: anderer Weg als der erste Verfolger) oder zur zuletzt
+                // bemerkten Stelle
+                let goal = if flank {
+                    player
+                } else {
+                    c.brain.memory.unwrap_or(player)
+                };
+                let c = &mut self.customers[i];
+                c.brain.flank_cd -= dt;
+                if c.field.is_empty() || (goal - c.target).length() > 1.0 || c.brain.flank_cd <= 0.0
+                {
+                    c.brain.flank_cd = 0.7;
+                    c.target = goal;
+                    let from = c.pos;
+                    let mut field = std::mem::take(&mut c.field);
+                    let nav = &self.world.nav;
+                    match flank_of {
+                        // der Weg des ersten Verfolgers ist fuer den Flankierer gesperrt
+                        Some(lead) => {
+                            npc::bfs_blocked(nav, goal, &mut field, |x, z| {
+                                let q = nav.center(x, z);
+                                (q - goal).length() > 2.5
+                                    && (q - from).length() > 1.5
+                                    && seg_dist(q, lead, goal) < FLANK_WIDTH
+                            });
+                            if !npc::reachable(nav, &field, from) {
+                                npc::bfs_into(nav, goal, &mut field);
+                            }
+                        }
+                        None => npc::bfs_into(nav, goal, &mut field),
+                    }
+                    self.customers[i].field = field;
+                }
+                let c = &mut self.customers[i];
+                if !fresh && (c.pos - goal).length() < 0.8 {
+                    // dort ist niemand mehr: in der Naehe suchen
+                    let around = c.pos;
+                    if let Some(q) = self.near_walkable_cell(around, 4.0) {
+                        self.customers[i].brain.memory = Some(q);
+                    }
+                } else {
+                    c.pos = npc::step_along(&self.world, &c.field, c.pos, goal, s, dt);
+                }
+            }
+            let c = &mut self.customers[i];
             c.moving = (c.pos - old).length_squared() > 1e-8;
             if c.moving {
-                c.yaw = npc::yaw_towards(old, c.pos);
+                c.yaw = lerp_angle(c.yaw, npc::yaw_towards(old, c.pos), (dt * 10.0).min(1.0));
             }
             c.pose = Pose::Idle;
-            // nach dem Anschleichen nicht zurueck "nach Hause" rennen, sondern hier weiterbummeln
-            c.field.clear();
             c.wait = 0.0;
+            if c.brain.motion.stuck(c.pos, true, dt) && c.brain.detour.is_none() {
+                let around = c.pos;
+                if let Some(q) = self.near_walkable_cell(around, 1.5) {
+                    self.customers[i].brain.detour = Some((q, 0.8));
+                }
+            }
+            let c = &mut self.customers[i];
             let dist = vec3(c.pos.x - player.x, 0.0, c.pos.z - player.z).length();
             // Waehrend eines Gespraechs (und kurz danach) ist man sicher
             // ... und an der Kasse, solange das Kassen-Minispiel laeuft
@@ -373,18 +473,6 @@ impl Game {
                 let (at, variant) = (self.customers[i].pos, self.customers[i].variant);
                 self.caught_by(at, variant);
                 return;
-            }
-        }
-        // Kunden nicht ineinander laufen lassen
-        for i in 0..self.customers.len() {
-            for j in (i + 1)..self.customers.len() {
-                let d = self.customers[j].pos - self.customers[i].pos;
-                let l = vec3(d.x, 0.0, d.z).length();
-                if l < 0.6 && l > 1e-4 {
-                    let push = vec3(d.x, 0.0, d.z) / l * (0.6 - l) * 0.5;
-                    self.customers[i].pos -= push;
-                    self.customers[j].pos += push;
-                }
             }
         }
     }
@@ -412,12 +500,20 @@ impl Game {
             }
             let (pos, home) = (c.pos, c.home);
             let go_home = !at_home && self.rng.gen_bool(0.6);
-            let target = if go_home {
-                home
+            let picked = if go_home {
+                Some(home)
             } else {
-                self.near_walkable_cell(pos, BROWSE_RADIUS).unwrap_or(home)
+                self.near_walkable_cell(pos, BROWSE_RADIUS)
             };
-            let field = npc::bfs(&self.world.nav, target);
+            let (target, field) = match picked {
+                Some(t) => self
+                    .reachable_target(pos, |_| Some(t))
+                    .or_else(|| {
+                        self.reachable_target(pos, |g| g.near_walkable_cell(pos, BROWSE_RADIUS))
+                    })
+                    .unwrap_or((pos, Vec::new())),
+                None => (pos, Vec::new()),
+            };
             let wait = if go_home {
                 self.rng.gen_range(4.0..9.0)
             } else {
@@ -435,11 +531,123 @@ impl Game {
         c.moving = (c.pos - old).length_squared() > 1e-8;
         if c.moving {
             c.yaw = lerp_angle(c.yaw, npc::yaw_towards(old, c.pos), (dt * 6.0).min(1.0));
-        } else {
+        }
+        if !c.moving || c.brain.motion.stuck(c.pos, true, dt) {
             // kommt nicht weiter: neues Ziel suchen
             c.field.clear();
         }
         c.pose = Pose::Idle;
+    }
+
+    /// Ziel suchen, das von `from` aus wirklich zu Fuss erreichbar ist (bis zu 5 Versuche).
+    /// Liefert Ziel und Wegfeld dorthin.
+    fn reachable_target(
+        &mut self,
+        from: Vec3,
+        mut pick: impl FnMut(&mut Self) -> Option<Vec3>,
+    ) -> Option<(Vec3, Vec<u16>)> {
+        for _ in 0..5 {
+            let t = pick(self)?;
+            let field = npc::bfs(&self.world.nav, t);
+            if npc::reachable(&self.world.nav, &field, from) {
+                return Some((t, field));
+            }
+        }
+        None
+    }
+
+    /// Welche jagenden Verfolger flankieren, und wer vor ihnen jagt: nach Entfernung sortiert
+    /// jeder zweite (nie der naechste), und nur, wer weiter als 6 m weg ist.
+    pub(super) fn flankers(&self) -> Vec<(usize, Vec3)> {
+        let player = self.player.pos;
+        let mut hunters: Vec<(f32, usize)> = self
+            .customers
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.stalker && c.brain.fresh())
+            .map(|(i, c)| ((c.pos - player).length(), i))
+            .collect();
+        hunters.sort_by(|a, b| a.0.total_cmp(&b.0));
+        hunters
+            .iter()
+            .enumerate()
+            .filter(|(rank, (d, _))| rank % 2 == 1 && *d > FLANK_FROM)
+            .map(|(rank, (_, i))| (*i, self.customers[hunters[rank - 1].1].pos))
+            .collect()
+    }
+
+    /// Niemand laeuft durch andere hindurch: Kunden, Personal und Kundschaft halten Abstand
+    /// voneinander, zum Spieler und zum abgestellten Wagen. Im Gespraech bleiben Kunden stehen.
+    fn separate_people(&mut self) {
+        let talking = self.dialog.is_some();
+        let player = self.player.pos;
+        let cart = (!self.trolley.pushing).then_some(self.trolley.pos);
+        // (Position, darf geschoben werden); Jaeger draengen sich am Wagen vorbei
+        let mut ps: Vec<(Vec3, bool)> = Vec::new();
+        let mut cart_shy: Vec<bool> = Vec::new();
+        for c in &self.customers {
+            ps.push((c.pos, !talking && c.stare <= 0.0));
+            cart_shy.push(!c.brain.hunting);
+        }
+        for e in &self.employees {
+            ps.push((e.pos, e.state != EmpState::Talking && !e.carrying));
+            cart_shy.push(true);
+        }
+        for s in &self.shoppers {
+            ps.push((s.pos, true));
+            cart_shy.push(true);
+        }
+        let before: Vec<Vec3> = ps.iter().map(|p| p.0).collect();
+        for i in 0..ps.len() {
+            for j in (i + 1)..ps.len() {
+                let d = vec3(ps[j].0.x - ps[i].0.x, 0.0, ps[j].0.z - ps[i].0.z);
+                let l = d.length();
+                if l >= PERSON_GAP || l < 1e-4 {
+                    continue;
+                }
+                let push = d / l * (PERSON_GAP - l);
+                match (ps[i].1, ps[j].1) {
+                    (true, true) => {
+                        ps[i].0 -= push * 0.5;
+                        ps[j].0 += push * 0.5;
+                    }
+                    (true, false) => ps[i].0 -= push,
+                    (false, true) => ps[j].0 += push,
+                    _ => {}
+                }
+            }
+        }
+        for (p, shy) in ps.iter_mut().zip(&cart_shy).filter(|(p, _)| p.1) {
+            for (o, gap) in [
+                (Some(player), PLAYER_GAP),
+                (cart.filter(|_| *shy), CART_GAP),
+            ] {
+                let Some(o) = o else { continue };
+                let d = vec3(p.0.x - o.x, 0.0, p.0.z - o.z);
+                let l = d.length();
+                if l < gap && l > 1e-4 {
+                    p.0 += d / l * (gap - l);
+                }
+            }
+        }
+        let mut k = 0;
+        let world = &self.world;
+        let mut write = |pos: &mut Vec3| {
+            let (new, movable) = ps[k];
+            if movable && (new - before[k]).length_squared() > 1e-10 {
+                *pos = world.collide(new, 0.25);
+            }
+            k += 1;
+        };
+        for c in &mut self.customers {
+            write(&mut c.pos);
+        }
+        for e in &mut self.employees {
+            write(&mut e.pos);
+        }
+        for s in &mut self.shoppers {
+            write(&mut s.pos);
+        }
     }
 
     /// Zufaelliger begehbarer Platz im Umkreis (fuer den Einkaufsbummel).
@@ -504,6 +712,7 @@ impl Game {
         for i in 0..self.employees.len() {
             let head = self.employees[i].pos + vec3(0.0, 1.7, 0.0);
             let los = self.world.line_of_sight(head, eye);
+            let sees = self.employees[i].brain.sees_player;
             {
                 let e = &mut self.employees[i];
                 e.ignore -= dt;
@@ -514,7 +723,8 @@ impl Game {
                 e.sprint_cd -= dt;
                 if e.state == EmpState::Talking {
                     e.moving = false;
-                    e.yaw = npc::yaw_towards(e.pos, player);
+                    e.yaw =
+                        lerp_angle(e.yaw, npc::yaw_towards(e.pos, player), (dt * 10.0).min(1.0));
                     continue;
                 }
             }
@@ -541,9 +751,47 @@ impl Game {
             }
             let dist = (e.pos - player).length();
             // An der Kasse lassen die Mitarbeiter einen in Ruhe
-            let interested = (e.follow > 0.0 || e.heard > 0.0 || (dist < 7.0 && los))
+            // bemerkt ihn (Sichtkegel, senses.rs) oder folgt ihm nach einer schlechten Antwort
+            let interested = (e.follow > 0.0 || sees) && e.ignore <= 0.0 && !self.till_protects();
+            // hat etwas gehoert: geht nachsehen, wo es war (nicht direkt zum Spieler)
+            let investigating = !interested
                 && e.ignore <= 0.0
-                && !self.till_protects();
+                && !self.till_protects()
+                && e.brain.investigate.is_some();
+            if investigating {
+                let spot = e.brain.investigate.unwrap();
+                let e = &mut self.employees[i];
+                e.state = EmpState::Approach;
+                if (e.pos - spot).length() < 1.0 || e.brain.look_around > 0.0 {
+                    // angekommen: umsehen, dann zurueck zur Streife
+                    e.moving = false;
+                    e.brain.look_around += dt;
+                    e.yaw += dt * 1.4 * (e.brain.look_around * 1.3).sin().signum();
+                    if e.brain.look_around > LOOK_AROUND {
+                        e.brain.investigate = None;
+                        e.brain.look_around = 0.0;
+                        e.field.clear();
+                    }
+                    continue;
+                }
+                if e.field.is_empty() || (e.target - spot).length() > 1.0 {
+                    e.target = spot;
+                    let mut field = std::mem::take(&mut e.field);
+                    npc::bfs_into(&self.world.nav, spot, &mut field);
+                    self.employees[i].field = field;
+                }
+                let e = &mut self.employees[i];
+                let old = e.pos;
+                e.pos = npc::step_along(&self.world, &e.field, e.pos, spot, 1.3, dt);
+                e.moving = (e.pos - old).length_squared() > 1e-8;
+                if e.moving {
+                    e.yaw = lerp_angle(e.yaw, npc::yaw_towards(old, e.pos), (dt * 8.0).min(1.0));
+                }
+                if e.brain.motion.stuck(e.pos, true, dt) {
+                    e.brain.investigate = None;
+                }
+                continue;
+            }
             if interested {
                 let busy = self.checking_out();
                 let e = &mut self.employees[i];
@@ -552,7 +800,7 @@ impl Game {
                 let old = e.pos;
                 e.pos = npc::step_along(&self.world, &self.player_field, e.pos, player, speed, dt);
                 e.moving = (e.pos - old).length_squared() > 1e-8;
-                e.yaw = npc::yaw_towards(e.pos, player);
+                e.yaw = lerp_angle(e.yaw, npc::yaw_towards(e.pos, player), (dt * 8.0).min(1.0));
                 if dist < 1.7
                     && los
                     && self.dialog.is_none()
@@ -599,7 +847,10 @@ impl Game {
                         }
                         target
                     };
-                    let field = npc::bfs(&self.world.nav, target);
+                    let from = self.employees[i].pos;
+                    let (target, field) = self
+                        .reachable_target(from, |_| Some(target))
+                        .unwrap_or((target, npc::bfs(&self.world.nav, target)));
                     let e = &mut self.employees[i];
                     e.retarget = 12.0;
                     e.target = target;
@@ -611,7 +862,10 @@ impl Game {
                 e.pos = npc::step_along(&self.world, &e.field, e.pos, e.target, 0.9, dt);
                 e.moving = (e.pos - old).length_squared() > 1e-8;
                 if e.moving {
-                    e.yaw = npc::yaw_towards(old, e.pos);
+                    e.yaw = lerp_angle(e.yaw, npc::yaw_towards(old, e.pos), (dt * 6.0).min(1.0));
+                }
+                if e.brain.motion.stuck(e.pos, true, dt) {
+                    e.retarget = 0.0;
                 }
             }
         }
@@ -683,4 +937,12 @@ pub(super) fn gait_clip(g: &crate::people::Gait, still: Clip) -> Clip {
     } else {
         Clip::Walk
     }
+}
+
+/// Abstand eines Punkts zur Strecke a-b (in der Ebene).
+fn seg_dist(p: Vec3, a: Vec3, b: Vec3) -> f32 {
+    let ab = vec3(b.x - a.x, 0.0, b.z - a.z);
+    let ap = vec3(p.x - a.x, 0.0, p.z - a.z);
+    let t = (ap.dot(ab) / ab.length_squared().max(1e-6)).clamp(0.0, 1.0);
+    (ap - ab * t).length()
 }

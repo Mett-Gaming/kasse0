@@ -1386,3 +1386,164 @@ fn customers_follow_you_with_their_heads_more_and_more() {
     g.collect_people(&mut out);
     assert!(out.iter().any(|d| d.look_at.is_some()), "kein Blickziel");
 }
+
+#[test]
+fn smoothed_paths_are_short_and_reach_the_goal_in_many_markets() {
+    let mut ok = 0;
+    for seed in 0..20u64 {
+        let mut p = world::WorldParams::normal(seed);
+        p.tipped = true;
+        p.stretch = 2.0;
+        let w = world::generate(&p);
+        let a = w.spawn;
+        let dz = w.drinks_zone;
+        let b = w.collide(vec3(dz.min.x + 1.7, 0.0, dz.max.z - 0.8), 0.3);
+        let field = npc::bfs(&w.nav, b);
+        if !npc::reachable(&w.nav, &field, a) {
+            continue;
+        }
+        // Rasterweg: Feldwert in Metern (gerader Schritt = eine Zelle)
+        let grid_len = npc::field_at(&w.nav, &field, a) as f32 / npc::STRAIGHT as f32 * w.nav.cell;
+        let mut pos = a;
+        let mut walked = 0.0;
+        for _ in 0..(120 * 60) {
+            let next = npc::step_along(&w, &field, pos, b, 1.5, 1.0 / 60.0);
+            walked += (next - pos).length();
+            pos = next;
+            if (pos - b).length() < 0.6 {
+                break;
+            }
+        }
+        assert!(
+            (pos - b).length() < 0.6,
+            "seed {seed}: kommt nicht an ({pos:?} -> {b:?})"
+        );
+        assert!(
+            walked < grid_len * 1.05 + 0.5,
+            "seed {seed}: Umweg {walked:.1} m statt {grid_len:.1} m"
+        );
+        ok += 1;
+    }
+    assert!(ok >= 15, "nur {ok} Maerkte geprueft");
+}
+
+#[test]
+fn people_keep_their_distance() {
+    let mut g = Game::new(8);
+    g.tip();
+    g.employees.clear();
+    g.customers.clear();
+    g.scare_cd = 1e6;
+    // vier Kunden auf einem Haufen, ein Mitarbeiter mittendrin
+    let p = g.player.pos;
+    let c0 = g.world.collide(p + vec3(0.0, 0.0, -5.0), 0.3);
+    for k in 0..4 {
+        g.spawn_customer_at(c0 + vec3(k as f32 * 0.05, 0.0, 0.0));
+        let c = g.customers.last_mut().unwrap();
+        c.angry = 0.0;
+        c.wait = 100.0;
+    }
+    let mut e = npc::Employee::new(c0 + vec3(0.02, 0.0, 0.02));
+    e.ignore = 100.0;
+    g.employees.push(e);
+    step(&mut g, 2.0, Input::default());
+    let pos: Vec<Vec3> = g
+        .customers
+        .iter()
+        .map(|c| c.pos)
+        .chain(g.employees.iter().map(|e| e.pos))
+        .collect();
+    for i in 0..pos.len() {
+        for j in (i + 1)..pos.len() {
+            let d = vec3(pos[i].x - pos[j].x, 0.0, pos[i].z - pos[j].z).length();
+            assert!(d > 0.45, "{i} und {j} stecken ineinander ({d:.2} m)");
+        }
+    }
+}
+
+#[test]
+fn stuck_npcs_find_a_new_way() {
+    let mut m = npc::Motion::default();
+    let p = Vec3::ZERO;
+    let mut fired = false;
+    for _ in 0..(3 * 60) {
+        fired |= m.stuck(p, true, 1.0 / 60.0);
+    }
+    assert!(fired, "Feststecken wird nicht erkannt");
+    let mut m = npc::Motion::default();
+    let mut q = Vec3::ZERO;
+    for _ in 0..(3 * 60) {
+        q.x += 0.02;
+        assert!(!m.stuck(q, true, 1.0 / 60.0), "Laufen gilt als Feststecken");
+    }
+}
+
+#[test]
+fn two_stalkers_split_up_and_cut_you_off() {
+    let mut g = Game::new(12);
+    g.tip();
+    g.employees.clear();
+    g.customers.clear();
+    g.scare_cd = 1e6;
+    g.tier = Tier::Collapse;
+    let p = g.player.pos;
+    let mut start = None;
+    for _ in 0..200 {
+        let q = g.far_walkable_cell(9.0).expect("kein Platz");
+        if (q - p).length() < 13.0 {
+            start = Some(q);
+            break;
+        }
+    }
+    let start = start.expect("kein Platz in 9-13 m");
+    for k in 0..2 {
+        g.spawn_customer_at(start + vec3(k as f32 * 0.6, 0.0, 0.0));
+        let c = g.customers.last_mut().unwrap();
+        c.stalker = true;
+        c.angry = 0.0;
+        c.brain.notice(p, true);
+    }
+    g.player.yaw = 0.0;
+    g.player.pitch = -1.4; // auf den Boden schauen: keiner wird gesehen
+    let mut apart = 0.0f32;
+    for _ in 0..(8 * 60) {
+        g.player.pos = p;
+        for c in &mut g.customers {
+            c.brain.notice(p, true);
+        }
+        g.update(1.0 / 60.0, &mut Input::default());
+        if g.outcome != Outcome::Running || g.dying.is_some() {
+            break;
+        }
+        apart = apart.max((g.customers[0].pos - g.customers[1].pos).length());
+    }
+    assert!(
+        apart > 2.0,
+        "Verfolger laufen im Gaensemarsch ({apart:.1} m)"
+    );
+}
+
+/// Messung (nicht in CI): Spiel-Update im Kollaps mit allen NPCs.
+#[test]
+#[ignore]
+fn perf_update_in_collapse() {
+    let mut g = Game::new(3);
+    g.tip();
+    for _ in 0..6 {
+        g.cheat(3);
+    }
+    g.god = true;
+    g.scare_cd = 1e6;
+    let n = (g.customers.len(), g.employees.len());
+    let frames = 1200;
+    let t0 = std::time::Instant::now();
+    for k in 0..frames {
+        g.player.yaw = k as f32 * 0.01;
+        g.update(1.0 / 60.0, &mut Input::default());
+    }
+    let ms = t0.elapsed().as_secs_f64() * 1000.0 / frames as f64;
+    println!(
+        "Kollaps: {} Kunden, {} Mitarbeiter, {ms:.3} ms pro Update",
+        n.0, n.1
+    );
+}

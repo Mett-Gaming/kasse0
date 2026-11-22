@@ -10,6 +10,7 @@ pub mod escape;
 mod monitor;
 mod scare_cheats;
 mod scares;
+mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
@@ -325,6 +326,11 @@ pub struct Game {
     rng: Pcg64,
 
     player_field: Vec<u16>,
+    /// Geraeusche dieses Bilds: (Ort, Hoerweite)
+    noises: Vec<(Vec3, f32)>,
+    /// Weg des rollenden Geisterwagens zum Spieler (ohne die engen Regal-Durchgaenge)
+    cart_field: Vec<u16>,
+    cart_field_timer: f32,
     field_timer: f32,
     next_announce: f32,
     collapse_timer: f32,
@@ -499,6 +505,9 @@ impl Game {
             aspect: 16.0 / 9.0,
             rng,
             player_field: Vec::new(),
+            noises: Vec::new(),
+            cart_field: Vec::new(),
+            cart_field_timer: 0.0,
             field_timer: 0.0,
             next_announce: 0.0,
             collapse_timer: 0.0,

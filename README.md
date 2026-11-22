@@ -72,6 +72,12 @@ Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Übers
 - Sortiert ist logisch nach Warengruppen. Mit steigender Eskalation verschieben sich die Abteilungen: erst tauschen Unterabteilungen (Fisch ↔ Käse), dann wandern ganze Abteilungen in fremde Einrichtungen, am Ende steht Ware wild durcheinander und **die Schilder lügen**.
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
+### Was die NPCs wahrnehmen
+- **Verfolger** sehen dich rundum bis 22 m (ganz nah spüren sie dich immer) und hören deine Schritte: Rennen hört man 15 m weit, Gehen kaum, ein quietschender Wagen oder herunterfallende Ware locken sie an. Sie jagen die Stelle, an der sie dich zuletzt bemerkt haben. Hängst du sie ab, suchen sie dort und geben nach einer Weile auf.
+- Zwei oder mehr Verfolger **nehmen dich in die Zange**: Der zweite meidet den Weg des ersten und kommt durch einen anderen Gang.
+- **Mitarbeiter** sehen nur nach vorne (bis 9 m, ganz nah immer). Hören sie Lärm, gehen sie zur Geräuschquelle und sehen sich um.
+- Niemand läuft mehr durch andere hindurch, Wege werden geglättet, und wer irgendwo hängen bleibt, sucht sich einen neuen Weg.
+
 ### Gespräche
 - Während eines Gesprächs bewegt sich kein Kunde (alle frieren in ihrer Pose ein und schauen nur langsam zu dir), auch der Geisterwagen hält an. Danach hast du noch 2,5 s Schonfrist.
 - Rennst du an einem Mitarbeiter vorbei, kann er dich nicht ansprechen. Das fällt aber auf (+20 %), und er folgt dir.

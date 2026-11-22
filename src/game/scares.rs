@@ -364,16 +364,30 @@ impl Game {
                     self.fire_scare(0.7);
                     return;
                 }
+                // eigener Weg: durch die engen Durchgaenge passt der Wagen nicht
+                self.cart_field_timer -= dt;
+                if self.cart_field_timer <= 0.0 {
+                    self.cart_field_timer = 1.0;
+                    let nav = &self.world.nav;
+                    let passages = &self.world.passages;
+                    npc::bfs_blocked(nav, player, &mut self.cart_field, |x, z| {
+                        let c = nav.center(x, z);
+                        passages
+                            .iter()
+                            .any(|(p, _)| vec3(c.x - p.x, 0.0, c.z - p.z).length() < 0.7)
+                    });
+                }
                 let old = self.trolley.pos;
-                let new = npc::step_along(
+                let new = npc::step_along_r(
                     &self.world,
-                    &self.player_field,
+                    &self.cart_field,
                     old,
                     player,
                     CART_ROLL_SPEED,
                     dt,
+                    0.3,
                 );
-                self.trolley.pos = self.world.collide(new, 0.3);
+                self.trolley.pos = new;
                 if (new - old).length_squared() > 1e-8 {
                     // Griff zeigt nach hinten: der Wagen rollt mit der Front voran
                     self.trolley.yaw = std::f32::consts::PI - npc::yaw_towards(old, new);
