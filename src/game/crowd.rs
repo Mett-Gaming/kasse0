@@ -208,9 +208,12 @@ impl Game {
         self.keep_npcs_out_of_checkout(&before);
         self.update_whispers(dt);
         // Gangart: Animationszeit an die zurueckgelegte Strecke koppeln (Fuesse rutschen nicht)
-        for c in &mut self.customers {
-            c.gait
-                .advance(c.pos, dt, crate::people::PEOPLE[c.variant].1);
+        // im Gespraech: Kunden-Posen eingefroren (Animationszeit steht)
+        if self.dialog.is_none() {
+            for c in &mut self.customers {
+                c.gait
+                    .advance(c.pos, dt, crate::people::PEOPLE[c.variant].1);
+            }
         }
         for e in &mut self.employees {
             e.gait
@@ -275,6 +278,8 @@ impl Game {
         let running = self.player.vel.length() > WALK_SPEED * 1.3;
         let noticed = self.suspicion >= 1.0;
         let chase = self.chasing();
+        // Im Gespraech mit einem Mitarbeiter steht die Welt still: kein Kunde rueckt naeher
+        let talking = self.dialog.is_some();
         for i in 0..self.customers.len() {
             let chest = self.customers[i].pos + vec3(0.0, 1.25, 0.0);
             let head = self.customers[i].pos + vec3(0.0, 1.6, 0.0);
@@ -283,6 +288,11 @@ impl Game {
             c.seen = seen;
             c.moving = false;
             c.bump_cd -= dt;
+            if talking {
+                // eingefroren; nur der Blick wandert langsam zu einem herueber
+                c.yaw = lerp_angle(c.yaw, npc::yaw_towards(c.pos, player), (dt * 1.5).min(1.0));
+                continue;
+            }
             // starrt (nach "hinter dir"): steht nur da, schaut her, tut nichts
             if c.stare > 0.0 {
                 c.stare -= dt;

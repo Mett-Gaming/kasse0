@@ -137,7 +137,7 @@ Direkt nach dem Bezahlen: Durchsage „ACHTUNG: Kunde 0 hat ein Gesicht. Schnapp
 | Nicht stören | Anrempeln: +0,15. Ihren Tomatensaft nehmen: +0,35, und dieser Kunde wird schneller. |
 | Nicht auffallen | Rennen in Sichtweite: +0,15/s. Anstarren (über 1,5 s): +0,12/s. Falsche Ware: +0,25. Unbekannter Artikel an der Kasse: zählt zum Misstrauen der Kassiererin (siehe Kassen-Minispiel). |
 | Auffälligkeit 100 % | Die Kunden bewegen sich auch unter Beobachtung (langsam). |
-| Gesprächs-Schutz | Während eines Gesprächs und 2,5 s danach kann kein Kunde erwischen. |
+| Gesprächs-Schutz | Während eines Gesprächs bewegt sich kein Kunde (Pose eingefroren, nur langsames Herüberdrehen), der Geisterwagen pausiert; danach 2,5 s Schonfrist, in der niemand fangen kann. |
 | Vorbeisprinten | Wer schneller als 2,4 m/s an einem Mitarbeiter vorbeirennt, wird nicht angesprochen, bekommt aber +0,2 Auffälligkeit und wird 12 s verfolgt. |
 | Mitarbeiter | Patrouillieren, sprechen an, 9 s Antwortzeit. Gut: 25 s Ruhe. Neutral: +0,08. Schlecht oder Schweigen: +0,3 bzw. +0,2, danach 20 s Verfolgung. |
 | Kollaps | Der Umbau passiert nur, während man sich umdreht oder Boden bzw. Decke anschaut (spätestens nach 60 s). |
