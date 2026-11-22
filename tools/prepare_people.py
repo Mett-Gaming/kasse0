@@ -11,9 +11,18 @@ Ausgabe:
 
 Format .k0s: b"K0S1", u32 n, f32[3] min, f32[3] max,
              n * (f32[3] pos, f32[3] normal, f32[3] color, f32[4] knochen, f32[4] gewichte)
-Format .k0a: b"K0A1", u32 knochen, u32 clips,
-             je Clip: u8 namenslaenge, name, f32 fps, u32 bilder,
-                      bilder * knochen * f32[12] (3x4-Matrix, zeilenweise, Engine-Koordinaten)
+Format .k0a: b"K0A2", u32 knochen, u32 clips,
+             je Knochen: u8 namenslaenge, name, i32 eltern (-1 = Wurzel),
+                         f32[12] Ruhepose global (3x4, zeilenweise, Engine-Koordinaten)
+             je Clip: u8 namenslaenge, name, f32 fps, u32 bilder, u8 schleife,
+                      bilder * knochen * f32[10] lokal: Quaternion xyzw, Position xyz, Skalierung xyz
+             Eltern stehen immer vor ihren Kindern. Global = Eltern-Global x Lokal,
+             Skinning = Global x Ruhepose^-1.
+
+Animationen: die eigenen Clips der Quaternius-Figuren und Clips aus der Quaternius Universal
+Animation Library 1+2 (CC0, assets_src/packs/quaternius_ual/), uebertragen auf das
+Figuren-Skelett: Knochen-Richtungen werden pro Bild uebernommen (Ruhepose-Unterschiede
+ausgeglichen), die Fuesse danach auf den Boden gesetzt.
 
 Aufruf (headless):
     blender -b --factory-startup -P tools/prepare_people.py -- <kasse0-Ordner> [variante ...]
@@ -26,7 +35,7 @@ import os
 import struct
 import sys
 
-from mathutils import Matrix
+from mathutils import Matrix, Quaternion
 
 ROOT = sys.argv[sys.argv.index("--") + 1]
 ONLY = set(sys.argv[sys.argv.index("--") + 2:])
@@ -38,34 +47,57 @@ MAX_TRIS = 2800
 HEIGHT = {"m": 1.78, "f": 1.68}
 REFERENCE = {"m": "casual", "f": "casual"}
 # Clips im Spiel -> Animation in der Quelle
-CLIPS = [("idle", "Idle"), ("walk", "Walk"), ("reach", "Interact"), ("run", "Run")]
-# Zusaetzlicher Clip "sit" (Kassiererin): die Figuren haben keine Sitz-Animation. Sie wird aus der
-# Universal Animation Library 1 (Quaternius, CC0, Mannequin-Skelett) uebertragen.
-UAL = os.path.join(ROOT, "assets_src", "packs", "quaternius_ual", "UAL1_Standard.glb")
-SIT_ACTION = "Sitting_Idle_Loop"
-# Mannequin-Knochen -> Knochen der Modular-Figuren (Reihenfolge: Eltern vor Kindern)
-SIT_MAP = [
-    ("pelvis", "Body"),
-    ("spine_01", "Abdomen"),
-    ("spine_02", "Torso"),
-    ("spine_03", "Chest"),
-    ("neck_01", "Neck"),
-    ("Head", "Head"),
-    ("clavicle_l", "Shoulder.L"),
-    ("upperarm_l", "UpperArm.L"),
-    ("lowerarm_l", "LowerArm.L"),
-    ("hand_l", "Wrist.L"),
-    ("clavicle_r", "Shoulder.R"),
-    ("upperarm_r", "UpperArm.R"),
-    ("lowerarm_r", "LowerArm.R"),
-    ("hand_r", "Wrist.R"),
-    ("thigh_l", "UpperLeg.L"),
-    ("calf_l", "LowerLeg.L"),
-    ("thigh_r", "UpperLeg.R"),
-    ("calf_r", "LowerLeg.R"),
+# (Name im Spiel, Quelle, Animation, Schleife). Quelle "q" = eigene Clips der Figur,
+# "u1"/"u2" = Universal Animation Library 1/2. Reihenfolge = people::Clip in src/people.rs.
+CLIPS = [
+    ("idle", "q", "Idle", True),
+    ("walk", "q", "Walk", True),
+    ("reach", "q", "Interact", True),
+    ("run", "q", "Run", True),
+    ("grab", "q", "Punch_Right", False),
+    ("wave", "q", "Wave", True),
+    ("hit", "q", "HitRecieve", False),
+    ("death", "q", "Death", False),
+    ("crouch_walk", "u1", "Crouch_Fwd_Loop", True),
+    ("crouch_idle", "u1", "Crouch_Idle_Loop", True),
+    ("zombie_walk", "u2", "Zombie_Walk_Fwd_Loop", True),
+    ("zombie_idle", "u2", "Zombie_Idle_Loop", True),
+    ("scratch", "u2", "Zombie_Scratch", True),
+    ("get_up", "u2", "LayToIdle", False),
+    ("fold_arms", "u2", "Idle_FoldArms_Loop", True),
+    ("phone", "u2", "Idle_TalkingPhone_Loop", True),
+    ("talk", "u1", "Idle_Talking_Loop", True),
+    ("pick_up", "u1", "PickUp_Table", False),
+    ("push", "u1", "Push_Loop", True),
+    ("carry", "u2", "Walk_Carry_Loop", True),
+    ("kneel", "u1", "Fixing_Kneeling", True),
+    ("no", "u2", "Idle_No_Loop", True),
+    ("walk_formal", "u1", "Walk_Formal_Loop", True),
+    # Kassiererin sitzt auf dem Buerostuhl
+    ("sit", "u1", "Sitting_Idle_Loop", True),
 ]
-# Fuesse haengen bei den Figuren nicht am Unterschenkel (IK-Ziel unter Root)
-SIT_FEET = [("foot_l", "Foot.L", "LowerLeg.L"), ("foot_r", "Foot.R", "LowerLeg.R")]
+UAL = {
+    "u1": os.path.join(ROOT, "assets_src", "packs", "quaternius_ual", "UAL1_Standard.glb"),
+    "u2": os.path.join(ROOT, "assets_src", "packs", "quaternius_ual", "UAL2_Standard.glb"),
+}
+# Figuren-Knochen <- UAL-Knochen (Rotation wird uebertragen). Body traegt das Becken
+# (Huefte samt Beinen), dazu die Position.
+UAL_MAP = {
+    "Body": "pelvis", "Abdomen": "spine_01", "Torso": "spine_02", "Chest": "spine_03",
+    "Neck": "neck_01", "Head": "Head",
+    "UpperLeg.L": "thigh_l", "LowerLeg.L": "calf_l", "Foot.L": "foot_l",
+    "UpperLeg.R": "thigh_r", "LowerLeg.R": "calf_r", "Foot.R": "foot_r",
+}
+for side, s in (("L", "l"), ("R", "r")):
+    UAL_MAP.update({
+        f"Shoulder.{side}": f"clavicle_{s}", f"UpperArm.{side}": f"upperarm_{s}",
+        f"LowerArm.{side}": f"lowerarm_{s}", f"Wrist.{side}": f"hand_{s}",
+    })
+    for f in ("Index", "Middle", "Ring", "Pinky"):
+        for k in (1, 2, 3):
+            UAL_MAP[f"{f}{k}.{side}"] = f"{f.lower()}_0{k}_{s}"
+    for k in (1, 2, 3):
+        UAL_MAP[f"Thumb{k}.{side}"] = f"thumb_0{k}_{s}"
 
 with open(os.path.join(ROOT, "tools", "people.json"), encoding="utf-8") as f:
     CFG = json.load(f)
@@ -255,158 +287,210 @@ def write_skin(path, verts):
           f"{mx[0]-mn[0]:.2f} x {mx[1]-mn[1]:.2f} x {mx[2]-mn[2]:.2f} m")
 
 
-def world_rot(arm, m):
-    """Drehung (Quaternion) einer Knochen-Matrix im Armatur-Raum, in Weltkoordinaten."""
-    return (arm.matrix_world @ m).to_quaternion()
+def ordered_bones(arm):
+    """Knochen so sortiert, dass Eltern vor ihren Kindern stehen."""
+    out, seen = [], set()
+
+    def visit(b):
+        if b.name in seen:
+            return
+        if b.parent:
+            visit(b.parent)
+        seen.add(b.name)
+        out.append(b.name)
+
+    for b in arm.data.bones:
+        visit(b)
+    return out
 
 
-def sit_pose(src, dst, frame):
-    """Setzt `dst` (Modular-Figur) in die Pose des Mannequins `src` bei `frame`:
-    gleiche Drehung relativ zur Ruhepose (Weltraum), Huefte sinkt im Verhaeltnis der Beinlaengen,
-    Fuesse sitzen am Ende der Unterschenkel. IK der Figur ist dabei abgeschaltet."""
-    bpy.context.scene.frame_set(frame)
-    bpy.context.view_layer.update()
-    sb, db = src.pose.bones, dst.pose.bones
-    # Beinlaengen (Welt) fuer die Hoehe der Huefte
-    def leg(arm, top, bottom):
-        return ((arm.matrix_world @ arm.data.bones[top].head_local)
-                - (arm.matrix_world @ arm.data.bones[bottom].head_local)).length
-    ratio = leg(dst, "UpperLeg.L", "Foot.L") / leg(src, "thigh_l", "foot_l")
-    for b in db:
-        b.matrix_basis = Matrix.Identity(4)
-    bpy.context.view_layer.update()
-    dst_inv = dst.matrix_world.inverted()
-    for s, d in SIT_MAP:
-        pb_s, pb_d = sb[s], db[d]
-        delta = world_rot(src, pb_s.matrix) @ world_rot(src, pb_s.bone.matrix_local).inverted()
-        want = delta @ world_rot(dst, pb_d.bone.matrix_local)
-        # Position wie in der Ruhepose relativ zum (schon gesetzten) Elternknochen
-        if pb_d.parent:
-            rel = pb_d.parent.bone.matrix_local.inverted() @ pb_d.bone.matrix_local
-            base = pb_d.parent.matrix @ rel
-        else:
-            base = pb_d.bone.matrix_local.copy()
-        loc = base.to_translation()
-        if s == "pelvis":
-            shift = (src.matrix_world @ pb_s.matrix).to_translation() \
-                - (src.matrix_world @ pb_s.bone.matrix_local).to_translation()
-            loc = loc + (dst_inv.to_3x3() @ (shift * ratio))
-        rot_arm = (dst.matrix_world.to_quaternion().inverted() @ want).to_matrix().to_4x4()
-        scale = base.to_scale()
-        pb_d.matrix = Matrix.Translation(loc) @ rot_arm @ Matrix.Diagonal((*scale, 1.0))
-        bpy.context.view_layer.update()
-    for s, d, shin in SIT_FEET:
-        pb_s, pb_d, pb_shin = sb[s], db[d], db[shin]
-        delta = world_rot(src, pb_s.matrix) @ world_rot(src, pb_s.bone.matrix_local).inverted()
-        want = delta @ world_rot(dst, pb_d.bone.matrix_local)
-        # Versatz Knoechel -> Fussknochen aus der Ruhepose, mitgedreht
-        ankle_rest = pb_shin.bone.tail_local
-        ankle_now = (pb_shin.matrix @ pb_shin.bone.matrix_local.inverted()) @ ankle_rest
-        offset = pb_d.bone.head_local - ankle_rest
-        rot_arm_q = dst.matrix_world.to_quaternion().inverted() @ want
-        rest_rot_arm = pb_d.bone.matrix_local.to_quaternion()
-        turn = rot_arm_q @ rest_rot_arm.inverted()
-        loc = ankle_now + turn @ offset
-        scale = pb_d.bone.matrix_local.to_scale()
-        pb_d.matrix = Matrix.Translation(loc) @ rot_arm_q.to_matrix().to_4x4() @ Matrix.Diagonal((*scale, 1.0))
-        bpy.context.view_layer.update()
+def write_mat(out, M):
+    out += struct.pack("<12f", *[M[r][c] for r in range(3) for c in range(4)])
 
 
-def export_sit(arm, bones, C, out):
-    """Haengt den Clip "sit" an (aus der Animations-Bibliothek uebertragen)."""
-    Ci = C.inverted()
-    before = set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=UAL)
-    new = [o for o in bpy.data.objects if o not in before]
-    src = next(o for o in new if o.type == "ARMATURE")
-    action = bpy.data.actions.get(SIT_ACTION)
-    if action is None:
-        raise RuntimeError(f"Animation fehlt: {SIT_ACTION}")
-    src.animation_data_create()
-    src.animation_data.action = action
-    if hasattr(src.animation_data, "action_slot") and getattr(action, "slots", None):
-        src.animation_data.action_slot = action.slots[0]
-    # die eigene Animation und die IK der Figur abschalten
-    if arm.animation_data:
-        arm.animation_data.action = None
-    muted = []
-    for pb in arm.pose.bones:
-        for c in pb.constraints:
-            if not c.mute:
-                c.mute = True
-                muted.append(c)
-    fps = bpy.context.scene.render.fps / bpy.context.scene.render.fps_base
+def set_action(arm, action):
+    arm.animation_data_create()
+    arm.animation_data.action = action
+    if hasattr(arm.animation_data, "action_slot") and getattr(action, "slots", None):
+        arm.animation_data.action_slot = action.slots[0]
+
+
+def find_action(suffix, armature_name=None):
+    for a in bpy.data.actions:
+        base = a.name.split(".")[0]
+        if base == suffix or base.endswith("|" + suffix):
+            return a
+    return None
+
+
+def locals_from_globals(G, bones, parent):
+    """Engine-Globale -> lokale (Quaternion, Position, Skalierung) je Knochen."""
+    rows = []
+    for b in bones:
+        p = parent[b]
+        L = G[b] if p is None else G[p].inverted() @ G[b]
+        loc, rot, sca = L.decompose()
+        rows.append((rot, loc, sca))
+    return rows
+
+
+def native_frames(arm, action, bones, C):
+    set_action(arm, action)
     f0, f1 = int(action.frame_range[0]), int(action.frame_range[1])
-    frames = list(range(f0, f1))
-    name = b"sit"
-    out += struct.pack("<B", len(name)) + name
-    out += struct.pack("<fI", fps, len(frames))
-    for fr in frames:
-        sit_pose(src, arm, fr)
+    frames = []
+    for fr in range(f0, f1):
+        bpy.context.scene.frame_set(fr)
+        frames.append({b: C @ arm.matrix_world @ arm.pose.bones[b].matrix for b in bones})
+    return frames
+
+
+def retarget_frames(arm, src, action, bones, C):
+    """Ein UAL-Clip auf das Figuren-Skelett: Knochen-Richtungen uebernehmen (Vorwaertskinematik
+    von Hand, ohne Blender-Auswertung), Fuesse auf den Boden."""
+    set_action(src, action)
+    tb = arm.data.bones
+    sb = src.data.bones
+    Wt = arm.matrix_world
+    Ws = src.matrix_world
+    rest_t = {b: tb[b].matrix_local for b in bones}
+    # Ausgleich der Ruhepose: Arme und Beine uebernehmen die Richtung der UAL-Knochen (beide
+    # Skelette stehen in T-Pose, kleine Unterschiede werden ausgeglichen). Alle anderen
+    # Knochen (Fuesse, Wirbelsaeule, Schultern, Finger) uebernehmen nur die Bewegung relativ
+    # zur Ruhepose, damit Fuesse flach und Proportionen der Figur erhalten bleiben.
+    limbs = ("UpperArm.", "LowerArm.", "UpperLeg.", "LowerLeg.")
+    off = {}
+    for t, s_ in UAL_MAP.items():
+        if t not in tb or s_ not in sb:
+            continue
+        if not t.startswith(limbs):
+            off[t] = Quaternion()
+            continue
+        dt = (Wt.to_3x3() @ (tb[t].tail_local - tb[t].head_local)).normalized()
+        ds = (Ws.to_3x3() @ (sb[s_].tail_local - sb[s_].head_local)).normalized()
+        off[t] = ds.rotation_difference(dt)
+    # Groessenverhaeltnis ueber die Hoehe der Huefte (Oberschenkel-Ansatz)
+    h_t = (Wt @ tb["UpperLeg.L"].head_local).z
+    h_s = (Ws @ sb["thigh_l"].head_local).z
+    ratio = h_t / h_s
+    pelvis_rest = Ws @ sb["pelvis"].head_local
+    body_rest = Wt @ tb["Body"].head_local
+    def foot_low(M, side):
+        # Ferse (Kopf des Fussknochens) und Zehenspitze (sein Ende)
+        tip = M @ Matrix.Translation((0, tb["Foot." + side].length, 0))
+        return min(M.translation.z, tip.translation.z)
+
+    foot_rest_z = min(foot_low(Wt @ rest_t["Foot.L"], "L"), foot_low(Wt @ rest_t["Foot.R"], "R"))
+    parent = {b: (tb[b].parent.name if tb[b].parent else None) for b in bones}
+    f0, f1 = int(action.frame_range[0]), int(action.frame_range[1])
+    frames = []
+    for fr in range(f0, f1):
+        bpy.context.scene.frame_set(fr)
+        world = {}  # Figuren-Knochen in Blender-Weltkoordinaten
         for b in bones:
-            pb = arm.pose.bones[b]
-            D = arm.matrix_world @ pb.matrix @ pb.bone.matrix_local.inverted() @ arm.matrix_world.inverted()
-            E = C @ D @ Ci
-            out += struct.pack("<12f", *[E[r][c] for r in range(3) for c in range(4)])
-    print(f"  Clip sit: {len(frames)} Bilder bei {fps:.0f} fps (uebertragen aus {SIT_ACTION})")
-    # Vorschau zum Pruefen (KASSE0_SIT_PREVIEW=<ordner>): Seitenansicht der sitzenden Figur
-    prev = os.environ.get("KASSE0_SIT_PREVIEW")
-    if prev:
-        for o in new:
-            o.hide_render = True
-        cam_data = bpy.data.cameras.new("cam")
-        cam = bpy.data.objects.new("cam", cam_data)
-        bpy.context.scene.collection.objects.link(cam)
-        cam.location = (2.4, -1.2, 0.9)
-        cam.rotation_euler = (1.45, 0.0, 1.1)
-        bpy.context.scene.camera = cam
-        light = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN"))
-        bpy.context.scene.collection.objects.link(light)
-        bpy.context.scene.render.engine = "BLENDER_WORKBENCH"
-        bpy.context.scene.render.resolution_x = 480
-        bpy.context.scene.render.resolution_y = 480
-        bpy.context.scene.render.filepath = os.path.join(prev, f"sit_{arm.name}.png")
-        sit_pose(src, arm, frames[len(frames) // 2])
-        bpy.ops.render.render(write_still=True)
-        print("  Vorschau:", bpy.context.scene.render.filepath)
-    for c in muted:
-        c.mute = False
-    for o in new:
-        bpy.data.objects.remove(o, do_unlink=True)
+            p = parent[b]
+            # Ruhelage relativ zum Elternknochen
+            if p is None:
+                base = Wt @ rest_t[b]
+            else:
+                base = world[p] @ rest_t[p].inverted() @ rest_t[b]
+            s_name = UAL_MAP.get(b)
+            if s_name is None or s_name not in src.pose.bones:
+                world[b] = base
+                continue
+            spb = src.pose.bones[s_name]
+            Rs = (Ws @ spb.matrix).to_quaternion()
+            Rs0 = (Ws @ sb[s_name].matrix_local).to_quaternion()
+            Rt0 = (Wt @ rest_t[b]).to_quaternion()
+            Rt = Rs @ Rs0.inverted() @ off[b].inverted() @ Rt0
+            loc = base.translation
+            if b == "Body":
+                ps = (Ws @ spb.matrix).translation
+                loc = body_rest + (ps - pelvis_rest) * ratio
+            if b.startswith("Foot."):
+                # Fuss sitzt am Ende des Unterschenkels (IK-Ziel der Quaternius-Figuren)
+                leg = "LowerLeg." + b[-1]
+                loc = (world[leg] @ rest_t[leg].inverted() @ rest_t[b]).translation
+            world[b] = Matrix.LocRotScale(loc, Rt, base.to_scale())
+        # Fuesse auf den Boden: tiefster Fuss auf Ruhehoehe
+        low = min(foot_low(world["Foot.L"], "L"), foot_low(world["Foot.R"], "R"))
+        lift = Matrix.Translation((0, 0, foot_rest_z - low))
+        frames.append({b: C @ lift @ world[b] for b in bones})
+    return frames
 
 
 def export_anims(gender, arm, bones, C):
-    """Knochen-Matrizen (Engine-Koordinaten) aller Clips eines Geschlechts."""
-    Ci = C.inverted()
+    """Hierarchie und lokale Knochen-Transformationen (Engine-Koordinaten) aller Clips."""
     fps = bpy.context.scene.render.fps / bpy.context.scene.render.fps_base
-    out = bytearray(b"K0A1")
-    out += struct.pack("<II", len(bones), len(CLIPS) + 1)
-    for clip, src in CLIPS:
-        action = next((a for a in bpy.data.actions if a.name.split(".")[0].endswith("|" + src)), None)
-        if action is None:
-            raise RuntimeError(f"Animation fehlt: {src}")
-        arm.animation_data_create()
-        arm.animation_data.action = action
-        if hasattr(arm.animation_data, "action_slot") and getattr(action, "slots", None):
-            arm.animation_data.action_slot = action.slots[0]
-        f0, f1 = int(action.frame_range[0]), int(action.frame_range[1])
-        frames = list(range(f0, f1))  # Schleife: letztes Bild = erstes
+    order = ordered_bones(arm)
+    parent = {b: (arm.data.bones[b].parent.name if arm.data.bones[b].parent else None) for b in order}
+    out = bytearray(b"K0A2")
+    out += struct.pack("<II", len(order), len(CLIPS))
+    for b in order:
+        name = b.encode()
+        out += struct.pack("<B", len(name)) + name
+        out += struct.pack("<i", order.index(parent[b]) if parent[b] else -1)
+        write_mat(out, C @ arm.matrix_world @ arm.data.bones[b].matrix_local)
+    sources = {}
+    # KASSE0_ADD_CLIPS=sit,...: nur diese Clips erzeugen und hinten an die vorhandene Datei
+    # haengen (dafuer muessen sie am Ende von CLIPS stehen). So braucht man nicht alle Quellen.
+    add = {c for c in os.environ.get("KASSE0_ADD_CLIPS", "").split(",") if c}
+    head_len = len(out)
+    for clip, kind, src_name, loop in CLIPS:
+        if add and clip not in add:
+            continue
+        if kind == "q":
+            action = find_action(src_name)
+            if action is None:
+                raise RuntimeError(f"Animation fehlt: {src_name}")
+            frames = native_frames(arm, action, order, C)
+        else:
+            if kind not in sources:
+                before = set(bpy.data.objects)
+                bpy.ops.import_scene.gltf(filepath=UAL[kind])
+                objs = [o for o in bpy.data.objects if o not in before]
+                src = next(o for o in objs if o.type == "ARMATURE")
+                for o in objs:
+                    if o.type == "MESH":
+                        o.hide_viewport = True
+                sources[kind] = (src, {a.name for a in bpy.data.actions})
+            src, _ = sources[kind]
+            action = next((a for a in bpy.data.actions
+                           if a.name.split(".")[0] == src_name
+                           and a.name.split(".")[0] not in ("",)), None)
+            if action is None:
+                raise RuntimeError(f"UAL-Animation fehlt: {src_name}")
+            frames = retarget_frames(arm, src, action, order, C)
         name = clip.encode()
         out += struct.pack("<B", len(name)) + name
-        out += struct.pack("<fI", fps, len(frames))
-        for fr in frames:
-            bpy.context.scene.frame_set(fr)
-            for b in bones:
-                pb = arm.pose.bones[b]
-                D = arm.matrix_world @ pb.matrix @ pb.bone.matrix_local.inverted() @ arm.matrix_world.inverted()
-                E = C @ D @ Ci
-                out += struct.pack("<12f", *[E[r][c] for r in range(3) for c in range(4)])
-        print(f"  Clip {clip}: {len(frames)} Bilder bei {fps:.0f} fps")
-    export_sit(arm, bones, C, out)
+        out += struct.pack("<fIB", fps, len(frames), 1 if loop else 0)
+        prev = {}
+        for G in frames:
+            for b, (rot, loc, sca) in zip(order, locals_from_globals(G, order, parent)):
+                # Quaternion-Vorzeichen stetig halten (sonst springt slerp)
+                if b in prev and prev[b].dot(rot) < 0.0:
+                    rot = -rot
+                prev[b] = rot
+                out += struct.pack("<10f", rot.x, rot.y, rot.z, rot.w,
+                                   loc.x, loc.y, loc.z, sca.x, sca.y, sca.z)
+        print(f"  Clip {clip}: {len(frames)} Bilder bei {fps:.0f} fps ({kind}:{src_name})")
+        rest_frame(arm)
     path = os.path.join(OUT, f"anim_{gender}.k0a")
+    if add:
+        names = [c[0] for c in CLIPS]
+        if names[-len(add):] != [n for n in names if n in add]:
+            raise RuntimeError("KASSE0_ADD_CLIPS: die Clips muessen am Ende von CLIPS stehen")
+        with open(path, "rb") as f:
+            old = f.read()
+        if old[:4] != b"K0A2" or old[4:8] != out[4:8] or old[12:head_len] != out[12:head_len]:
+            raise RuntimeError("vorhandene Animationsdatei passt nicht zum Skelett")
+        count = struct.unpack_from("<I", old, 8)[0]
+        if count != len(CLIPS) - len(add):
+            raise RuntimeError(f"vorhandene Datei hat {count} Clips, erwartet {len(CLIPS) - len(add)}")
+        out = bytearray(old[:8]) + struct.pack("<I", len(CLIPS)) + old[12:] + out[head_len:]
     with open(path, "wb") as f:
         f.write(out)
-    print(f"  -> {os.path.basename(path)}: {len(bones)} Knochen, {len(out) // 1024} KB")
+    print(f"  -> {os.path.basename(path)}: {len(order)} Knochen, {len(out) // 1024} KB")
+    return order
 
 
 def reference(gender):
@@ -425,7 +509,7 @@ def reference(gender):
 for gender in ("m", "f"):
     print("== Skelett", gender)
     arm, bones, C, ref_rest = reference(gender)
-    export_anims(gender, arm, bones, C)
+    bones = export_anims(gender, arm, bones, C)
     bone_index = {b: i for i, b in enumerate(bones)}
     for variant in CFG["variants"]:
         if variant["g"] != gender or (ONLY and variant["id"] not in ONLY):

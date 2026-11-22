@@ -96,6 +96,8 @@ pub struct SkinDraw {
     pub first_bone: u32,
     /// halbtransparent (Hologramm)
     pub ghost: bool,
+    /// Zerreissen im Shader (0..1)
+    pub distort: f32,
 }
 
 pub struct FrameParams {
@@ -996,7 +998,7 @@ impl Renderer {
                 insts.push(GpuMeshInst {
                     model: s.model.to_cols_array_2d(),
                     tint: [s.tint.x, s.tint.y, s.tint.z, 1.0],
-                    extra: [s.tint.w, s.first_bone as f32, 0.0, 0.0],
+                    extra: [s.tint.w, s.first_bone as f32, s.distort, 0.0],
                 });
             }
             let bone_data: Vec<[[f32; 4]; 4]> = bones[..bone_count]

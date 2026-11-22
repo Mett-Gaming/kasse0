@@ -33,7 +33,23 @@ pub const CHEATS: &[&str] = &[
     "Schreck: Monitor",
     "Schreck: Tod (Gesicht)",
     "Schreck: Troll-Option",
+    "Schreck: Kühltruhe",
+    "Schreck: An der Decke",
+    "Schreck: Alle schauen",
+    "Schreck: Schritte (dunkel)",
+    "Schreck: Regal-Gesicht",
+    "Schreck: Im Wagen",
+    "Schreck: Durchsage",
+    "Schreck: Regal kracht",
+    "Stufe +1 (sofort)",
+    "Director: Höhepunkt",
+    "Director: Ruhe",
+    "Verfolger 6 m hinter dir",
+    "NPC-Zustände an/aus",
 ];
+
+/// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
+pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
 
 /// Kategorien des Cheat-Menues: Name, kurze Beschreibung, Cheats (Index in `CHEATS`).
 /// Jeder Cheat steht in genau einer Kategorie (siehe Test).
@@ -62,7 +78,12 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         (
             "Schrecken",
             "Jeden Jumpscare einzeln auslösen",
-            (FIRST_SCARE_CHEAT..CHEATS.len()).collect(),
+            (FIRST_SCARE_CHEAT..FIRST_NPC_CHEAT).collect(),
+        ),
+        (
+            "NPCs & Stufen",
+            "Stufe, Spannungskurve, Verfolger, Zustände anzeigen",
+            (FIRST_NPC_CHEAT..CHEATS.len()).collect(),
         ),
     ]
 }
@@ -193,6 +214,7 @@ impl Game {
                     "Kartenzahlung.".into()
                 }
             }
+            i if i >= FIRST_NPC_CHEAT => self.npc_cheat(i - FIRST_NPC_CHEAT),
             i if i >= FIRST_SCARE_CHEAT => self.scare_cheat(i - FIRST_SCARE_CHEAT),
             _ => {
                 // Wagen 2 m vor dir abstellen, ein Mitarbeiter schnappt ihn sich
@@ -283,7 +305,7 @@ mod tests {
 
     #[test]
     fn every_scare_cheat_scares() {
-        for i in FIRST_SCARE_CHEAT..CHEATS.len() {
+        for i in FIRST_SCARE_CHEAT..FIRST_NPC_CHEAT {
             let mut g = Game::new(56);
             g.cheat(i);
             let mut scared = false;
@@ -298,7 +320,7 @@ mod tests {
                     g.player.yaw += std::f32::consts::PI;
                 }
                 g.update(1.0 / 60.0, &mut inp);
-                scared |= g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Scare));
+                scared |= !g.scares.is_empty();
                 troll |= g.take_troll_request();
                 g.sfx.clear();
                 if scared || troll {
@@ -312,6 +334,93 @@ mod tests {
             );
             assert_eq!(g.deaths, 0, "Cheat {:?} kostet ein Leben", CHEATS[i]);
         }
+    }
+
+    #[test]
+    fn every_scare_has_its_own_look_and_sound() {
+        use super::super::scare_kinds::ScareKind::*;
+        let kinds = [
+            Behind,
+            Blackout,
+            Cashier,
+            CartGhost,
+            Mirage,
+            Cables,
+            Hanging,
+            Monitor,
+            Freezer,
+            Crawler,
+            AllLook,
+            DarkSteps,
+            ShelfFace,
+            CartRider,
+            Announcement,
+            ShelfShake,
+        ];
+        let sig = |k: super::super::scare_kinds::ScareKind| {
+            let st = k.style();
+            format!(
+                "{:?}{:?}{}{:.1}{:.1}{:.1}{:.1}",
+                st.sounds[0].0, st.sounds[1].0, st.invert, st.flash, st.zoom, st.red, st.shake
+            )
+        };
+        let all: std::collections::HashSet<String> = kinds.iter().map(|&k| sig(k)).collect();
+        assert_eq!(
+            all.len(),
+            kinds.len(),
+            "zwei Schrecken fuehlen sich gleich an"
+        );
+        // nicht alle mit Negativ-Flackern und Blitz wie frueher
+        let inverted = kinds.iter().filter(|k| k.style().invert).count();
+        assert!(inverted <= 4, "{inverted} Schrecken flackern negativ");
+    }
+
+    #[test]
+    fn the_same_scare_does_not_come_twice_in_a_row() {
+        use super::super::scare_kinds::ScareKind;
+        let mut g = Game::new(59);
+        g.tip();
+        g.tier = Tier::Wrong;
+        g.scare_cd = 0.0;
+        g.fire_scare_kind(ScareKind::Crawler, 0.7);
+        g.scare_cd = 0.0;
+        assert!(
+            !g.can_scare_kind(true, ScareKind::Crawler),
+            "gleiche Art sofort wieder"
+        );
+        assert!(g.can_scare_kind(true, ScareKind::DarkSteps));
+        for k in [
+            ScareKind::DarkSteps,
+            ScareKind::Announcement,
+            ScareKind::AllLook,
+        ] {
+            g.fire_scare_kind(k, 0.7);
+        }
+        g.scare_cd = 0.0;
+        g.director = Default::default();
+        assert!(
+            g.can_scare_kind(true, ScareKind::Crawler),
+            "nach drei anderen wieder erlaubt"
+        );
+    }
+
+    #[test]
+    fn npc_cheats_work() {
+        let mut g = Game::new(58);
+        g.cheat(FIRST_NPC_CHEAT);
+        assert!(g.tipped && g.tier >= Tier::Uneasy, "Stufe steigt nicht");
+        g.cheat(FIRST_NPC_CHEAT + 1);
+        assert_eq!(g.director.phase, super::super::director::Phase::Peak);
+        g.cheat(FIRST_NPC_CHEAT + 2);
+        assert_eq!(g.director.phase, super::super::director::Phase::Relax);
+        g.cheat(FIRST_NPC_CHEAT + 3);
+        let behind = g
+            .customers
+            .iter()
+            .any(|c| c.stalker && c.brain.fresh() && (c.pos - g.player.pos).length() < 7.5);
+        assert!(behind, "kein Verfolger hinter dir");
+        g.cheat(FIRST_NPC_CHEAT + 4);
+        assert!(g.npc_debug && !g.npc_debug_labels().is_empty());
     }
 
     #[test]

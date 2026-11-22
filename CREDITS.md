@@ -8,6 +8,7 @@ Spiel, Engine, Code, Shader und alle Sounds (synthetisiert): eigenes Projekt.
 |---|---|---|---|
 | Kundschaft und Personal (24 + 8 Varianten, Teile gemischt, Personal in Dienstkleidung umgefärbt und gesichtslos) | [Ultimate Modular Men Pack](https://poly.pizza/bundle/ZiH8muWqwQ), [Ultimate Modular Women Pack](https://poly.pizza/bundle/aCBDXDdTNN) | Quaternius | CC0 1.0 |
 | Mannequin in Sitzpose (frühere Kassiererin, noch in den Spieldateien) und Sitz-Animation `Sitting_Idle_Loop` (auf die Personal-Figur der Kassiererin übertragen) | Universal Animation Library 1 | Quaternius | CC0 1.0 |
+| Figuren-Animationen: Ducken, Zombie-Gang, Aufstehen, Arme verschränkt, Telefonieren, Reden, Aufheben, Wagen schieben, Tragen, kniend Einräumen, Kopfschütteln, förmliches Gehen (auf das Skelett der Modular-Figuren übertragen) | [Universal Animation Library](https://quaternius.itch.io/universal-animation-library) 1 und [2](https://quaternius.itch.io/universal-animation-library-2) | Quaternius (mit Gonzalo Furnier) | CC0 1.0 |
 | Einkaufswagen ("Shopping cart") | [poly.pizza/m/4lhRcMbl1pw](https://poly.pizza/m/4lhRcMbl1pw) | Poly by Google | **CC-BY 3.0** |
 | Ratte ("Rat") | [poly.pizza/m/6hsesZHvcPI](https://poly.pizza/m/6hsesZHvcPI) | Poly by Google | **CC-BY 3.0** |
 | Zigarette ("Cigarette") | [poly.pizza/m/2RL6h8MbDPb](https://poly.pizza/m/2RL6h8MbDPb) | Zgeal | **CC-BY 3.0** |

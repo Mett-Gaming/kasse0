@@ -1,10 +1,13 @@
 //! Animierte Figuren (Kundschaft und Personal): Meshes mit Knochen-Gewichten (.k0s) und
-//! Animationen als Knochen-Matrizen pro Bild (.k0a), erzeugt von tools/prepare_people.py.
-//! Die CPU tastet die Animation ab, die GPU verformt die Figur (Skinning im Vertex-Shader).
+//! Animationen mit Knochen-Hierarchie (.k0a v2), erzeugt von tools/prepare_people.py.
+//! Die CPU rechnet die Pose (anim.rs), die GPU verformt die Figur (Skinning im Vertex-Shader).
 
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Vec3, Vec4};
 use std::sync::OnceLock;
+
+mod anim;
+pub use anim::{AnimSet, Animator, Clip, PoseFx, SIT_BACK, SIT_UP};
 
 mod gen {
     include!(concat!(env!("OUT_DIR"), "/people_gen.rs"));
@@ -34,35 +37,6 @@ pub struct SkinData {
     pub vertices: Vec<SkinVertex>,
 }
 
-/// Animation einer Figur (Reihenfolge wie CLIPS in tools/prepare_people.py)
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Clip {
-    Idle = 0,
-    Walk = 1,
-    Reach = 2,
-    Run = 3,
-    /// Sitzen (Kassiererin): aus der Animations-Bibliothek uebertragen (tools/prepare_people.py)
-    Sit = 4,
-}
-
-/// Sitzpose: so weit liegt das Gesaess hinter dem Figur-Ursprung (Meter, gegen die
-/// Blickrichtung) - so stellt man die Figur, damit sie auf einem Stuhl landet
-pub const SIT_BACK: f32 = 0.25;
-/// und so viel hoeher, damit es auf der Sitzflaeche aufliegt
-pub const SIT_UP: f32 = 0.03;
-
-struct ClipData {
-    fps: f32,
-    frames: usize,
-    /// frames * bones Matrizen
-    mats: Vec<Mat4>,
-}
-
-pub struct AnimSet {
-    bones: usize,
-    clips: Vec<ClipData>,
-}
-
 fn f32_at(b: &[u8], o: usize) -> f32 {
     f32::from_le_bytes(b[o..o + 4].try_into().unwrap())
 }
@@ -90,75 +64,14 @@ pub fn parse_skin(b: &[u8]) -> SkinData {
     SkinData { vertices }
 }
 
-fn parse_anim(b: &[u8]) -> AnimSet {
-    assert_eq!(&b[0..4], b"K0A1", "keine K0A1-Animation");
-    let bones = u32_at(b, 4) as usize;
-    let count = u32_at(b, 8) as usize;
-    let mut o = 12;
-    let mut clips = Vec::with_capacity(count);
-    for _ in 0..count {
-        let len = b[o] as usize;
-        o += 1 + len;
-        let fps = f32_at(b, o);
-        let frames = u32_at(b, o + 4) as usize;
-        o += 8;
-        let mut mats = Vec::with_capacity(frames * bones);
-        for _ in 0..frames * bones {
-            let m = |r: usize, c: usize| f32_at(b, o + (r * 4 + c) * 4);
-            // 3x4 zeilenweise -> Spalten fuer glam
-            mats.push(Mat4::from_cols(
-                Vec4::new(m(0, 0), m(1, 0), m(2, 0), 0.0),
-                Vec4::new(m(0, 1), m(1, 1), m(2, 1), 0.0),
-                Vec4::new(m(0, 2), m(1, 2), m(2, 2), 0.0),
-                Vec4::new(m(0, 3), m(1, 3), m(2, 3), 1.0),
-            ));
-            o += 48;
-        }
-        clips.push(ClipData { fps, frames, mats });
-    }
-    AnimSet { bones, clips }
-}
-
-impl AnimSet {
-    pub fn bones(&self) -> usize {
-        self.bones
-    }
-
-    /// Knochen-Matrizen zur Zeit `t` (Sekunden, laeuft in Schleife), zwischen zwei Bildern gemischt.
-    pub fn sample(&self, clip: Clip, t: f32, out: &mut Vec<Mat4>) {
-        let c = &self.clips[clip as usize];
-        let pos = (t * c.fps).rem_euclid(c.frames as f32);
-        let f0 = pos.floor() as usize % c.frames;
-        let f1 = (f0 + 1) % c.frames;
-        let a = pos.fract();
-        for b in 0..self.bones {
-            let m0 = c.mats[f0 * self.bones + b];
-            let m1 = c.mats[f1 * self.bones + b];
-            out.push(Mat4::from_cols(
-                m0.x_axis.lerp(m1.x_axis, a),
-                m0.y_axis.lerp(m1.y_axis, a),
-                m0.z_axis.lerp(m1.z_axis, a),
-                m0.w_axis.lerp(m1.w_axis, a),
-            ));
-        }
-    }
-
-    /// Dauer eines Clips in Sekunden.
-    #[allow(dead_code)]
-    pub fn duration(&self, clip: Clip) -> f32 {
-        let c = &self.clips[clip as usize];
-        c.frames as f32 / c.fps
-    }
-}
-
 /// Animationen fuer Maenner- bzw. Frauen-Skelett.
 pub fn anims(female: bool) -> &'static AnimSet {
     static M: OnceLock<AnimSet> = OnceLock::new();
     static F: OnceLock<AnimSet> = OnceLock::new();
     if female {
-        F.get_or_init(|| parse_anim(gen::ANIM_F_BYTES))
+        F.get_or_init(|| anim::parse_anim(gen::ANIM_F_BYTES))
     } else {
-        M.get_or_init(|| parse_anim(gen::ANIM_M_BYTES))
+        M.get_or_init(|| anim::parse_anim(gen::ANIM_M_BYTES))
     }
 }
 
@@ -193,6 +106,10 @@ pub struct PersonDraw {
     pub ghost: bool,
     /// kopfueber (Fuesse oben an `pos`)
     pub flip: bool,
+    /// Blickziel des Kopfes (Welt), None = Kopf folgt der Animation
+    pub look_at: Option<Vec3>,
+    /// Ueberblenden, Blickgrenze, Zucken, Strecken, Stop-Motion
+    pub fx: PoseFx,
 }
 
 #[cfg(test)]
@@ -226,38 +143,62 @@ mod tests {
         }
     }
 
+    /// Alle Vertices einer Figur in der Pose `clip` bei t = 0 (Engine-Koordinaten).
+    fn posed(v: usize, s: &SkinData, clip: Clip) -> Vec<(Vec3, Vec3)> {
+        let mut m = Vec::new();
+        anims(PEOPLE[v].1).sample(clip, 0.0, &mut m);
+        s.vertices
+            .iter()
+            .map(|vx| {
+                let p = Vec3::from(vx.pos).extend(1.0);
+                let mut r = Vec4::ZERO;
+                for k in 0..4 {
+                    r += m[vx.joints[k] as usize] * p * vx.weights[k];
+                }
+                (Vec3::from(vx.pos), r.truncate())
+            })
+            .collect()
+    }
+
     #[test]
-    fn sitting_pose_is_lower_and_has_the_seat_behind() {
-        // Sitzpose: Kopf deutlich tiefer als im Stehen, Fuesse weiter am Boden
+    fn the_cashier_can_sit_on_a_chair() {
+        // Sitzpose (Clip "sit"): deutlich tiefer als im Stehen, Fuesse am Boden, Gesaess
+        // etwa SIT_BACK hinter dem Ursprung in Sitzhoehe - dort steht der Stuhl
         let skins = load_skins();
         for (v, s) in skins.iter().enumerate() {
-            let a = anims(PEOPLE[v].1);
-            let top = |clip: Clip| {
-                let mut m = Vec::new();
-                a.sample(clip, 0.0, &mut m);
-                let (mut lo, mut hi) = (f32::MAX, f32::MIN);
-                for vx in s.vertices.iter().step_by(5) {
-                    let p = Vec3::from(vx.pos).extend(1.0);
-                    let mut r = Vec4::ZERO;
-                    for k in 0..4 {
-                        r += m[vx.joints[k] as usize] * p * vx.weights[k];
-                    }
-                    lo = lo.min(r.y);
-                    hi = hi.max(r.y);
-                }
-                (lo, hi)
-            };
-            let (_, stand) = top(Clip::Idle);
-            let (feet, sit) = top(Clip::Sit);
+            assert!(anims(PEOPLE[v].1).has_clip(Clip::Sit), "Sitz-Clip fehlt");
+            let stand = posed(v, s, Clip::Idle);
+            let sit = posed(v, s, Clip::Sit);
+            let top = |pts: &[(Vec3, Vec3)]| pts.iter().map(|p| p.1.y).fold(f32::MIN, f32::max);
+            let low = sit.iter().map(|p| p.1.y).fold(f32::MAX, f32::min);
             assert!(
-                sit < stand - 0.25,
-                "{} sitzt nicht: {stand} -> {sit}",
+                top(&sit) < top(&stand) - 0.25,
+                "{} sitzt nicht",
                 PEOPLE[v].0
             );
             assert!(
-                feet.abs() < 0.15,
-                "{} Fuesse schweben im Sitzen: {feet}",
+                low.abs() < 0.15,
+                "{} Fuesse schweben im Sitzen: {low}",
                 PEOPLE[v].0
+            );
+            // Gesaess: tiefster Punkt der Vertices, die in Ruhe auf Hueft-Hoehe liegen
+            let butt = sit
+                .iter()
+                .filter(|(rest, _)| rest.y > 0.75 && rest.y < 0.95)
+                .map(|p| p.1)
+                .min_by(|a, b| a.y.total_cmp(&b.y))
+                .unwrap();
+            assert!(
+                butt.y > 0.3 && butt.y < 0.6,
+                "{} Gesaess auf {} m",
+                PEOPLE[v].0,
+                butt.y
+            );
+            assert!(
+                (butt.z + SIT_BACK).abs() < 0.15,
+                "{} Gesaess {} m vor/hinter dem Ursprung",
+                PEOPLE[v].0,
+                butt.z
             );
         }
     }

@@ -142,7 +142,7 @@ impl Game {
         let old = e.pos;
         e.pos = npc::step_along(&self.world, &self.player_field, e.pos, player, speed, dt);
         e.moving = (e.pos - old).length_squared() > 1e-8;
-        e.yaw = npc::yaw_towards(e.pos, player);
+        e.yaw = lerp_angle(e.yaw, npc::yaw_towards(e.pos, player), (dt * 10.0).min(1.0));
         let d = vec3(e.pos.x - player.x, 0.0, e.pos.z - player.z).length();
         if d < CATCH_DIST && !self.god && !self.paid_and_outside() {
             let (at, v) = (self.employees[i].pos, self.employees[i].variant);

@@ -2,6 +2,7 @@
 //! genau einen Schreck aus (Menue mit F1, untere Haelfte).
 
 use super::mirage::Hologram;
+use super::scare_kinds::ScareKind;
 use super::scares::CartGhost;
 use super::*;
 
@@ -20,10 +21,107 @@ impl Game {
             6 => self.cheat_ceiling(true),
             7 => self.cheat_monitor(),
             8 => self.cheat_death(),
-            _ => {
+            9 => {
                 self.troll_request = true;
                 "Jumpscares abschalten ...".into()
             }
+            10 => self.cheat_freezer(),
+            11 => {
+                self.scare_stage(Tier::Uneasy);
+                self.stand_in_aisle();
+                if self.start_free_scare(ScareKind::Crawler) {
+                    "An der Decke.".into()
+                } else {
+                    "Keine freie Decke im Blick.".into()
+                }
+            }
+            12 => self.cheat_all_look(),
+            13 => {
+                self.scare_stage(Tier::Uneasy);
+                self.stand_in_aisle();
+                self.start_free_scare(ScareKind::DarkSteps);
+                "Licht aus.".into()
+            }
+            14 => self.cheat_shelf(true),
+            15 => {
+                self.scare_stage(Tier::Uneasy);
+                self.stand_in_aisle();
+                let p = self.player.pos;
+                self.trolley.pos = self.world.collide(p + vec3(0.0, 0.0, 2.8), 0.42);
+                self.show_cart_rider();
+                "Im Wagen.".into()
+            }
+            16 => {
+                self.scare_stage(Tier::Uneasy);
+                self.start_free_scare(ScareKind::Announcement);
+                "Durchsage.".into()
+            }
+            _ => self.cheat_shelf(false),
+        }
+    }
+
+    fn cheat_freezer(&mut self) -> String {
+        self.scare_stage(Tier::Wrong);
+        let Some(&(mid, yaw, _)) = self.world.freezers.first() else {
+            return "Keine Kuehltruhe im Markt.".into();
+        };
+        let side = vec3(yaw.cos(), 0.0, -yaw.sin());
+        let stand = self.world.collide(mid + side * 1.1, 0.3);
+        self.player.pos = stand;
+        let to = vec3(mid.x, 0.5, mid.z) - self.eye();
+        self.player.yaw = to.x.atan2(-to.z);
+        self.player.pitch = (to.y / to.length()).asin();
+        self.show_freezer(mid, yaw);
+        "Schau in die Truhe.".into()
+    }
+
+    fn cheat_all_look(&mut self) -> String {
+        self.scare_stage(Tier::Uneasy);
+        self.stand_in_aisle();
+        let p = self.player.pos;
+        for k in 0..3 {
+            let want = p + vec3(k as f32 * 0.7 - 0.7, 0.0, 4.0 + k as f32);
+            let q = self.world.collide(want, 0.25);
+            self.spawn_customer_at(q);
+            let c = self.customers.last_mut().unwrap();
+            c.stalker = false;
+            c.angry = 0.0;
+            c.seen = true;
+            c.yaw = std::f32::consts::PI * 0.3 * k as f32;
+        }
+        self.start_free_scare(ScareKind::AllLook);
+        "Alle schauen.".into()
+    }
+
+    /// Vor ein Regal mit Ware stellen; Gesicht (true) oder herabstuerzende Ware (false).
+    fn cheat_shelf(&mut self, face: bool) -> String {
+        self.scare_stage(Tier::Uneasy);
+        let spot = self.world.items.iter().find_map(|it| {
+            if it.taken || it.pos.y < 0.8 || it.pos.y > 1.6 {
+                return None;
+            }
+            for (dx, dz) in [(0.9f32, 0.0f32), (-0.9, 0.0), (0.0, 0.9), (0.0, -0.9)] {
+                let want = vec3(it.pos.x + dx, 0.0, it.pos.z + dz);
+                if (self.world.collide(want, 0.3) - want).length() < 0.01 {
+                    return Some((want, it.pos));
+                }
+            }
+            None
+        });
+        let Some((stand, item)) = spot else {
+            return "Kein Regal gefunden.".into();
+        };
+        self.player.pos = stand;
+        let to = item - self.eye();
+        self.player.yaw = to.x.atan2(-to.z);
+        self.player.pitch = (to.y / to.length()).asin();
+        if face {
+            self.show_shelf_face(item);
+            "Greif zu.".into()
+        } else if self.start_free_scare(ScareKind::ShelfShake) {
+            "Das Regal kracht.".into()
+        } else {
+            "Zu wenig Ware in der Naehe.".into()
         }
     }
 
@@ -235,5 +333,53 @@ impl Game {
     /// Hat ein Cheat den Troll-Jumpscare angefordert? (setzt die Anfrage zurueck)
     pub fn take_troll_request(&mut self) -> bool {
         std::mem::take(&mut self.troll_request)
+    }
+}
+
+impl Game {
+    /// Cheats fuer NPCs, Stufen und die Spannungskurve.
+    pub(super) fn npc_cheat(&mut self, k: usize) -> String {
+        match k {
+            0 => {
+                self.tip();
+                let next = match self.tier {
+                    Tier::Calm => Tier::Uneasy,
+                    Tier::Uneasy => Tier::Wrong,
+                    _ => Tier::Collapse,
+                };
+                self.force_tier(next);
+                format!("Stufe: {}", self.tier.name())
+            }
+            1 => {
+                self.director.pressure = 1.0;
+                self.director.phase = super::director::Phase::Peak;
+                self.director.t = 0.0;
+                "Director: Höhepunkt (alle Verfolger rücken heran).".into()
+            }
+            2 => {
+                self.director.calm_down(30.0);
+                "Director: 30 s Ruhe.".into()
+            }
+            3 => {
+                self.tip();
+                let i = self.cheat_customer(true);
+                let p = self.player.pos;
+                let f = self.view_dir();
+                let back = vec3(-f.x, 0.0, -f.z).normalize_or_zero();
+                let spot = self.world.collide(p + back * 6.0, 0.25);
+                let c = &mut self.customers[i];
+                c.pos = spot;
+                c.field.clear();
+                c.brain.notice(p, true);
+                "Ein Verfolger steht 6 m hinter dir.".into()
+            }
+            _ => {
+                self.npc_debug = !self.npc_debug;
+                format!(
+                    "NPC-Zustände: {}",
+                    if self.npc_debug { "AN" } else { "AUS" }
+                )
+            }
+        }
     }
 }

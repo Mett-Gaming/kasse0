@@ -195,6 +195,8 @@ pub(super) struct Gen<'a> {
     pub(super) layout: Layout,
     pub(super) items: Vec<ShelfItem>,
     pub(super) spots: Vec<Spot>,
+    /// Kuehltruhen-Stuecke: (Mitte, Laengsrichtung, Laenge)
+    pub(super) freezers: Vec<(Vec3, f32, f32)>,
     /// Zettel-Waren, die noch nirgends stehen (werden bevorzugt platziert)
     pub(super) missing: std::collections::HashSet<usize>,
     /// riesige Waren (Verfall)

@@ -1,16 +1,20 @@
 //! Ein Run: Einkaufen, Kippen, Kunden, Mitarbeiter, Kasse, Ausgang.
 
 pub mod belt_window;
+mod brain;
 mod cheats;
 mod checkout;
 mod corridor;
 mod crowd;
 mod death;
+pub mod director;
 mod draws;
 pub mod escape;
 mod monitor;
 mod scare_cheats;
+pub mod scare_kinds;
 mod scares;
+mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
@@ -338,6 +342,27 @@ pub struct Game {
     rng: Pcg64,
 
     player_field: Vec<u16>,
+    /// Geraeusche dieses Bilds: (Ort, Hoerweite)
+    noises: Vec<(Vec3, f32)>,
+    /// Spannungskurve (director.rs)
+    pub director: director::Director,
+    /// Schrecken dieses Bilds (main.rs leert die Liste) und die letzten Arten
+    pub scares: Vec<scare_kinds::ScareKind>,
+    recent_scares: Vec<scare_kinds::ScareKind>,
+    /// Stil des laufenden Schrecks (Klang, Bildwirkung)
+    scare_style: scare_kinds::ScareStyle,
+    /// Zusatz-Schrecken (Decke, Kuehltruhe, Wagen, ...)
+    extra: scare_kinds::ExtraScares,
+    /// Geraeusche mit Ort: (Klang, Lautstaerke, Ort); main.rs verteilt sie im Stereobild
+    pub sfx_at: Vec<(Sfx, f32, Vec3)>,
+    /// Cheat: Zustand der NPCs ueber ihren Koepfen anzeigen
+    pub npc_debug: bool,
+    /// wie lange der Spieler schon stillsteht; hat er gerade ins Regal gegriffen?
+    player_still: f32,
+    player_reached: bool,
+    /// Weg des rollenden Geisterwagens zum Spieler (ohne die engen Regal-Durchgaenge)
+    cart_field: Vec<u16>,
+    cart_field_timer: f32,
     field_timer: f32,
     next_announce: f32,
     collapse_timer: f32,
@@ -514,6 +539,18 @@ impl Game {
             aspect: 16.0 / 9.0,
             rng,
             player_field: Vec::new(),
+            noises: Vec::new(),
+            director: Default::default(),
+            scares: Vec::new(),
+            recent_scares: Vec::new(),
+            scare_style: scare_kinds::ScareKind::Generic.style(),
+            extra: Default::default(),
+            sfx_at: Vec::new(),
+            npc_debug: false,
+            player_still: 0.0,
+            player_reached: false,
+            cart_field: Vec::new(),
+            cart_field_timer: 0.0,
             field_timer: 0.0,
             next_announce: 0.0,
             collapse_timer: 0.0,
@@ -649,6 +686,23 @@ impl Game {
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn list_complete(&self) -> bool {
         self.list.iter().all(|&i| self.list_done(i))
+    }
+
+    /// Stufe sofort setzen (Cheat): wie ein Aufstieg in check_tier.
+    pub(super) fn force_tier(&mut self, new: Tier) {
+        if new <= self.tier {
+            return;
+        }
+        let old = self.tier;
+        self.tier = new;
+        self.apply_tier_params();
+        self.rebuild_world();
+        self.glitch = 0.8;
+        let extra_c = new.customers().saturating_sub(old.customers());
+        let extra_e = new.employees().saturating_sub(old.employees());
+        self.spawn_customers(extra_c);
+        self.assign_stalkers();
+        self.spawn_employees(extra_e);
     }
 
     fn check_tier(&mut self) {

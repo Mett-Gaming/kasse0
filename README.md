@@ -77,6 +77,21 @@ Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Übers
 - Sortiert ist logisch nach Warengruppen. Mit steigender Eskalation verschieben sich die Abteilungen: erst tauschen Unterabteilungen (Fisch ↔ Käse), dann wandern ganze Abteilungen in fremde Einrichtungen, am Ende steht Ware wild durcheinander und **die Schilder lügen**.
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
+### Was die NPCs wahrnehmen
+- **Verfolger** sehen dich rundum bis 22 m (ganz nah spüren sie dich immer) und hören deine Schritte: Rennen hört man 15 m weit, Gehen kaum, ein quietschender Wagen oder herunterfallende Ware locken sie an. Sie jagen die Stelle, an der sie dich zuletzt bemerkt haben. Hängst du sie ab, suchen sie dort und geben nach einer Weile auf.
+- Zwei oder mehr Verfolger **nehmen dich in die Zange**: Der zweite meidet den Weg des ersten und kommt durch einen anderen Gang.
+- **Mitarbeiter** sehen nur nach vorne (bis 9 m, ganz nah immer). Hören sie Lärm, gehen sie zur Geräuschquelle und sehen sich um.
+- Niemand läuft mehr durch andere hindurch, Wege werden geglättet, und wer irgendwo hängen bleibt, sucht sich einen neuen Weg.
+
+### Wie sich die NPCs verhalten
+- Kunden tun im Stehen etwas: ins Regal greifen, **dieselbe Ware immer wieder nehmen**, telefonieren, Arme verschränken, reden. Im gekippten Markt folgt ihr Kopf dir.
+- Sie **ahmen dich nach**: Stehst du still, erstarren sie. Greifst du ins Regal, greifen sie mit. Starrst du eine an, dreht sie sich weg.
+- Erwischst du einen Verfolger beim Heranschleichen, **erstarrt er mitten im Schritt**. Ab „falsch“ schleichen Verfolger geduckt, im Kollaps wie Untote. Auf den letzten Metern holen sie zum Griff aus.
+- Mitarbeiter **räumen kniend Regale ein** (später endlos dieselbe Lücke), schieben deinen Wagen weg und reden mit dir.
+- Ab „unruhig“ werden die Kunden **körperlich falsch**: Kopf zu weit gedreht, kurze Ruckler wie Stop-Motion. Ab „falsch“ langer Hals, Zucken, zu lange Arme. Im Kollaps lange Glieder, Köpfe bis ganz herum oder verkehrt herum, und wer genau hinsieht, sieht sie **zerreißen**.
+- **Du hörst sie:** Schritte der Verfolger mit Richtung (links/rechts), im Kollaps ein Schlurfen, das Schlüsselbund des Personals, Flüstern aus der Richtung der Flüsternden. Schaust du einen Verfolger an, verstummt er.
+- Ein **Director** steuert die Spannung: Erst rücken einzelne Verfolger heran, dann alle, dann ist eine Weile Ruhe, und die anderen lauern nur auf Abstand. Nach einem Tod sind 20 s Ruhe, auf dem Höhepunkt gibt es keine Scares.
+
 ### Gespräche
 - Während eines Gesprächs bewegt sich kein Kunde (alle frieren in ihrer Pose ein und schauen nur langsam zu dir), auch der Geisterwagen hält an. Danach hast du noch 2,5 s Schonfrist.
 - Rennst du an einem Mitarbeiter vorbei, kann er dich nicht ansprechen. Das fällt aber auf (+20 %), und er folgt dir.
@@ -93,7 +108,7 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
 - Mitarbeiter tragen kräftig blaue Dienstkleidung und leuchten im Dunkeln leicht, damit man sie von der Kundschaft unterscheiden kann.
 - Fata Morganen tauchen auf: eine Kundin, ein Mitarbeiter, ein voller Wagen, ein Ausgangsschild. Sie wirken echt, bis du auf etwa 3 m heran bist, dann flackern sie als Hologramm auf und sind weg.
-- Jumpscares, mit kurzen Ruhepausen dazwischen. Das Licht fällt aus und danach steht jemand vor dir, ein Verfolger steht plötzlich hinter dir, die Kassiererin beugt sich ruckartig zu dir vor, dein abgestellter Wagen verschwindet und rollt von selbst heran, aus Deckenlöchern stürzen Kabel, und auf dem Überwachungsmonitor an der Kasse steht jemand hinter dir, der nicht da ist, wenn du dich umdrehst.
+- Jumpscares, mit kurzen Ruhepausen dazwischen. Das Licht fällt aus und danach steht jemand vor dir, ein Verfolger steht plötzlich hinter dir, die Kassiererin beugt sich ruckartig zu dir vor, dein abgestellter Wagen verschwindet und rollt von selbst heran, aus Deckenlöchern stürzen Kabel, und auf dem Überwachungsmonitor an der Kasse steht jemand hinter dir, der nicht da ist, wenn du dich umdrehst. Dazu: jemand liegt in der Kühltruhe und richtet sich auf, eine Gestalt rennt kopfüber über die Decke, alle Kunden drehen sich gleichzeitig zu dir, im Dunkeln rennt jemand von hinten heran, ein Gesicht schiebt sich zwischen die Ware, in deinem Wagen hockt jemand, die Durchsage kreischt, ein Regal kracht auf dich. Jeder Schreck klingt und wirkt anders, und dieselbe Art kommt nicht direkt wieder.
 
 Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen).
 
@@ -120,11 +135,11 @@ Das Cheat-Menü (**F1**, zwei Spalten) kippt den Markt, füllt den Zettel, erhö
 ### Modelle neu konvertieren
 Waren (Katalog `tools/catalog.json`, Quell-Packs in `assets_src/packs`):
 ```powershell
-D:AppsBlenderlender.exe -b --factory-startup -P tools/prepare_products.py -- .
+D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_products.py -- .
 ```
-Kundschaft und Personal (Varianten in `tools/people.json`, Quelle `assets_src/packs/quaternius_modular_people`):
+Kundschaft und Personal (Varianten in `tools/people.json`, Quelle `assets_src/packs/quaternius_modular_people`, zusätzliche Animationen aus `assets_src/packs/quaternius_ual/UAL1_Standard.glb` und `UAL2_Standard.glb`, Quaternius Universal Animation Library 1+2, CC0). Das Skript schreibt die Knochen-Hierarchie und überträgt die UAL-Clips auf das Figuren-Skelett:
 ```powershell
-D:AppsBlenderlender.exe -b --factory-startup -P tools/prepare_people.py -- .
+D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_people.py -- .
 ```
 Figuren und Requisiten (Quaternius-Mannequins, Poly-Haven-Modelle; mit `$env:KASSE0_ONLY = "cashier,chair"` nur einzelne):
 Die Quell-Modelle liegen in `assets_src/downloads` (Web-Downloads) bzw. auf `F:\Dev\_work\source-assets\quaternius`. Das Skript reduziert die Polygone, friert die Posen ein und ersetzt Texturen durch Durchschnittsfarben:

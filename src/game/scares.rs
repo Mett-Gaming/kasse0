@@ -15,7 +15,7 @@ use super::*;
 use crate::people::{Clip, PersonDraw};
 
 /// Abklingzeit nach einem grossen Schreck (Sekunden, zufaellig dazwischen)
-const SCARE_COOLDOWN: (f32, f32) = (18.0, 32.0);
+pub(super) const SCARE_COOLDOWN: (f32, f32) = (18.0, 32.0);
 /// Stille vor einem angekuendigten Schreck
 const HUSH_TIME: f32 = 1.2;
 /// "Hinter dir": wie weit hinter dem Spieler, wie lange er wartet
@@ -34,7 +34,7 @@ const BLACKOUT_PLACE: f32 = 0.35;
 const BLACKOUT_DIST: f32 = 2.6;
 const BLACKOUT_CHANCE: f32 = 0.035;
 /// Schreck-Effekt: so lange laufen Farbumkehr-Stroboskop, Lichtblitz und Zoom-Ruck
-const SCARE_FX: f32 = 0.55;
+pub(super) const SCARE_FX: f32 = 0.55;
 /// Unterschwellige Farbumkehr-Blitze ab "falsch": Abstand in Sekunden, Dauer
 const SUBLIMINAL_EVERY: (f32, f32) = (14.0, 30.0);
 const SUBLIMINAL_TIME: f32 = 0.09;
@@ -64,17 +64,12 @@ impl Game {
             && self.dialog.is_none()
             && !self.paid
             && !self.till_paying()
+            && self.director.allows_scares()
     }
 
     /// Schreck ausloesen: harter Klang, Bildriss, kurzer roter Blitz, danach Abklingzeit.
     pub(super) fn fire_scare(&mut self, strength: f32) {
-        self.sfx.push((Sfx::Scare, 0.6 + 0.4 * strength));
-        self.glitch = self.glitch.max(0.6 + 0.4 * strength);
-        self.red = self.red.max(0.35 * strength);
-        self.hush_t = 0.0;
-        self.scare_cd = self.rng.gen_range(SCARE_COOLDOWN.0..SCARE_COOLDOWN.1);
-        self.scare_fx = SCARE_FX;
-        self.scare_fx_strength = strength;
+        self.fire_scare_kind(super::scare_kinds::ScareKind::Generic, strength);
     }
 
     /// 0..1 wie weit der Schreck-Effekt noch laeuft (1 = gerade ausgeloest)
@@ -89,7 +84,7 @@ impl Game {
         let k = self.scare_fx_k();
         let strobe = |hz: f32| ((t * hz) as i64 % 2 == 0) as i32 as f32;
         let mut inv = 0.0f32;
-        if k > 0.35 {
+        if k > 0.35 && self.scare_style.invert {
             inv = strobe(18.0);
         }
         if let Some((bt, _)) = self.blackout {
@@ -110,13 +105,13 @@ impl Game {
             return 0.0;
         }
         let flick = 0.6 + 0.4 * ((self.time * 40.0).sin() * 0.5 + 0.5);
-        k * k * flick * (0.5 + 0.5 * self.scare_fx_strength)
+        k * k * flick * (0.5 + 0.5 * self.scare_fx_strength) * self.scare_style.flash
     }
 
     /// Zoom-Ruck: das Sichtfeld zieht beim Schreck ruckartig zusammen (Faktor < 1).
     pub fn scare_zoom(&self) -> f32 {
         let k = self.scare_fx_k();
-        1.0 - 0.3 * k * k * (0.5 + 0.5 * self.scare_fx_strength)
+        1.0 - self.scare_style.zoom * k * k * (0.5 + 0.5 * self.scare_fx_strength)
     }
 
     fn update_scare_fx(&mut self, dt: f32) {
@@ -155,6 +150,7 @@ impl Game {
         self.update_cart_ghost(dt);
         self.update_ceiling_scares(dt);
         self.update_monitor_scare(dt);
+        self.update_extra_scares(dt);
         self.update_blackout(dt);
     }
 
@@ -170,13 +166,13 @@ impl Game {
                 // umgedreht: er steht direkt vor einem
                 c.stare = 1.5;
                 self.behind = None;
-                self.fire_scare(1.0);
+                self.fire_scare_kind(super::scare_kinds::ScareKind::Behind, 1.0);
             } else if c.stare <= 0.0 {
                 self.behind = None;
             }
             return;
         }
-        if !self.can_scare(true) {
+        if !self.can_scare_kind(true, super::scare_kinds::ScareKind::Behind) {
             return;
         }
         // abgelenkt: Zettel offen oder Blick ins Regal, dazu ein bisschen Zufall
@@ -220,7 +216,7 @@ impl Game {
         }
         self.cashier_done = true;
         self.cashier_scare = Some(0.0);
-        self.fire_scare(1.0);
+        self.fire_scare_kind(super::scare_kinds::ScareKind::Cashier, 1.0);
     }
 
     fn update_cashier_scare(&mut self, dt: f32) {
@@ -244,7 +240,7 @@ impl Game {
             if now >= BLACKOUT_TIME {
                 self.blackout = None;
                 if figure.is_some() {
-                    self.fire_scare(1.0);
+                    self.fire_scare_kind(super::scare_kinds::ScareKind::Blackout, 1.0);
                 } else {
                     self.sfx.push((Sfx::Sting, 0.6));
                 }
@@ -253,7 +249,9 @@ impl Game {
             }
             return;
         }
-        if !self.can_scare(true) || self.checking_out() {
+        if !self.can_scare_kind(true, super::scare_kinds::ScareKind::Blackout)
+            || self.checking_out()
+        {
             return;
         }
         if !self
@@ -294,7 +292,8 @@ impl Game {
 
     /// Wie dunkel der Stromausfall das Bild gerade macht (0..1); am Ende flackert das Licht.
     pub fn blackout(&self) -> f32 {
-        match self.blackout {
+        let steps = self.dark_steps_dark();
+        steps.max(match self.blackout {
             Some((t, _)) if t > BLACKOUT_TIME - 0.3 => {
                 if ((t * 30.0) as i32) % 2 == 0 {
                     1.0
@@ -304,7 +303,7 @@ impl Game {
             }
             Some(_) => 1.0,
             None => 0.0,
-        }
+        })
     }
 
     /// Steht die Kassiererin gerade (statt zu sitzen)?
@@ -326,7 +325,9 @@ impl Game {
                     return;
                 }
                 self.cart_unseen += dt;
-                if self.cart_unseen < CART_UNSEEN || !self.can_scare(false) {
+                if self.cart_unseen < CART_UNSEEN
+                    || !self.can_scare_kind(false, super::scare_kinds::ScareKind::CartGhost)
+                {
                     return;
                 }
                 // weg: an einen unbeobachteten Platz weit weg
@@ -360,20 +361,33 @@ impl Game {
                 if (self.trolley.pos - player).length() < CART_STOP {
                     // knallt direkt vor einem zum Stehen
                     self.cart_ghost = CartGhost::Idle;
-                    self.sfx.push((Sfx::Rattle, 1.0));
-                    self.fire_scare(0.7);
+                    self.fire_scare_kind(super::scare_kinds::ScareKind::CartGhost, 0.7);
                     return;
                 }
+                // eigener Weg: durch die engen Durchgaenge passt der Wagen nicht
+                self.cart_field_timer -= dt;
+                if self.cart_field_timer <= 0.0 {
+                    self.cart_field_timer = 1.0;
+                    let nav = &self.world.nav;
+                    let passages = &self.world.passages;
+                    npc::bfs_blocked(nav, player, &mut self.cart_field, |x, z| {
+                        let c = nav.center(x, z);
+                        passages
+                            .iter()
+                            .any(|(p, _)| vec3(c.x - p.x, 0.0, c.z - p.z).length() < 0.7)
+                    });
+                }
                 let old = self.trolley.pos;
-                let new = npc::step_along(
+                let new = npc::step_along_r(
                     &self.world,
-                    &self.player_field,
+                    &self.cart_field,
                     old,
                     player,
                     CART_ROLL_SPEED,
                     dt,
+                    0.3,
                 );
-                self.trolley.pos = self.world.collide(new, 0.3);
+                self.trolley.pos = new;
                 if (new - old).length_squared() > 1e-8 {
                     // Griff zeigt nach hinten: der Wagen rollt mit der Front voran
                     self.trolley.yaw = std::f32::consts::PI - npc::yaw_towards(old, new);
@@ -421,7 +435,7 @@ impl Game {
             if self.tier >= Tier::Collapse && up && self.can_scare(true) {
                 self.hole_done[i] = true;
                 self.hanging = Some((h, 0.0));
-                self.fire_scare(1.0);
+                self.fire_scare_kind(super::scare_kinds::ScareKind::Hanging, 1.0);
                 return;
             }
             // darunter durchlaufen: Kabel stuerzen funkensprühend herab
@@ -430,8 +444,7 @@ impl Game {
                 let fwd = self.view_dir();
                 let spot = player + vec3(fwd.x, 0.0, fwd.z).normalize_or_zero() * 1.1;
                 self.cable_drops.push((vec3(spot.x, 0.0, spot.z), 0.0));
-                self.sfx.push((Sfx::Spark, 0.9));
-                self.fire_scare(0.5);
+                self.fire_scare_kind(super::scare_kinds::ScareKind::Cables, 0.6);
                 return;
             }
         }
@@ -494,6 +507,7 @@ impl Game {
     /// Figuren der Schrecken: aufgestandene Kassiererin, Gestalt kopfueber im Deckenloch,
     /// Gesicht in Grossaufnahme beim Tod.
     pub(super) fn collect_scare_people(&self, out: &mut Vec<PersonDraw>) {
+        self.collect_extra_scare_people(out);
         let staff = crate::people::people_of(true);
         // Kassiererin steht auf und beugt sich zum Spieler
         if let (Some(t), Some(lane)) = (self.cashier_scare, self.open_lane()) {
@@ -510,6 +524,8 @@ impl Game {
                 tint: Vec4::new(0.8, 0.85, 0.9, 0.3),
                 ghost: false,
                 flip: false,
+                look_at: None,
+                fx: Default::default(),
             });
         }
         // kopfueber im Deckenloch
@@ -525,6 +541,8 @@ impl Game {
                 tint: Vec4::new(0.7, 0.7, 0.7, 0.15),
                 ghost: false,
                 flip: true,
+                look_at: None,
+                fx: Default::default(),
             });
         }
         // Tod: das leere Gesicht direkt vor der Kamera, bevor das Bild wegkippt
@@ -559,6 +577,8 @@ impl Game {
             tint: Vec4::new(0.85, 0.85, 0.85, 0.2),
             ghost: false,
             flip: false,
+            look_at: None,
+            fx: Default::default(),
         }
     }
 }

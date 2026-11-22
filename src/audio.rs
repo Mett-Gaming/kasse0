@@ -48,7 +48,22 @@ pub enum Sfx {
     Creak,
     /// Klopfen am Absperrband
     Knock,
+    /// schlurfender Schritt (Untote im Kollaps)
+    Shuffle,
+    /// hohes, kratzendes Kreischen (wie ein Bogen auf Metall)
+    Screech,
+    /// tiefer, dumpfer Schlag
+    Thud,
+    /// Fernsehrauschen
+    Static,
+    /// anschwellendes tiefes Grollen, das abrupt abbricht
+    Rumble,
+    /// Schluesselbund des Personals
+    Keys,
 }
+
+/// Bis zu dieser Entfernung hoert man Geraeusche mit Ort (Meter)
+pub const HEAR_RANGE: f32 = 18.0;
 
 /// Was die Musik gerade tun soll.
 pub struct Mood {
@@ -215,6 +230,87 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 let env = (t * 400.0).min(1.0) * (1.0 - ((t - 1.9) / 0.7).max(0.0)).max(0.0);
                 let mix = (scream * 0.9 + metal + noise) * env + boom;
                 (mix * 2.2).tanh() * 0.95
+            })
+        }
+        Sfx::Screech => {
+            // Bogen auf Metall: hoher Saegezahn mit nervoesem Vibrato, verzerrt, kratzend
+            let mut ph = 0.0f32;
+            let mut ph2 = 0.0f32;
+            gen(1.1, &mut |t| {
+                let f = 1650.0 + 260.0 * (TAU * 13.0 * t).sin() + 140.0 * rng.next();
+                ph = (ph + f / RATE as f32).fract();
+                ph2 = (ph2 + f * 1.493 / RATE as f32).fract();
+                let x = (ph * 2.0 - 1.0) + 0.5 * (ph2 * 2.0 - 1.0) + rng.next() * 0.35;
+                let env = (t * 60.0).min(1.0) * (1.0 - t / 1.1).max(0.0).powf(1.3);
+                (x * 1.8).tanh() * 0.55 * env
+            })
+        }
+        Sfx::Thud => {
+            // dumpfer Einschlag: tiefer Sinus, der absackt, plus kurzer Klick
+            let mut ph = 0.0f32;
+            gen(0.9, &mut |t| {
+                let f = 70.0 * (1.0 - t / 0.9).max(0.35);
+                ph = (ph + f / RATE as f32).fract();
+                let body = (TAU * ph).sin() * (-t * 5.0).exp();
+                let click = rng.next() * (-t * 120.0).exp();
+                ((body * 1.4 + click * 0.5) * 1.5).tanh() * 0.9
+            })
+        }
+        Sfx::Static => {
+            // Fernsehrauschen: grob abgetastetes Rauschen in Schueben
+            let mut hold = 0.0f32;
+            let mut n = 0usize;
+            gen(0.7, &mut |t| {
+                if n % 6 == 0 {
+                    hold = rng.next();
+                }
+                n += 1;
+                let gate = if ((t * 23.0) as i32) % 3 == 0 {
+                    0.4
+                } else {
+                    1.0
+                };
+                hold * 0.5 * gate * (1.0 - t / 0.7).max(0.0)
+            })
+        }
+        Sfx::Rumble => {
+            // tiefes Grollen schwillt an und bricht abrupt ab
+            let mut lp = 0.0f32;
+            let mut ph = 0.0f32;
+            gen(1.4, &mut |t| {
+                lp += (rng.next() - lp) * 0.02;
+                ph = (ph + 42.0 / RATE as f32).fract();
+                let swell = (t / 1.3).min(1.0).powi(2);
+                let cut = if t > 1.3 {
+                    (1.0 - (t - 1.3) / 0.1).max(0.0)
+                } else {
+                    1.0
+                };
+                ((lp * 3.0 + (TAU * ph).sin() * 0.6) * swell * cut * 0.8).clamp(-1.0, 1.0)
+            })
+        }
+        Sfx::Shuffle => {
+            // Schleifen ueber den Boden: gefiltertes Rauschen, das an- und abschwillt
+            let mut lp = 0.0;
+            gen(0.5, &mut |t| {
+                let n = rng.next();
+                lp += (n - lp) * 0.08;
+                let env = (t / 0.08).min(1.0) * (1.0 - t / 0.5).max(0.0).powi(2);
+                lp * 0.9 * env
+            })
+        }
+        Sfx::Keys => {
+            // Schluessel: kurze, hohe, unharmonische Klingeltoene nacheinander
+            gen(0.45, &mut |t| {
+                let mut s = 0.0;
+                for (k, f) in [3150.0f32, 4210.0, 5370.0, 3720.0].iter().enumerate() {
+                    let t0 = k as f32 * 0.08;
+                    if t > t0 {
+                        let u = t - t0;
+                        s += (TAU * f * u).sin() * (-u * 28.0).exp();
+                    }
+                }
+                s * 0.18
             })
         }
         Sfx::Spark => {
@@ -437,6 +533,12 @@ impl Audio {
             Sfx::Knock,
             Sfx::Scare,
             Sfx::Shriek,
+            Sfx::Shuffle,
+            Sfx::Keys,
+            Sfx::Screech,
+            Sfx::Thud,
+            Sfx::Static,
+            Sfx::Rumble,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -459,6 +561,26 @@ impl Audio {
 
     pub fn play(&self, sfx: Sfx) {
         self.play_vol(sfx, 1.0);
+    }
+
+    /// Wie `play_vol`, aber im Stereobild verteilt: `pan` -1 = links, 1 = rechts.
+    pub fn play_at(&self, sfx: Sfx, vol: f32, pan: f32) {
+        let Some((_, data)) = self
+            .sounds
+            .iter()
+            .find(|(s, _)| std::mem::discriminant(s) == std::mem::discriminant(&sfx))
+        else {
+            return;
+        };
+        // gleiche Lautheit in der Mitte (Sinus/Kosinus-Verteilung)
+        let a = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
+        let (l, r) = (a.cos(), a.sin());
+        let stereo: Vec<f32> = data.iter().flat_map(|&x| [x * l, x * r]).collect();
+        if let Ok(sink) = Sink::try_new(&self.handle) {
+            sink.set_volume(self.master * vol);
+            sink.append(SamplesBuffer::new(2, RATE, stereo));
+            sink.detach();
+        }
     }
 
     pub fn play_vol(&self, sfx: Sfx, vol: f32) {
@@ -531,6 +653,12 @@ mod tests {
             Sfx::Knock,
             Sfx::Scare,
             Sfx::Shriek,
+            Sfx::Shuffle,
+            Sfx::Keys,
+            Sfx::Screech,
+            Sfx::Thud,
+            Sfx::Static,
+            Sfx::Rumble,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

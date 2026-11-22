@@ -64,8 +64,8 @@ impl Game {
         if scared {
             self.mirage_force_scary = false;
         }
-        if scared && self.can_scare(false) {
-            self.fire_scare(0.7);
+        if scared && self.can_scare_kind(false, super::scare_kinds::ScareKind::Mirage) {
+            self.fire_scare_kind(super::scare_kinds::ScareKind::Mirage, 0.7);
         }
 
         self.mirage_timer -= dt;

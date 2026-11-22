@@ -439,6 +439,23 @@ impl App {
             for (s, v) in self.game.sfx.drain(..) {
                 a.play_vol(s, v);
             }
+            self.game.scares.clear();
+            // Geraeusche mit Ort: leiser mit der Entfernung, links/rechts nach Richtung
+            let eye = self.game.eye();
+            let right = self
+                .game
+                .view_dir()
+                .cross(glam::Vec3::Y)
+                .normalize_or_zero();
+            for (s, v, at) in self.game.sfx_at.drain(..) {
+                let d = at - eye;
+                let dist = d.length();
+                let fall = (1.0 - dist / audio::HEAR_RANGE).clamp(0.0, 1.0).powf(1.5);
+                if fall > 0.0 {
+                    let pan = right.dot(d / dist.max(0.01)).clamp(-1.0, 1.0);
+                    a.play_at(s, v * fall, pan);
+                }
+            }
             a.update(&Mood {
                 playing: self.screen != Screen::Title,
                 tipped: self.game.tipped,
@@ -484,6 +501,25 @@ impl App {
                 hud::MENU_SCARE_TIME - self.menu_scare,
                 self.clock,
             );
+        }
+        // Cheat: Zustand der NPCs ueber ihren Koepfen
+        if self.screen == Screen::Playing && self.game.npc_debug {
+            let vp = self.game.view_proj(aspect);
+            let labels: Vec<(f32, f32, String)> = self
+                .game
+                .npc_debug_labels()
+                .into_iter()
+                .filter_map(|(at, text)| {
+                    let c = vp * at.extend(1.0);
+                    if c.w <= 0.05 {
+                        return None;
+                    }
+                    let (x, y) = (c.x / c.w, c.y / c.w);
+                    (x.abs() < 1.0 && y.abs() < 1.0)
+                        .then(|| ((x * 0.5 + 0.5) * ui::W, (0.5 - y * 0.5) * ui::H, text))
+                })
+                .collect();
+            hud::draw_npc_debug(&mut self.ui, &labels, &self.game);
         }
 
         let Some(r) = self.running.as_mut() else {
@@ -540,6 +576,13 @@ impl App {
         let g = &self.game;
         let troll = (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare);
         let mut view_proj = g.view_proj(aspect);
+        // Kamera wackelt beim Schreck (je nach Art)
+        let (sx, sy, sr) = g.scare_shake();
+        if sx != 0.0 || sy != 0.0 || sr != 0.0 {
+            view_proj = glam::Mat4::from_translation(glam::vec3(sx, sy, 0.0))
+                * glam::Mat4::from_rotation_z(sr)
+                * view_proj;
+        }
         if let Some(e) = troll {
             // Bild wackelt und kippt (stark beim Einschlag, danach weniger)
             let k = if e < hud::MENU_SCARE_FACE { 1.0 } else { 0.35 };
@@ -692,6 +735,19 @@ impl App {
                     && self.sel < game::cheat_groups().len() =>
             {
                 self.activate(event_loop, 1)
+            }
+            // lange Kategorie (zwei Spalten): links/rechts wechselt die Spalte
+            KeyCode::ArrowRight | KeyCode::KeyD
+                if hud::two_column_rows(self.screen).is_some_and(|r| self.sel + r < n) =>
+            {
+                self.sel += hud::two_column_rows(self.screen).unwrap();
+                self.sfx(Sfx::Blip);
+            }
+            KeyCode::ArrowLeft | KeyCode::KeyA
+                if hud::two_column_rows(self.screen).is_some_and(|r| self.sel >= r) =>
+            {
+                self.sel -= hud::two_column_rows(self.screen).unwrap();
+                self.sfx(Sfx::Blip);
             }
             KeyCode::ArrowLeft | KeyCode::KeyA
                 if matches!(self.screen, Screen::Cheats { group: Some(_) }) =>
@@ -889,8 +945,13 @@ fn add_skins(
 ) {
     for p in people_in {
         let first_bone = bones.len() as u32;
+        let model =
+            glam::Mat4::from_rotation_translation(glam::Quat::from_rotation_y(p.yaw), p.pos);
+        let mut fx = p.fx;
+        // Blickziel in Figuren-Koordinaten (vorne = +z)
+        fx.look = p.look_at.map(|w| model.inverse().transform_point3(w));
         people::anims(people::PEOPLE[p.variant % people::PEOPLE.len()].1)
-            .sample(p.clip, p.time, bones);
+            .pose(p.clip, p.time, &fx, bones);
         skins.push(render::SkinDraw {
             skin: p.variant,
             model: if p.flip {
@@ -906,6 +967,7 @@ fn add_skins(
             tint: p.tint,
             first_bone,
             ghost: p.ghost,
+            distort: p.fx.distort,
         });
     }
 }

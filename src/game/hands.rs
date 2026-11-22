@@ -133,6 +133,13 @@ impl Game {
         if p.step_acc > 0.7 {
             p.step_acc = 0.0;
             self.sfx.push((Sfx::Step, if running { 0.5 } else { 0.25 }));
+            // Schritte hoert man: Rennen weit, Gehen kaum
+            let r = if running {
+                super::senses::NOISE_RUN
+            } else {
+                super::senses::NOISE_WALK
+            };
+            self.noise(pos, r);
         }
         if let Some(t) = &mut self.tutorial {
             t.walked += moved;
@@ -374,14 +381,10 @@ impl Game {
         }
     }
 
-    /// Lautes Geraeusch an der Spielerposition: Mitarbeiter im Umkreis kommen nachsehen.
+    /// Lautes Geraeusch an der Spielerposition: wer es hoert, kommt nachsehen (senses.rs).
     pub(super) fn make_noise(&mut self, radius: f32) {
         let p = self.player.pos;
-        for e in &mut self.employees {
-            if !e.carrying && e.ignore <= 0.0 && (e.pos - p).length() < radius {
-                e.heard = 6.0;
-            }
-        }
+        self.noise(p, radius);
     }
 
     /// Mitarbeiter schnappt sich den herrenlosen Wagen und bringt ihn zur Wagenbox.
@@ -473,8 +476,11 @@ impl Game {
         if it.taken {
             return;
         }
+        self.player_reached = true;
         it.taken = true;
+        let item_pos = it.pos;
         let data = ItemData::from_shelf(it);
+        self.maybe_shelf_face(item_pos);
         self.statics_dirty = true;
         self.play(Sfx::Pickup, 0.5);
         self.held = Some(data);
@@ -550,10 +556,12 @@ impl Game {
 
     /// Fallen gelassene Waren: Schwerkraft, landen auf Boden oder Hindernissen.
     pub(super) fn update_loose(&mut self, dt: f32) {
+        let mut landed = Vec::new();
         for l in &mut self.loose {
             if l.vel == Vec3::ZERO {
                 continue;
             }
+            let fast = l.vel.length() > 1.5;
             let prev = l.pos;
             l.vel.y -= 9.81 * dt;
             l.pos += l.vel * dt;
@@ -581,6 +589,13 @@ impl Game {
                 l.pos.y = 0.0;
                 l.vel = Vec3::ZERO;
             }
+            // laut aufgeschlagen: das hoert man
+            if l.vel == Vec3::ZERO && fast {
+                landed.push(l.pos);
+            }
+        }
+        for p in landed {
+            self.noise(p, super::senses::NOISE_DROP);
         }
     }
 

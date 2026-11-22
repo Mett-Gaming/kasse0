@@ -31,6 +31,8 @@ impl Game {
         self.dying = Some(0.0);
         // Schreck: das leere Gesicht kurz in Grossaufnahme (scares.rs)
         self.sfx.push((Sfx::Scare, 1.0));
+        self.sfx.push((Sfx::Thud, 1.0));
+        self.scares.push(super::scare_kinds::ScareKind::Death);
         self.catcher = Some(catcher);
         self.dialog = None;
         self.red = 1.0;
@@ -87,6 +89,8 @@ impl Game {
     }
 
     fn respawn(&mut self) {
+        // danach Ruhe: niemand rueckt heran (director.rs)
+        self.director.calm_down(super::director::CALM_AFTER_DEATH);
         let death_pos = self.player.pos;
         self.dying = None;
         self.catcher = None;
