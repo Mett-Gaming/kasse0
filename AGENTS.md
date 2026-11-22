@@ -31,6 +31,20 @@ Gearbeitet wird direkt auf `main`.
 
 **Nie:** `--force`, Verlauf umschreiben (rebase/amend auf bereits gepushte Commits), Tags oder Branches anderer löschen, Hooks umgehen (`--no-verify`).
 
+### Engine (Mettgine) als Submodule
+Die Engine liegt als Git-Submodule in `mettgine/` ([Mett-Gaming/mettgine](https://github.com/Mett-Gaming/mettgine)). Für alles, was dort passiert, gilt zusätzlich **`mettgine/AGENTS.md`**: Kompatibilität mit allen Spielen, Code-Qualität, eigene Versionen.
+- **Vor der Arbeit** die Engine auf ihren Zweig bringen und aktualisieren:
+  ```
+  git submodule update --init
+  git -C mettgine checkout main
+  git submodule update --remote --merge
+  ```
+  `git -C mettgine branch --show-current` muss `main` zeigen. Nie auf einem losen Commit in der Engine arbeiten.
+- **Gehört eine Änderung in die Engine** (etwas, das auch andere Spiele brauchen könnten): erst im Ordner `mettgine/` nach `mettgine/AGENTS.md` committen, mergen, taggen und pushen. Danach hier den neuen Stand mit `git add mettgine` in den Spiel-Commit aufnehmen. Spielinhalte gehören nie in die Engine.
+- **Reihenfolge beim Pushen:** erst die Engine, dann das Spiel. Sonst zeigt das Spiel auf einen Engine-Stand, den es auf dem Server noch nicht gibt, und der Build schlägt fehl.
+- Hat jemand anderes die Engine geändert, holt `git submodule update --remote --merge` den Stand. Danach prüfen (`cargo test --release`) und den neuen Zeiger mit committen.
+- Die Engine nie als normalen Ordner einchecken und `.gitmodules` nicht ändern, außer die Person verlangt es.
+
 ## 4. Versionen und Releases
 - Tags haben die Form `vMAJOR.MINOR.PATCH` (z. B. `v0.4.1`).
 - Die nächste Version wird **nach** `git fetch --tags` aus dem höchsten vorhandenen Tag berechnet:
