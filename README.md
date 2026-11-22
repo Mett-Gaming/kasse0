@@ -118,8 +118,20 @@ In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ände
 Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
 
 ## Entwicklung
+Die Engine **Mettgine** liegt als Git-Submodule in `mettgine/` ([Mett-Gaming/mettgine](https://github.com/Mett-Gaming/mettgine)). Darum mit `--recursive` klonen bzw. nach dem Holen die Engine mitziehen:
+
 ```powershell
-cargo test                     # Generator, Gameplay-Regeln, UI, Audio, Assets
+git clone --recursive https://github.com/Mett-Gaming/kasse0.git
+git pull
+git submodule update --init --remote --merge
+```
+
+Die Engine steht dabei auf ihrem Zweig `main` (in `.gitmodules`: `branch = main`, `update = merge`), nicht auf einem losen Commit. Engine-Änderungen werden ohne Pull-Requests direkt gemacht:
+1. In `mettgine/` ändern und dort committen, dann `git fetch origin`, `git merge origin/main`, `git push origin main` (bei neuer Funktion oder Korrektur mit Tag `vX.Y.Z`).
+2. In kasse0 den neuen Engine-Stand festhalten: `git add mettgine`, mit den Spieländerungen committen und wie gewohnt pushen.
+
+```powershell
+cargo test                     # Spiel und Engine: Generator, Gameplay-Regeln, UI, Audio, Assets, Animation, Absturzberichte
 ```
 
 Frame-Zeit messen: `$env:KASSE0_PERF = 1` setzen, dann schreibt das Spiel alle 5 s die mittlere Frame-Zeit auf die Konsole (auch im Auto-Screenshot-Durchlauf).
@@ -148,7 +160,7 @@ D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_assets.py -- F
 ```
 
 ## Aufbau
-Das Repository ist ein Cargo-Workspace aus zwei Teilen: **Mettgine** (`mettgine/`, die Engine der Mett-Gaming-Spiele) und dem Spiel KASSE 0 (`src/`). `cargo test` prüft beide.
+Das Repository ist ein Cargo-Workspace aus zwei Teilen: **Mettgine** (`mettgine/`, die Engine der Mett-Gaming-Spiele, als Submodule aus [Mett-Gaming/mettgine](https://github.com/Mett-Gaming/mettgine)) und dem Spiel KASSE 0 (`src/`). `cargo test` prüft beide.
 
 | Pfad | Inhalt |
 |---|---|
