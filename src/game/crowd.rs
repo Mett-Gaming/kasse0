@@ -97,6 +97,7 @@ impl Game {
                 bump_cd: 0.0,
                 whisper_cd: 0.0,
                 gait: Default::default(),
+                stare: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
                 field: Vec::new(),
@@ -137,6 +138,7 @@ impl Game {
                 bump_cd: 0.0,
                 whisper_cd: 0.0,
                 gait: Default::default(),
+                stare: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
                 field: Vec::new(),
@@ -173,6 +175,7 @@ impl Game {
             bump_cd: 0.0,
             whisper_cd: 0.0,
             gait: Default::default(),
+            stare: 0.0,
             stalker: true,
             target: pos,
             field: Vec::new(),
@@ -280,6 +283,13 @@ impl Game {
             c.seen = seen;
             c.moving = false;
             c.bump_cd -= dt;
+            // starrt (nach "hinter dir"): steht nur da, schaut her, tut nichts
+            if c.stare > 0.0 {
+                c.stare -= dt;
+                c.pose = Pose::Idle;
+                c.yaw = lerp_angle(c.yaw, npc::yaw_towards(c.pos, player), (dt * 8.0).min(1.0));
+                continue;
+            }
             // Verfolger kommen naeher, sobald man wegsieht (oder immer, wenn man aufgefallen ist)
             // Nach dem Alarm rennen alle, ob man hinsieht oder nicht
             let hunting = c.stalker && (!seen || noticed || chase);
@@ -325,8 +335,8 @@ impl Game {
             let safe =
                 self.god || self.dialog.is_some() || self.grace > 0.0 || self.till_protects();
             if dist < CATCH_DIST && !self.paid_and_outside() && !safe {
-                let at = self.customers[i].pos;
-                self.caught_by(at);
+                let (at, variant) = (self.customers[i].pos, self.customers[i].variant);
+                self.caught_by(at, variant);
                 return;
             }
         }

@@ -141,6 +141,7 @@ impl Gen<'_> {
 
     /// Loch in der Decke: Leere, herabhaengende Kabel, Truemmer darunter.
     fn ceiling_hole(&mut self, c: Vec3) {
+        self.ceiling_holes.push(c);
         let h = CEILING_HEIGHT;
         let r = self.weird.gen_range(0.5..1.0);
         for _ in 0..3 {

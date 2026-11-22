@@ -27,7 +27,7 @@ pub const PAUSE_ITEMS: &[&str] = &[
     "Beenden",
 ];
 pub const END_ITEMS: &[&str] = &["Nochmal (gleicher Seed)", "Neuer Einkauf", "Hauptmenü"];
-pub const OPTION_COUNT: usize = 7;
+pub const OPTION_COUNT: usize = 8;
 
 pub fn option_rows(s: &Settings) -> Vec<String> {
     vec![
@@ -43,6 +43,8 @@ pub fn option_rows(s: &Settings) -> Vec<String> {
             "Tutorial              < {:<4} >",
             if s.tutorial { "An" } else { "Aus" }
         ),
+        // laesst sich nicht abschalten (siehe main.rs: menu_scare)
+        "Jumpscares            < An   >".to_string(),
         "Zurück".to_string(),
     ]
 }
@@ -587,6 +589,21 @@ mod tests {
         assert!(u.verts.len() > 100);
         assert_eq!(u.verts.len() % 6, 0);
     }
+
+    #[test]
+    fn jumpscares_cannot_be_switched_off() {
+        let rows = option_rows(&Settings::default());
+        assert_eq!(rows.len(), OPTION_COUNT);
+        assert!(rows[6].starts_with("Jumpscares") && rows[6].contains("An"));
+        // alle Zeilen passen auf den Bildschirm
+        let (y0, step) = menu_layout(Screen::Options { from_pause: false });
+        assert!(y0 + step * (OPTION_COUNT as f32) < ui::H);
+        let mut u = Ui::default();
+        for e in [0.0, 0.5, 1.5, 3.0] {
+            draw_menu_scare(&mut u, e, 1.0);
+        }
+        assert!(!u.verts.is_empty());
+    }
 }
 
 /// Auffaelligkeits-Meter: schmaler Balken unten links, blinkt bei 100 %.
@@ -623,3 +640,54 @@ fn stamina_meter(u: &mut Ui, s: f32, exhausted: bool) {
     u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.0, 0.0, 0.0, 0.6]);
     u.rect(x, y, w * s.clamp(0.0, 1.0), h, color);
 }
+
+/// Wer versucht, Jumpscares abzuschalten, bekommt einen.
+/// `e` = Sekunden seit dem Ausloesen. Erst weisser Blitz und Stroboskop (das Gesicht macht der
+/// Renderer), dann knallt die Nachricht Zeile fuer Zeile rein und zittert.
+pub fn draw_menu_scare(u: &mut Ui, e: f32, clock: f32) {
+    let shake = |k: f32, amp: f32| {
+        let n = ((clock * 60.0).floor() * 12.9898 + k * 78.233).sin() * 43758.547;
+        (n.fract() - 0.5) * 2.0 * amp
+    };
+    // weisser Blitz zum Einschlag, danach rotes Pulsieren
+    if e < 0.07 {
+        u.rect(0.0, 0.0, ui::W, ui::H, [1.0, 1.0, 1.0, 1.0]);
+        return;
+    }
+    if e < MENU_SCARE_FACE {
+        let strobe = ((e * 14.0) as i32) % 2 == 0;
+        if !strobe {
+            u.rect(0.0, 0.0, ui::W, ui::H, [0.6, 0.0, 0.0, 0.35]);
+        }
+        return;
+    }
+    let t = e - MENU_SCARE_FACE;
+    let pulse = 0.55 + 0.45 * (clock * 18.0).sin().abs();
+    u.rect(0.0, 0.0, ui::W, ui::H, [0.05, 0.0, 0.0, 0.82]);
+    u.rect(0.0, 0.0, ui::W, ui::H, [0.5, 0.0, 0.0, 0.18 * pulse]);
+    let red = [1.0, 0.08 * pulse, 0.05, 1.0];
+    let lines: [(&str, f32, f32, f32); 3] = [
+        ("PEASANT,", 4.0, 62.0, 0.0),
+        ("did you really think...", 2.0, 128.0, 0.45),
+        ("...you could turn us off?", 2.0, 168.0, 1.0),
+    ];
+    for (k, (text, scale, y, at)) in lines.into_iter().enumerate() {
+        if t < at {
+            continue;
+        }
+        // jede Zeile knallt gross rein und schrumpft auf ihre Groesse
+        let slam = (1.0 - (t - at) / 0.12).max(0.0);
+        let sc = scale * (1.0 + slam * 0.8);
+        let amp = 1.5 + slam * 6.0;
+        let w = Ui::text_width(text, sc);
+        let x = (ui::W - w) * 0.5 + shake(k as f32, amp);
+        let yy = y - (sc - scale) * 4.0 + shake(k as f32 + 9.0, amp);
+        // Doppelbild versetzt, wie ein kaputter Fernseher
+        u.text(x + 3.0, yy, text, [0.2, 0.9, 1.0, 0.35], sc);
+        u.text_s(x, yy, text, red, sc);
+    }
+}
+
+/// Dauer des Troll-Jumpscares und wie lange davon das Gesicht zu sehen ist
+pub const MENU_SCARE_TIME: f32 = 3.4;
+pub const MENU_SCARE_FACE: f32 = 1.1;

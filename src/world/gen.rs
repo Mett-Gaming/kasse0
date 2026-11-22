@@ -120,6 +120,7 @@ pub fn generate(params: &WorldParams) -> World {
         rat_runs: Vec::new(),
         drips: Vec::new(),
         sparks: Vec::new(),
+        ceiling_holes: Vec::new(),
     };
 
     // --- Huelle ---
@@ -1007,6 +1008,29 @@ pub fn generate(params: &WorldParams) -> World {
                 a += w;
             }
         }
+        // Ueberwachungsmonitor hinter dem Scanner: zeigt das Bild der Deckenkamera
+        let monitor = vec3(cx - 0.75, 2.45, z0 + 3.3);
+        g.b.add(
+            monitor + vec3(0.0, 0.0, 0.17),
+            vec3(0.3, 0.23, 0.16),
+            vec3(0.16, 0.16, 0.17),
+            PLAIN,
+        );
+        g.b.add(
+            monitor + vec3(0.0, (CEILING_HEIGHT - monitor.y) * 0.5 + 0.11, 0.17),
+            vec3(0.02, (CEILING_HEIGHT - monitor.y) * 0.5 - 0.11, 0.02),
+            vec3(0.35, 0.35, 0.36),
+            PLAIN,
+        );
+        g.b.add_ex(
+            monitor,
+            vec3(0.25, 0.185, 0.008),
+            vec3(0.05, 0.06, 0.05),
+            MONITOR,
+            i as f32,
+            1.2,
+            0.0,
+        );
         lanes.push(Lane {
             scan_point: vec3(cx - 0.7, 0.0, z0 + 2.4),
             register: vec3(cx + 0.12, 0.91, z0 + 2.75),
@@ -1018,6 +1042,7 @@ pub fn generate(params: &WorldParams) -> World {
             seat: vec3(cx + 0.8, 0.0, z0 + 2.5),
             shutter: vec3(cx + 1.32, 1.0, z0 + 2.4),
             camera: vec3(cx + 0.4, 3.78, z0 + 1.2),
+            monitor,
         });
     }
 
@@ -1309,6 +1334,7 @@ pub fn generate(params: &WorldParams) -> World {
         rat_runs,
         drips,
         sparks,
+        ceiling_holes,
         ..
     } = g;
     let nav = build_nav(&b.solids, &b.obbs, width, depth);
@@ -1346,6 +1372,7 @@ pub fn generate(params: &WorldParams) -> World {
         rat_runs,
         drips,
         sparks,
+        ceiling_holes,
         corral,
     };
     world.index_items();

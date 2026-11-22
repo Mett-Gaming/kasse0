@@ -153,6 +153,8 @@ pub struct Customer {
     pub bump_cd: f32,
     /// Pause bis zum naechsten Fluestern
     pub whisper_cd: f32,
+    /// steht still und starrt den Spieler an (nach "hinter dir"), solange > 0
+    pub stare: f32,
     /// Animationszeit, an die Laufstrecke gekoppelt
     pub gait: crate::people::Gait,
     /// Verfolger: schleicht sich an, sobald man wegsieht. Alle anderen kaufen nur ein.

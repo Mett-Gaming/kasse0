@@ -213,6 +213,10 @@ impl Game {
             }
         }
         if self.belt.is_empty() {
+            if self.scanned_complete() {
+                // Schreck: die Kassiererin steht ruckartig auf und beugt sich vor
+                self.start_cashier_scare();
+            }
             let s = if self.scanned_complete() {
                 "Alles gescannt. Bezahl am Kartenterminal [E]."
             } else {

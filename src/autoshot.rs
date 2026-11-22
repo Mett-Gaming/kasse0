@@ -478,6 +478,25 @@ impl App {
             77 => self.shot_request = Some(shot("36_collapse_aisle")),
             79 => self.shot_request = Some(shot("37_collapse_shelf")),
             81 => self.shot_request = Some(shot("38_collapse_ceiling")),
+            82 => {
+                // Kassengang, Blick auf den Ueberwachungsmonitor (gekippt)
+                self.start_game(seed);
+                self.game.tutorial = None;
+                self.game.tip();
+                self.game.customers.clear();
+                self.game.employees.clear();
+                self.game.message = None;
+                let lane = self.game.open_lane().unwrap();
+                self.game.player.pos = vec3(lane.scan_point.x, 0.0, lane.monitor.z - 2.5);
+                let to = lane.monitor - (self.game.player.pos + vec3(0.0, game::EYE_HEIGHT, 0.0));
+                self.game.player.yaw = to.x.atan2(-to.z);
+                self.game.player.pitch = (to.y / to.length()).asin();
+                self.game.trolley.pushing = false;
+                self.game.trolley.pos = self.game.world.corral;
+                self.game.glitch = 0.0;
+                return Some(0.8);
+            }
+            83 => self.shot_request = Some(shot("39_monitor")),
             _ => return None,
         }
         Some(0.6)

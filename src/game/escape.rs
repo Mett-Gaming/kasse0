@@ -91,8 +91,8 @@ impl Game {
         e.yaw = npc::yaw_towards(e.pos, player);
         let d = vec3(e.pos.x - player.x, 0.0, e.pos.z - player.z).length();
         if d < CATCH_DIST && !self.god && !self.paid_and_outside() {
-            let at = self.employees[i].pos;
-            self.caught_by(at);
+            let (at, v) = (self.employees[i].pos, self.employees[i].variant);
+            self.caught_by(at, v);
         }
     }
 }

@@ -6,6 +6,8 @@ mod crowd;
 mod death;
 mod draws;
 pub mod escape;
+mod monitor;
+mod scares;
 mod tension;
 pub use cheats::CHEATS;
 pub mod dialog;
@@ -234,6 +236,24 @@ pub struct Game {
     pub dying: Option<f32>,
     /// letzter Funkenschauer je Kabelende (fuer das Knistern)
     spark_bursts: Vec<i64>,
+    /// Jumpscares (siehe scares.rs): Abklingzeit, Stille davor, laufende Schrecken
+    scare_cd: f32,
+    hush_t: f32,
+    behind: Option<usize>,
+    cashier_scare: Option<f32>,
+    cashier_done: bool,
+    cart_ghost: scares::CartGhost,
+    cart_unseen: f32,
+    hole_done: Vec<bool>,
+    hanging: Option<(Vec3, f32)>,
+    cable_drops: Vec<(Vec3, f32)>,
+    /// Figur, die einen erwischt hat (Gesicht in Grossaufnahme)
+    catcher_variant: Option<usize>,
+    /// Ueberwachungsmonitor: wie lange man hinschaut, laufender Spuk, schon passiert
+    monitor_watch: f32,
+    monitor_ghost: Option<f32>,
+    /// Stromausfall-Schreck: (Sekunden seit Beginn, Kundin, die im Dunkeln vor einen gestellt wurde)
+    blackout: Option<(f32, Option<usize>)>,
     pub holograms: Vec<mirage::Hologram>,
     mirage_timer: f32,
     tipped_time: f32,
@@ -384,6 +404,20 @@ impl Game {
             deaths: 0,
             dying: None,
             spark_bursts: Vec::new(),
+            scare_cd: 15.0,
+            hush_t: 0.0,
+            behind: None,
+            cashier_scare: None,
+            cashier_done: false,
+            cart_ghost: Default::default(),
+            cart_unseen: 0.0,
+            hole_done: Vec::new(),
+            hanging: None,
+            cable_drops: Vec::new(),
+            catcher_variant: None,
+            monitor_watch: 0.0,
+            monitor_ghost: None,
+            blackout: None,
             holograms: Vec::new(),
             mirage_timer: 12.0,
             tipped_time: 0.0,
@@ -822,6 +856,7 @@ impl Game {
         self.update_loose(dt);
         self.update_mirages(dt);
         self.update_spark_sounds();
+        self.update_scares(dt, input);
         // Zeit im gekippten Markt kann die Stufe auch ohne Einkauf anheben
         self.check_tier();
         self.update_belt(dt);

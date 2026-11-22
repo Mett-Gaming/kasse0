@@ -63,6 +63,8 @@ Du hast drei Leben im Markt: zweimal erwischt wachst du am Eingang auf (der Wage
 bleibt, wo es passiert ist), beim dritten Mal ist Schluss. Die drei Kassen-Leben
 zählen getrennt davon.
 
+Jumpscares lassen sich in den Optionen nicht abschalten. Probier es ruhig.
+
 Einstellungen werden unter %APPDATA%\kasse0\settings.txt gespeichert.
 
 Modelle, Schrift und Lizenzen: siehe Credits.md und den Ordner Lizenzen.

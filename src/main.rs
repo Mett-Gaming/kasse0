@@ -51,6 +51,8 @@ struct App {
     /// animierte Figuren dieses Frames und ihre Knochen-Matrizen
     people: Vec<people::PersonDraw>,
     skins: Vec<render::SkinDraw>,
+    /// Figuren nur fuer den Ueberwachungsmonitor (man selbst, und was hinter einem steht)
+    monitor_skins: Vec<render::SkinDraw>,
     bones: Vec<glam::Mat4>,
     input: game::Input,
     show_list: bool,
@@ -65,6 +67,8 @@ struct App {
     /// Test-Modus: laeuft alle Screens durch und speichert Screenshots
     autoshot: Option<(std::path::PathBuf, f32, usize)>,
     shot_request: Option<std::path::PathBuf>,
+    /// Sekunden, die der Troll-Jumpscare im Optionsmenue noch laeuft
+    menu_scare: f32,
     /// Frame-Zeit-Log (KASSE0_PERF=1 oder im Autoshot): (Frames, Summe, schlechtester Frame)
     perf: Option<(u32, f32, f32)>,
 }
@@ -95,6 +99,7 @@ impl App {
             ghosts: Vec::new(),
             people: Vec::new(),
             skins: Vec::new(),
+            monitor_skins: Vec::new(),
             bones: Vec::new(),
             input: game::Input::default(),
             show_list: false,
@@ -109,6 +114,7 @@ impl App {
             autoshot: std::env::var_os("KASSE0_AUTOSHOT")
                 .map(|d| (std::path::PathBuf::from(d), 0.0, 0)),
             shot_request: None,
+            menu_scare: 0.0,
             perf: (std::env::var_os("KASSE0_PERF").is_some()
                 || std::env::var_os("KASSE0_AUTOSHOT").is_some())
             .then_some((0, 0.0, 0.0)),
@@ -119,6 +125,17 @@ impl App {
         if let Some(a) = &self.audio {
             a.play(s);
         }
+    }
+
+    fn sfx_vol(&self, s: Sfx, vol: f32) {
+        if let Some(a) = &self.audio {
+            a.play_vol(s, vol);
+        }
+    }
+
+    /// Sekunden seit dem Troll-Jumpscare (None = laeuft nicht)
+    fn menu_scare_elapsed(&self) -> Option<f32> {
+        (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare)
     }
 
     fn set_grab(&mut self, grab: bool) {
@@ -214,6 +231,14 @@ impl App {
                     3 => s.fov = (s.fov + 5.0 * d).clamp(55.0, 100.0),
                     4 => s.fullscreen = !s.fullscreen,
                     5 => s.tutorial = !s.tutorial,
+                    6 => {
+                        // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
+                        self.menu_scare = hud::MENU_SCARE_TIME;
+                        self.sfx_vol(Sfx::Shriek, 1.5);
+                        self.sfx_vol(Sfx::Scare, 1.3);
+                        self.sfx_vol(Sfx::Sting, 1.2);
+                        return;
+                    }
                     _ => {
                         self.settings.save();
                         let back = if from_pause {
@@ -295,6 +320,15 @@ impl App {
             }
         }
         self.clock += dt;
+        let before = self.menu_scare_elapsed();
+        self.menu_scare = (self.menu_scare - dt).max(0.0);
+        // zweiter Einschlag, wenn die Nachricht reinknallt
+        if let (Some(b), Some(a)) = (before, self.menu_scare_elapsed()) {
+            if b < hud::MENU_SCARE_FACE && a >= hud::MENU_SCARE_FACE {
+                self.sfx_vol(Sfx::Scare, 1.4);
+                self.sfx_vol(Sfx::Sting, 1.4);
+            }
+        }
         self.fade = (self.fade - dt * 1.2).max(0.0);
         if let Some((dir, mut timer, step)) = self.autoshot.clone() {
             timer -= dt;
@@ -364,6 +398,7 @@ impl App {
                     self.screen,
                     Screen::Paused | Screen::Options { from_pause: true }
                 ),
+                hush: self.game.hush(),
             });
         } else {
             self.game.sfx.clear();
@@ -384,6 +419,13 @@ impl App {
             ),
             Screen::End => hud::draw_end(&mut self.ui, &self.game, self.sel, self.clock),
             Screen::Cheats => hud::draw_cheats(&mut self.ui, self.sel, self.clock, &self.game),
+        }
+        if self.menu_scare > 0.0 {
+            hud::draw_menu_scare(
+                &mut self.ui,
+                hud::MENU_SCARE_TIME - self.menu_scare,
+                self.clock,
+            );
         }
 
         let Some(r) = self.running.as_mut() else {
@@ -425,51 +467,69 @@ impl App {
         // Figuren: Animation abtasten, Knochen fuer die GPU sammeln
         self.people.clear();
         self.game.collect_people(&mut self.people);
+        if self.menu_scare > 0.0 {
+            // "Jumpscares aus" gibt es nicht
+            let staff = people::people_of(true);
+            self.people.push(self.game.face_in_view(staff[0], 0.24));
+        }
         self.skins.clear();
         self.bones.clear();
-        for p in &self.people {
-            let first_bone = self.bones.len() as u32;
-            people::anims(people::PEOPLE[p.variant % people::PEOPLE.len()].1).sample(
-                p.clip,
-                p.time,
-                &mut self.bones,
-            );
-            self.skins.push(render::SkinDraw {
-                skin: p.variant,
-                model: glam::Mat4::from_rotation_translation(
-                    glam::Quat::from_rotation_y(p.yaw),
-                    p.pos,
-                ),
-                tint: p.tint,
-                first_bone,
-                ghost: p.ghost,
-            });
-        }
+        add_skins(&self.people, &mut self.skins, &mut self.bones);
+        self.people.clear();
+        self.game.collect_monitor_people(&mut self.people);
+        self.monitor_skins.clear();
+        add_skins(&self.people, &mut self.monitor_skins, &mut self.bones);
         let g = &self.game;
+        let troll = (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare);
+        let mut view_proj = g.view_proj(aspect);
+        if let Some(e) = troll {
+            // Bild wackelt und kippt (stark beim Einschlag, danach weniger)
+            let k = if e < hud::MENU_SCARE_FACE { 1.0 } else { 0.35 };
+            let n = |s: f32| {
+                (((self.clock * 60.0).floor() * 12.9898 + s).sin() * 43758.547).fract() - 0.5
+            };
+            view_proj =
+                glam::Mat4::from_translation(glam::vec3(n(1.0) * 0.16 * k, n(2.0) * 0.16 * k, 0.0))
+                    * glam::Mat4::from_rotation_z(n(3.0) * 0.25 * k)
+                    * view_proj;
+        }
+        let strobe = troll
+            .is_some_and(|e| e > 0.07 && e < hud::MENU_SCARE_FACE && ((e * 14.0) as i32) % 2 == 1);
         let params = render::FrameParams {
-            view_proj: g.view_proj(aspect),
+            view_proj,
             cam_pos: g.eye(),
             time: g.time,
             tipped: g.tipped,
             fog_color: g.world.fog_color,
             fog_density: g.world.fog_density,
             // In Menues lesbar bleiben
-            glitch: if self.screen == Screen::Playing {
+            glitch: if self.menu_scare > 0.0 {
+                1.0
+            } else if self.screen == Screen::Playing {
                 g.glitch.max(g.suspicion * 0.2)
             } else {
                 0.0
             },
             vhs: self.settings.vhs,
-            fade: self.fade.max(g.death_fade()),
-            red: g.red.max(g.death_vignette()),
+            fade: self
+                .fade
+                .max(g.death_fade())
+                .max(g.blackout())
+                .max(if strobe { 0.85 } else { 0.0 }),
+            red: g
+                .red
+                .max(g.death_vignette())
+                .max(if troll.is_some() { 1.0 } else { 0.0 }),
             decay: g.poster_decay(),
             sway: g.sway_params(),
+            monitor: g.monitor_view(render::MONITOR_WIDTH as f32 / render::MONITOR_HEIGHT as f32),
         };
         if let Err(e) = r.renderer.draw(
             &params,
             &self.draws,
             &self.ghosts,
             &self.skins,
+            &self.monitor_skins,
             &self.bones,
             &self.ui.verts,
         ) {
@@ -547,12 +607,12 @@ impl App {
                 self.sfx(Sfx::Blip);
             }
             KeyCode::ArrowLeft | KeyCode::KeyA
-                if matches!(self.screen, Screen::Options { .. }) && self.sel < 6 =>
+                if matches!(self.screen, Screen::Options { .. }) && self.sel < 7 =>
             {
                 self.activate(event_loop, -1)
             }
             KeyCode::ArrowRight | KeyCode::KeyD
-                if matches!(self.screen, Screen::Options { .. }) && self.sel < 6 =>
+                if matches!(self.screen, Screen::Options { .. }) && self.sel < 7 =>
             {
                 self.activate(event_loop, 1)
             }
@@ -722,4 +782,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = App::new(fixed_seed);
     event_loop.run_app(&mut app)?;
     Ok(())
+}
+
+/// Figuren abtasten: Knochen fuer die GPU sammeln, SkinDraws anlegen.
+fn add_skins(
+    people_in: &[people::PersonDraw],
+    skins: &mut Vec<render::SkinDraw>,
+    bones: &mut Vec<glam::Mat4>,
+) {
+    for p in people_in {
+        let first_bone = bones.len() as u32;
+        people::anims(people::PEOPLE[p.variant % people::PEOPLE.len()].1)
+            .sample(p.clip, p.time, bones);
+        skins.push(render::SkinDraw {
+            skin: p.variant,
+            model: if p.flip {
+                // kopfueber: um die Querachse gedreht, Fuesse an p.pos
+                glam::Mat4::from_rotation_translation(
+                    glam::Quat::from_rotation_y(p.yaw)
+                        * glam::Quat::from_rotation_x(std::f32::consts::PI),
+                    p.pos,
+                )
+            } else {
+                glam::Mat4::from_rotation_translation(glam::Quat::from_rotation_y(p.yaw), p.pos)
+            },
+            tint: p.tint,
+            first_bone,
+            ghost: p.ghost,
+        });
+    }
 }

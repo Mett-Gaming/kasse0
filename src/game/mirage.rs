@@ -17,11 +17,15 @@ pub struct Hologram {
     pub real_tint: Vec4,
     /// < 0: noch nicht entlarvt; sonst Sekunden seit dem Entlarven
     pub revealed: f32,
+    /// selten: dreht sich ruckartig zum Spieler, bevor sie zerfaellt (Schreck)
+    pub scary: bool,
 }
 
 /// Erst so nah entpuppt sich eine Fata Morgana, dann flackert sie kurz und ist weg
 const REVEAL_DIST: f32 = 3.0;
 const REVEAL_TIME: f32 = 0.8;
+/// So lange bleibt eine "unheimliche" Fata Morgana nach dem Umdrehen noch scheinbar echt
+pub(super) const SCARY_HOLD: f32 = 0.35;
 
 impl Game {
     pub(super) fn update_mirages(&mut self, dt: f32) {
@@ -33,12 +37,20 @@ impl Game {
         // Aus der Naehe entpuppt sie sich: flackert kurz als Hologramm und ist weg
         let player = self.player.pos;
         let mut revealed_now = false;
+        let scary_now = self.tier >= Tier::Uneasy && self.rng.gen_bool(0.6);
+        let mut scared = false;
         self.holograms.retain_mut(|h| {
             h.life -= dt;
             let d = vec3(h.pos.x - player.x, 0.0, h.pos.z - player.z).length();
             if h.revealed < 0.0 && d < REVEAL_DIST {
                 h.revealed = 0.0;
                 revealed_now = true;
+                // selten: eine Figur dreht sich ruckartig um, bevor sie zerfaellt
+                if h.person.is_some() && scary_now {
+                    h.scary = true;
+                    h.yaw = npc::yaw_towards(h.pos, player);
+                    scared = true;
+                }
             } else if h.revealed >= 0.0 {
                 h.revealed += dt;
             }
@@ -47,6 +59,9 @@ impl Game {
         if revealed_now {
             self.glitch = self.glitch.max(0.35);
             self.sfx.push((Sfx::Blip, 0.3));
+        }
+        if scared && self.can_scare(false) {
+            self.fire_scare(0.7);
         }
 
         self.mirage_timer -= dt;
@@ -86,6 +101,7 @@ impl Game {
                 life: 18.0,
                 real_tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
                 revealed: -1.0,
+                scary: false,
             },
             1 => Hologram {
                 pos,
@@ -97,6 +113,7 @@ impl Game {
                 life: 18.0,
                 real_tint: Vec4::new(1.0, 1.0, 1.0, 0.22),
                 revealed: -1.0,
+                scary: false,
             },
             2 => Hologram {
                 pos,
@@ -108,6 +125,7 @@ impl Game {
                 life: 18.0,
                 real_tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
                 revealed: -1.0,
+                scary: false,
             },
             3 => Hologram {
                 pos,
@@ -119,6 +137,7 @@ impl Game {
                 life: 14.0,
                 real_tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
                 revealed: -1.0,
+                scary: false,
             },
             _ => Hologram {
                 pos: pos + vec3(0.0, 2.4, 0.0),
@@ -130,6 +149,7 @@ impl Game {
                 life: 16.0,
                 real_tint: Vec4::new(0.2, 1.0, 0.35, 1.2),
                 revealed: -1.0,
+                scary: false,
             },
         };
         self.holograms.push(h);
