@@ -509,6 +509,8 @@ impl Game {
                 tint: Vec4::new(0.8, 0.85, 0.9, 0.3),
                 ghost: false,
                 flip: false,
+                look_at: None,
+                fx: Default::default(),
             });
         }
         // kopfueber im Deckenloch
@@ -524,6 +526,8 @@ impl Game {
                 tint: Vec4::new(0.7, 0.7, 0.7, 0.15),
                 ghost: false,
                 flip: true,
+                look_at: None,
+                fx: Default::default(),
             });
         }
         // Tod: das leere Gesicht direkt vor der Kamera, bevor das Bild wegkippt
@@ -551,6 +555,8 @@ impl Game {
             tint: Vec4::new(0.85, 0.85, 0.85, 0.2),
             ghost: false,
             flip: false,
+            look_at: None,
+            fx: Default::default(),
         }
     }
 }

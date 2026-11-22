@@ -1,6 +1,7 @@
 //! Menschen im Markt: Spawnen und Verhalten von Kund:innen, Mitarbeitern und normalen Einkaufenden.
 
 use super::*;
+use crate::people::Clip;
 
 /// Einkaufsbummel der Kunden: Umkreis um den aktuellen Platz und Tempo
 const BROWSE_RADIUS: f32 = 7.0;
@@ -55,6 +56,8 @@ impl Game {
                 wait: 0.0,
                 whisper_cd: 0.0,
                 gait: Default::default(),
+                anim: Default::default(),
+                seed: npc::seed_of(pos),
             });
         }
     }
@@ -97,6 +100,8 @@ impl Game {
                 bump_cd: 0.0,
                 whisper_cd: 0.0,
                 gait: Default::default(),
+                anim: Default::default(),
+                seed: npc::seed_of(s.pos),
                 stare: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
@@ -138,6 +143,8 @@ impl Game {
                 bump_cd: 0.0,
                 whisper_cd: 0.0,
                 gait: Default::default(),
+                anim: Default::default(),
+                seed: npc::seed_of(pos),
                 stare: 0.0,
                 stalker: false,
                 target: Vec3::ZERO,
@@ -175,6 +182,8 @@ impl Game {
             bump_cd: 0.0,
             whisper_cd: 0.0,
             gait: Default::default(),
+            anim: Default::default(),
+            seed: npc::seed_of(pos),
             stare: 0.0,
             stalker: true,
             target: pos,
@@ -213,15 +222,26 @@ impl Game {
             for c in &mut self.customers {
                 c.gait
                     .advance(c.pos, dt, crate::people::PEOPLE[c.variant].1);
+                let still = if c.pose == Pose::Reach {
+                    Clip::Reach
+                } else {
+                    Clip::Idle
+                };
+                let clip = gait_clip(&c.gait, still);
+                c.anim.update(clip, c.gait.t + c.seed, dt, BLEND);
             }
         }
         for e in &mut self.employees {
             e.gait
                 .advance(e.pos, dt, crate::people::PEOPLE[e.variant].1);
+            let clip = gait_clip(&e.gait, Clip::Idle);
+            e.anim.update(clip, e.gait.t + e.seed, dt, BLEND);
         }
         for s in &mut self.shoppers {
             s.gait
                 .advance(s.pos, dt, crate::people::PEOPLE[s.variant].1);
+            let clip = gait_clip(&s.gait, Clip::Idle);
+            s.anim.update(clip, s.gait.t + s.seed, dt, BLEND);
         }
     }
 
@@ -643,5 +663,19 @@ impl Game {
                 s.whisper_cd = p.1;
             }
         }
+    }
+}
+
+/// Ueberblendzeit zwischen zwei Clips (Sekunden)
+const BLEND: f32 = 0.25;
+
+/// Gangart -> Clip: Gehen/Rennen laufen mit der Strecke mit, sonst Stehen (oder Greifen)
+pub(super) fn gait_clip(g: &crate::people::Gait, still: Clip) -> Clip {
+    if !g.moving {
+        still
+    } else if g.run {
+        Clip::Run
+    } else {
+        Clip::Walk
     }
 }

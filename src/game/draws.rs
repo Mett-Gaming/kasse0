@@ -80,25 +80,24 @@ impl Game {
             tint,
             ghost: false,
             flip: false,
+            look_at: None,
+            fx: Default::default(),
         };
 
-        // Gangart -> Clip: Gehen/Rennen laufen mit der Strecke mit, sonst Stehen (oder Greifen)
-        let moving_clip = |g: &crate::people::Gait, still: Clip| {
-            if !g.moving {
-                still
-            } else if g.run {
-                Clip::Run
-            } else {
-                Clip::Walk
-            }
+        // Figur mit eigenem Animator: Clip, Zeit, Ueberblenden
+        let animated = |variant, a: &crate::people::Animator, seed: f32, pos, yaw, tint| {
+            let mut d = person(variant, a.clip, a.clip_time(), pos, yaw, tint);
+            d.fx.blend = a.blend();
+            d.fx.seed = seed;
+            d
         };
 
         // Normale Kundschaft: geht zum naechsten Regal, wartet dort
-        for (i, s) in self.shoppers.iter().enumerate() {
-            out.push(person(
+        for s in &self.shoppers {
+            out.push(animated(
                 s.variant,
-                moving_clip(&s.gait, Clip::Idle),
-                s.gait.t + phase(i, 1.0),
+                &s.anim,
+                s.seed,
                 s.pos,
                 s.yaw,
                 s.tint.extend(0.0),
@@ -106,34 +105,35 @@ impl Game {
         }
 
         // Uncanny Kunden: greifen immer wieder ins Regal; wenn man wegsieht, kommen sie naeher
-        for (i, c) in self.customers.iter().enumerate() {
-            let still = if c.pose == Pose::Reach {
-                Clip::Reach
-            } else {
-                Clip::Idle
-            };
+        let eye = self.eye();
+        for c in &self.customers {
             // leicht fahles Eigenleuchten: Silhouetten bleiben im Dunkeln erkennbar
-            out.push(person(
-                c.variant,
-                moving_clip(&c.gait, still),
-                c.gait.t + phase(i, 2.0),
-                c.pos,
-                c.yaw,
-                c.tint.extend(0.1),
-            ));
+            let mut d = animated(c.variant, &c.anim, c.seed, c.pos, c.yaw, c.tint.extend(0.1));
+            // im gekippten Markt folgt der Kopf dir, waehrend der Koerper weitermacht
+            if let Some(limit) = self.head_follow_limit(c.pos) {
+                d.look_at = Some(eye);
+                d.fx.look_limit = limit;
+            }
+            out.push(d);
         }
 
         // Gesichtsloses Personal
-        for (i, e) in self.employees.iter().enumerate() {
-            out.push(person(
+        for e in &self.employees {
+            let mut d = animated(
                 e.variant,
-                moving_clip(&e.gait, Clip::Idle),
-                e.gait.t + phase(i, 3.0),
+                &e.anim,
+                e.seed,
                 e.pos,
                 e.yaw,
                 // Personal leuchtet leicht: im dunklen Markt sofort vom Publikum zu unterscheiden
                 Vec4::new(1.0, 1.0, 1.0, 0.22),
-            ));
+            );
+            // gesichtsloses Personal: dreht nur den Kopf zu dir, notfalls ganz nach hinten
+            if self.tipped && (e.pos - self.player.pos).length() < STAFF_LOOK_DIST {
+                d.look_at = Some(eye);
+                d.fx.look_limit = std::f32::consts::PI;
+            }
+            out.push(d);
         }
 
         // Kassiererin an der offenen Kasse: gesichtslose Personal-Figur. Beim Scannen greift sie
@@ -181,6 +181,8 @@ impl Game {
                 },
                 ghost,
                 flip: false,
+                look_at: None,
+                fx: Default::default(),
             });
         }
     }
@@ -334,5 +336,25 @@ impl Game {
                 }
             }
         }
+    }
+}
+
+/// So nah schauen Kunden bzw. Mitarbeiter einem mit dem Kopf hinterher (Meter)
+const CUSTOMER_LOOK_DIST: f32 = 14.0;
+const STAFF_LOOK_DIST: f32 = 9.0;
+
+impl Game {
+    /// Wie weit eine Kundin an `pos` den Kopf nach dir drehen darf (None = gar nicht).
+    /// Je spaeter die Stufe, desto unmenschlicher: am Ende dreht sich der Kopf ganz herum.
+    pub fn head_follow_limit(&self, pos: Vec3) -> Option<f32> {
+        if !self.tipped || (pos - self.player.pos).length() > CUSTOMER_LOOK_DIST {
+            return None;
+        }
+        Some(match self.tier {
+            Tier::Calm => 1.2,
+            Tier::Uneasy => 1.6,
+            Tier::Wrong => 2.3,
+            Tier::Collapse => std::f32::consts::PI,
+        })
     }
 }

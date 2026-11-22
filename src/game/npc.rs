@@ -126,6 +126,14 @@ pub fn step_along(
     new
 }
 
+/// Fester Zufallswert 0..10 aus einer Startposition (Animationsversatz einer Figur).
+pub fn seed_of(p: Vec3) -> f32 {
+    ((p.x * 12.9898 + p.z * 78.233 + p.y * 37.719).sin() * 43_758.547)
+        .fract()
+        .abs()
+        * 10.0
+}
+
 pub fn yaw_towards(from: Vec3, to: Vec3) -> f32 {
     let d = to - from;
     d.x.atan2(d.z)
@@ -158,6 +166,10 @@ pub struct Customer {
     pub stare: f32,
     /// Animationszeit, an die Laufstrecke gekoppelt
     pub gait: crate::people::Gait,
+    /// Clip-Wechsel mit Ueberblenden
+    pub anim: crate::people::Animator,
+    /// fester Zufallswert der Figur (Animationsversatz, Zucken)
+    pub seed: f32,
     /// Verfolger: schleicht sich an, sobald man wegsieht. Alle anderen kaufen nur ein.
     pub stalker: bool,
     /// Einkaufsbummel: Ziel, Wegfeld dorthin, Wartezeit am Ziel
@@ -176,6 +188,10 @@ pub enum EmpState {
 pub struct Employee {
     pub pos: Vec3,
     pub gait: crate::people::Gait,
+    /// Clip-Wechsel mit Ueberblenden
+    pub anim: crate::people::Animator,
+    /// fester Zufallswert der Figur (Animationsversatz, Zucken)
+    pub seed: f32,
     /// Figur in Dienstkleidung (Index in assets::PEOPLE)
     pub variant: usize,
     pub yaw: f32,
@@ -203,6 +219,8 @@ impl Employee {
         Self {
             pos,
             gait: Default::default(),
+            anim: Default::default(),
+            seed: seed_of(pos),
             variant: 0,
             yaw: 0.0,
             state: EmpState::Patrol,
@@ -237,6 +255,10 @@ pub struct Shopper {
     pub wait: f32,
     pub whisper_cd: f32,
     pub gait: crate::people::Gait,
+    /// Clip-Wechsel mit Ueberblenden
+    pub anim: crate::people::Animator,
+    /// fester Zufallswert der Figur (Animationsversatz, Zucken)
+    pub seed: f32,
 }
 
 #[cfg(test)]

@@ -831,8 +831,13 @@ fn add_skins(
 ) {
     for p in people_in {
         let first_bone = bones.len() as u32;
+        let model =
+            glam::Mat4::from_rotation_translation(glam::Quat::from_rotation_y(p.yaw), p.pos);
+        let mut fx = p.fx;
+        // Blickziel in Figuren-Koordinaten (vorne = +z)
+        fx.look = p.look_at.map(|w| model.inverse().transform_point3(w));
         people::anims(people::PEOPLE[p.variant % people::PEOPLE.len()].1)
-            .sample(p.clip, p.time, bones);
+            .pose(p.clip, p.time, &fx, bones);
         skins.push(render::SkinDraw {
             skin: p.variant,
             model: if p.flip {

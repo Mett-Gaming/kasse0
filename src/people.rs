@@ -1,10 +1,13 @@
 //! Animierte Figuren (Kundschaft und Personal): Meshes mit Knochen-Gewichten (.k0s) und
-//! Animationen als Knochen-Matrizen pro Bild (.k0a), erzeugt von tools/prepare_people.py.
-//! Die CPU tastet die Animation ab, die GPU verformt die Figur (Skinning im Vertex-Shader).
+//! Animationen mit Knochen-Hierarchie (.k0a v2), erzeugt von tools/prepare_people.py.
+//! Die CPU rechnet die Pose (anim.rs), die GPU verformt die Figur (Skinning im Vertex-Shader).
 
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Vec3, Vec4};
 use std::sync::OnceLock;
+
+mod anim;
+pub use anim::{AnimSet, Animator, Clip, PoseFx};
 
 mod gen {
     include!(concat!(env!("OUT_DIR"), "/people_gen.rs"));
@@ -34,27 +37,6 @@ pub struct SkinData {
     pub vertices: Vec<SkinVertex>,
 }
 
-/// Animation einer Figur (Reihenfolge wie CLIPS in tools/prepare_people.py)
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Clip {
-    Idle = 0,
-    Walk = 1,
-    Reach = 2,
-    Run = 3,
-}
-
-struct ClipData {
-    fps: f32,
-    frames: usize,
-    /// frames * bones Matrizen
-    mats: Vec<Mat4>,
-}
-
-pub struct AnimSet {
-    bones: usize,
-    clips: Vec<ClipData>,
-}
-
 fn f32_at(b: &[u8], o: usize) -> f32 {
     f32::from_le_bytes(b[o..o + 4].try_into().unwrap())
 }
@@ -82,75 +64,14 @@ pub fn parse_skin(b: &[u8]) -> SkinData {
     SkinData { vertices }
 }
 
-fn parse_anim(b: &[u8]) -> AnimSet {
-    assert_eq!(&b[0..4], b"K0A1", "keine K0A1-Animation");
-    let bones = u32_at(b, 4) as usize;
-    let count = u32_at(b, 8) as usize;
-    let mut o = 12;
-    let mut clips = Vec::with_capacity(count);
-    for _ in 0..count {
-        let len = b[o] as usize;
-        o += 1 + len;
-        let fps = f32_at(b, o);
-        let frames = u32_at(b, o + 4) as usize;
-        o += 8;
-        let mut mats = Vec::with_capacity(frames * bones);
-        for _ in 0..frames * bones {
-            let m = |r: usize, c: usize| f32_at(b, o + (r * 4 + c) * 4);
-            // 3x4 zeilenweise -> Spalten fuer glam
-            mats.push(Mat4::from_cols(
-                Vec4::new(m(0, 0), m(1, 0), m(2, 0), 0.0),
-                Vec4::new(m(0, 1), m(1, 1), m(2, 1), 0.0),
-                Vec4::new(m(0, 2), m(1, 2), m(2, 2), 0.0),
-                Vec4::new(m(0, 3), m(1, 3), m(2, 3), 1.0),
-            ));
-            o += 48;
-        }
-        clips.push(ClipData { fps, frames, mats });
-    }
-    AnimSet { bones, clips }
-}
-
-impl AnimSet {
-    pub fn bones(&self) -> usize {
-        self.bones
-    }
-
-    /// Knochen-Matrizen zur Zeit `t` (Sekunden, laeuft in Schleife), zwischen zwei Bildern gemischt.
-    pub fn sample(&self, clip: Clip, t: f32, out: &mut Vec<Mat4>) {
-        let c = &self.clips[clip as usize];
-        let pos = (t * c.fps).rem_euclid(c.frames as f32);
-        let f0 = pos.floor() as usize % c.frames;
-        let f1 = (f0 + 1) % c.frames;
-        let a = pos.fract();
-        for b in 0..self.bones {
-            let m0 = c.mats[f0 * self.bones + b];
-            let m1 = c.mats[f1 * self.bones + b];
-            out.push(Mat4::from_cols(
-                m0.x_axis.lerp(m1.x_axis, a),
-                m0.y_axis.lerp(m1.y_axis, a),
-                m0.z_axis.lerp(m1.z_axis, a),
-                m0.w_axis.lerp(m1.w_axis, a),
-            ));
-        }
-    }
-
-    /// Dauer eines Clips in Sekunden.
-    #[allow(dead_code)]
-    pub fn duration(&self, clip: Clip) -> f32 {
-        let c = &self.clips[clip as usize];
-        c.frames as f32 / c.fps
-    }
-}
-
 /// Animationen fuer Maenner- bzw. Frauen-Skelett.
 pub fn anims(female: bool) -> &'static AnimSet {
     static M: OnceLock<AnimSet> = OnceLock::new();
     static F: OnceLock<AnimSet> = OnceLock::new();
     if female {
-        F.get_or_init(|| parse_anim(gen::ANIM_F_BYTES))
+        F.get_or_init(|| anim::parse_anim(gen::ANIM_F_BYTES))
     } else {
-        M.get_or_init(|| parse_anim(gen::ANIM_M_BYTES))
+        M.get_or_init(|| anim::parse_anim(gen::ANIM_M_BYTES))
     }
 }
 
@@ -185,6 +106,10 @@ pub struct PersonDraw {
     pub ghost: bool,
     /// kopfueber (Fuesse oben an `pos`)
     pub flip: bool,
+    /// Blickziel des Kopfes (Welt), None = Kopf folgt der Animation
+    pub look_at: Option<Vec3>,
+    /// Ueberblenden, Blickgrenze, Zucken, Strecken, Stop-Motion
+    pub fx: PoseFx,
 }
 
 #[cfg(test)]

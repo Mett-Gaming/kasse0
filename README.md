@@ -114,11 +114,11 @@ Das Cheat-Menü (**F1**, zwei Spalten) kippt den Markt, füllt den Zettel, erhö
 ### Modelle neu konvertieren
 Waren (Katalog `tools/catalog.json`, Quell-Packs in `assets_src/packs`):
 ```powershell
-D:AppsBlenderlender.exe -b --factory-startup -P tools/prepare_products.py -- .
+D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_products.py -- .
 ```
-Kundschaft und Personal (Varianten in `tools/people.json`, Quelle `assets_src/packs/quaternius_modular_people`):
+Kundschaft und Personal (Varianten in `tools/people.json`, Quelle `assets_src/packs/quaternius_modular_people`, zusätzliche Animationen aus `assets_src/packs/quaternius_ual/UAL1_Standard.glb` und `UAL2_Standard.glb`, Quaternius Universal Animation Library 1+2, CC0). Das Skript schreibt die Knochen-Hierarchie und überträgt die UAL-Clips auf das Figuren-Skelett:
 ```powershell
-D:AppsBlenderlender.exe -b --factory-startup -P tools/prepare_people.py -- .
+D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_people.py -- .
 ```
 Figuren und Requisiten (Quaternius-Mannequins, Poly-Haven-Modelle; mit `$env:KASSE0_ONLY = "cashier,chair"` nur einzelne):
 Die Quell-Modelle liegen in `assets_src/downloads` (Web-Downloads) bzw. auf `F:\Dev\_work\source-assets\quaternius`. Das Skript reduziert die Polygone, friert die Posen ein und ersetzt Texturen durch Durchschnittsfarben:

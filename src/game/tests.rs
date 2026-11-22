@@ -1337,3 +1337,35 @@ fn customers_freeze_during_dialog() {
     assert!(moved < 0.01, "Kunde rueckt im Gespraech {moved} m naeher");
     assert_eq!(g.customers[c].gait.t, anim, "Pose nicht eingefroren");
 }
+
+#[test]
+fn customers_follow_you_with_their_heads_more_and_more() {
+    let mut g = Game::new(21);
+    let p = g.player.pos;
+    assert!(
+        g.head_follow_limit(p + vec3(2.0, 0.0, 0.0)).is_none(),
+        "vor dem Kippen"
+    );
+    g.tip();
+    let mut last = 0.0;
+    for t in [Tier::Calm, Tier::Uneasy, Tier::Wrong, Tier::Collapse] {
+        g.tier = t;
+        let l = g.head_follow_limit(p + vec3(2.0, 0.0, 0.0)).unwrap();
+        assert!(l > last, "Kopfdrehung waechst nicht mit der Stufe");
+        last = l;
+    }
+    assert!(
+        last >= 3.1,
+        "im Kollaps dreht sich der Kopf nicht ganz herum"
+    );
+    assert!(
+        g.head_follow_limit(p + vec3(30.0, 0.0, 0.0)).is_none(),
+        "zu weit weg"
+    );
+    // die gezeichnete Kundin bekommt das Blickziel
+    g.customers.truncate(1);
+    g.customers[0].pos = g.world.collide(p + vec3(0.0, 0.0, 3.0), 0.25);
+    let mut out = Vec::new();
+    g.collect_people(&mut out);
+    assert!(out.iter().any(|d| d.look_at.is_some()), "kein Blickziel");
+}

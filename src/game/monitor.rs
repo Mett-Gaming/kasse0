@@ -101,6 +101,8 @@ impl Game {
             tint: Vec4::new(0.8, 0.8, 0.8, 0.0),
             ghost: false,
             flip: false,
+            look_at: None,
+            fx: Default::default(),
         });
         if let Some(t) = self.monitor_ghost {
             let k = (t / GHOST_STRIKE).min(1.0);
@@ -120,6 +122,8 @@ impl Game {
                 tint: Vec4::new(0.75, 0.75, 0.75, 0.1),
                 ghost: false,
                 flip: false,
+                look_at: None,
+                fx: Default::default(),
             });
         }
     }
