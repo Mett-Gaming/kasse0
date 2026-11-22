@@ -31,8 +31,6 @@ use winit::{
 };
 
 const FIXED_STEP: f32 = 1.0 / 60.0;
-/// Dauer des Troll-Jumpscares im Optionsmenue
-const MENU_SCARE_TIME: f32 = 1.6;
 
 struct Running {
     // Reihenfolge wichtig: Renderer (Surface) vor dem Fenster freigeben.
@@ -127,6 +125,17 @@ impl App {
         if let Some(a) = &self.audio {
             a.play(s);
         }
+    }
+
+    fn sfx_vol(&self, s: Sfx, vol: f32) {
+        if let Some(a) = &self.audio {
+            a.play_vol(s, vol);
+        }
+    }
+
+    /// Sekunden seit dem Troll-Jumpscare (None = laeuft nicht)
+    fn menu_scare_elapsed(&self) -> Option<f32> {
+        (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare)
     }
 
     fn set_grab(&mut self, grab: bool) {
@@ -224,8 +233,10 @@ impl App {
                     5 => s.tutorial = !s.tutorial,
                     6 => {
                         // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
-                        self.menu_scare = MENU_SCARE_TIME;
-                        self.sfx(Sfx::Scare);
+                        self.menu_scare = hud::MENU_SCARE_TIME;
+                        self.sfx_vol(Sfx::Shriek, 1.5);
+                        self.sfx_vol(Sfx::Scare, 1.3);
+                        self.sfx_vol(Sfx::Sting, 1.2);
                         return;
                     }
                     _ => {
@@ -309,7 +320,15 @@ impl App {
             }
         }
         self.clock += dt;
+        let before = self.menu_scare_elapsed();
         self.menu_scare = (self.menu_scare - dt).max(0.0);
+        // zweiter Einschlag, wenn die Nachricht reinknallt
+        if let (Some(b), Some(a)) = (before, self.menu_scare_elapsed()) {
+            if b < hud::MENU_SCARE_FACE && a >= hud::MENU_SCARE_FACE {
+                self.sfx_vol(Sfx::Scare, 1.4);
+                self.sfx_vol(Sfx::Sting, 1.4);
+            }
+        }
         self.fade = (self.fade - dt * 1.2).max(0.0);
         if let Some((dir, mut timer, step)) = self.autoshot.clone() {
             timer -= dt;
@@ -402,7 +421,11 @@ impl App {
             Screen::Cheats => hud::draw_cheats(&mut self.ui, self.sel, self.clock, &self.game),
         }
         if self.menu_scare > 0.0 {
-            hud::draw_menu_scare(&mut self.ui, self.menu_scare);
+            hud::draw_menu_scare(
+                &mut self.ui,
+                hud::MENU_SCARE_TIME - self.menu_scare,
+                self.clock,
+            );
         }
 
         let Some(r) = self.running.as_mut() else {
@@ -447,7 +470,7 @@ impl App {
         if self.menu_scare > 0.0 {
             // "Jumpscares aus" gibt es nicht
             let staff = people::people_of(true);
-            self.people.push(self.game.face_in_view(staff[0]));
+            self.people.push(self.game.face_in_view(staff[0], 0.24));
         }
         self.skins.clear();
         self.bones.clear();
@@ -457,8 +480,23 @@ impl App {
         self.monitor_skins.clear();
         add_skins(&self.people, &mut self.monitor_skins, &mut self.bones);
         let g = &self.game;
+        let troll = (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare);
+        let mut view_proj = g.view_proj(aspect);
+        if let Some(e) = troll {
+            // Bild wackelt und kippt (stark beim Einschlag, danach weniger)
+            let k = if e < hud::MENU_SCARE_FACE { 1.0 } else { 0.35 };
+            let n = |s: f32| {
+                (((self.clock * 60.0).floor() * 12.9898 + s).sin() * 43758.547).fract() - 0.5
+            };
+            view_proj =
+                glam::Mat4::from_translation(glam::vec3(n(1.0) * 0.16 * k, n(2.0) * 0.16 * k, 0.0))
+                    * glam::Mat4::from_rotation_z(n(3.0) * 0.25 * k)
+                    * view_proj;
+        }
+        let strobe = troll
+            .is_some_and(|e| e > 0.07 && e < hud::MENU_SCARE_FACE && ((e * 14.0) as i32) % 2 == 1);
         let params = render::FrameParams {
-            view_proj: g.view_proj(aspect),
+            view_proj,
             cam_pos: g.eye(),
             time: g.time,
             tipped: g.tipped,
@@ -473,11 +511,15 @@ impl App {
                 0.0
             },
             vhs: self.settings.vhs,
-            fade: self.fade.max(g.death_fade()),
+            fade: self
+                .fade
+                .max(g.death_fade())
+                .max(g.blackout())
+                .max(if strobe { 0.85 } else { 0.0 }),
             red: g
                 .red
                 .max(g.death_vignette())
-                .max(if self.menu_scare > 0.0 { 0.8 } else { 0.0 }),
+                .max(if troll.is_some() { 1.0 } else { 0.0 }),
             decay: g.poster_decay(),
             sway: g.sway_params(),
             monitor: g.monitor_view(render::MONITOR_WIDTH as f32 / render::MONITOR_HEIGHT as f32),

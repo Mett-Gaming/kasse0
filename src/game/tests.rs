@@ -459,6 +459,7 @@ fn dropped_item_falls_and_can_be_picked_up() {
 fn employee_tidies_up_unattended_cart_to_corral() {
     let mut g = Game::new(14);
     g.tip();
+    g.scare_cd = 1e6; // kein Geisterwagen dazwischen
     g.customers.clear();
     g.employees.clear();
     // Wagen irgendwo im Markt stehen lassen, Spieler weit weg
@@ -1189,4 +1190,70 @@ fn monitor_stays_calm_before_the_market_tips() {
     }
     assert!(!g.monitor_ghost_visible());
     assert!(g.monitor_view(16.0 / 9.0).is_some());
+}
+
+#[test]
+fn blackout_puts_someone_in_front_of_you() {
+    let mut g = scary_game(42, Tier::Uneasy);
+    g.customers.truncate(3);
+    for c in &mut g.customers {
+        c.stalker = false;
+    }
+    // freie Sicht nach vorn: im Gang stehen
+    let it = shelf_item(&g, g.list[0], false).unwrap();
+    let target = g.world.items[it].pos;
+    look_at_point(&mut g, target);
+    g.player.yaw += std::f32::consts::PI; // weg vom Regal, in den Gang
+    g.player.pitch = 0.0;
+    g.sfx.clear();
+    g.blackout = Some((0.0, None));
+    let mut dark = false;
+    for _ in 0..120 {
+        g.update(1.0 / 60.0, &mut Input::default());
+        dark |= g.blackout() > 0.9;
+        if g.blackout.is_none() {
+            break;
+        }
+    }
+    assert!(dark, "es wird nicht dunkel");
+    assert!(g.blackout.is_none(), "Licht kommt nicht wieder");
+    let near = g
+        .customers
+        .iter()
+        .any(|c| (c.pos - g.player.pos).length() < 3.2 && c.stare > 0.0);
+    if near {
+        assert!(scared(&g), "Gestalt steht da, aber kein Schreck");
+    }
+}
+
+#[test]
+fn jumpscares_come_regularly() {
+    // gekippter Markt, Stufe "unruhig", Spieler liest Zettel und dreht sich ab und zu um:
+    // in 4 Minuten mehrere Schrecken
+    let mut g = scary_game(7, Tier::Uneasy);
+    g.scare_cd = 15.0;
+    let mut scares = 0;
+    for k in 0..(240 * 10) {
+        if k % 70 == 69 {
+            g.player.yaw += std::f32::consts::PI;
+        }
+        let mut inp = Input {
+            list_open: true,
+            ..Default::default()
+        };
+        for _ in 0..6 {
+            g.update(1.0 / 60.0, &mut inp);
+        }
+        scares += g
+            .sfx
+            .iter()
+            .filter(|(s, _)| matches!(s, Sfx::Scare))
+            .count();
+        g.sfx.clear();
+        if g.outcome != Outcome::Running {
+            break;
+        }
+        g.tier = Tier::Uneasy;
+    }
+    assert!(scares >= 3, "nur {scares} Schrecken in 4 Minuten");
 }

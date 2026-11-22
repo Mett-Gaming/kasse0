@@ -28,6 +28,8 @@ pub enum Sfx {
     Whisper,
     /// Jumpscare: greller, schiefer Akkord mit Rauschstoss
     Scare,
+    /// Troll-Jumpscare im Menue: verzerrter Schrei, Metallkreischen, Basseinschlag
+    Shriek,
 }
 
 /// Was die Musik gerade tun soll.
@@ -174,6 +176,29 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 ((s / 6.0) * 0.8 + noise * 0.6) * 0.75 * env
             })
         }
+        Sfx::Shriek => {
+            // Schrei: Saegezahn mit Vibrato, der hochschnellt, plus Obertoene, hart verzerrt;
+            // dazu ein kreischender Metallton, ein Basseinschlag und ein Rauschstoss
+            const DUR: f32 = 2.6;
+            let (mut p1, mut p2, mut p3, mut pb) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+            gen(DUR, &mut |t| {
+                let glide = 520.0 + 680.0 * (t / 0.12).min(1.0);
+                let vib = 1.0 + 0.07 * (TAU * 9.5 * t).sin() + 0.03 * rng.next();
+                let f = glide * vib * (1.0 - 0.25 * (t / DUR));
+                p1 = (p1 + f / RATE as f32).fract();
+                p2 = (p2 + f * 1.51 / RATE as f32).fract();
+                p3 = (p3 + (2900.0 + 400.0 * (TAU * 23.0 * t).sin()) / RATE as f32).fract();
+                let scream = (p1 * 2.0 - 1.0) + 0.6 * (p2 * 2.0 - 1.0);
+                let metal = if p3 < 0.5 { 0.35 } else { -0.35 };
+                let fb = 55.0 * (1.0 - t / 0.8).max(0.4);
+                pb = (pb + fb / RATE as f32).fract();
+                let boom = (TAU * pb).sin() * (1.0 - t / 0.9).max(0.0).powi(2) * 1.4;
+                let noise = rng.next() * (0.25 + 0.6 * (1.0 - t / 0.3).max(0.0));
+                let env = (t * 400.0).min(1.0) * (1.0 - ((t - 1.9) / 0.7).max(0.0)).max(0.0);
+                let mix = (scream * 0.9 + metal + noise) * env + boom;
+                (mix * 2.2).tanh() * 0.95
+            })
+        }
         Sfx::Spark => {
             // Knistern: dichte, kurze Knacker mit hellem Rauschen, schnell abklingend
             gen(0.35, &mut |t| {
@@ -279,6 +304,7 @@ impl Audio {
             Sfx::Spark,
             Sfx::Whisper,
             Sfx::Scare,
+            Sfx::Shriek,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -363,6 +389,7 @@ mod tests {
             Sfx::Spark,
             Sfx::Whisper,
             Sfx::Scare,
+            Sfx::Shriek,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

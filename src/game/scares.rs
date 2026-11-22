@@ -1,5 +1,7 @@
-//! Jumpscares: selten, aus den Spielregeln heraus, mit Abklingzeit und kurzer Stille davor.
-//! Kleine Schrecken ab Stufe "unruhig", grosse erst ab "falsch". Nie zwei hintereinander.
+//! Jumpscares: aus den Spielregeln heraus, mit kurzer Abklingzeit und Stille davor.
+//! Kleine Schrecken sobald der Markt gekippt ist, grosse ab "unruhig". Nie zwei direkt hintereinander.
+//!
+//! - Stromausfall: kurz stockdunkel, wenn das Licht wiederkommt, steht jemand vor einem
 //!
 //! - Umdrehen: ein Verfolger steht ploetzlich direkt hinter einem
 //! - Kassiererin steht nach dem letzten gescannten Artikel ruckartig auf
@@ -12,19 +14,26 @@ use super::*;
 use crate::people::{Clip, PersonDraw};
 
 /// Abklingzeit nach einem grossen Schreck (Sekunden, zufaellig dazwischen)
-const SCARE_COOLDOWN: (f32, f32) = (75.0, 130.0);
+const SCARE_COOLDOWN: (f32, f32) = (25.0, 45.0);
 /// Stille vor einem angekuendigten Schreck
 const HUSH_TIME: f32 = 2.5;
 /// "Hinter dir": wie weit hinter dem Spieler, wie lange er wartet
 const BEHIND_DIST: f32 = 1.6;
 const BEHIND_WAIT: f32 = 9.0;
 /// Wagen-Spuk: so lange unbeobachtet, bevor er verschwindet; Rolltempo; Halteabstand
-const CART_UNSEEN: f32 = 6.0;
+const CART_UNSEEN: f32 = 4.0;
 const CART_GONE: f32 = 5.0;
 const CART_ROLL_SPEED: f32 = 0.65;
 const CART_STOP: f32 = 2.3;
 /// Kassiererin: Dauer des Aufstehens
 const CASHIER_TIME: f32 = 2.6;
+/// Stromausfall: Dauer, ab wann die Gestalt steht, wie weit vor einem, Chance pro Sekunde
+const BLACKOUT_TIME: f32 = 1.4;
+const BLACKOUT_PLACE: f32 = 0.5;
+const BLACKOUT_DIST: f32 = 2.6;
+const BLACKOUT_CHANCE: f32 = 0.025;
+/// "Hinter dir": Chance pro Sekunde, abgelenkt bzw. sonst
+const BEHIND_CHANCE: (f32, f32) = (0.6, 0.04);
 
 /// Spuk um den abgestellten Wagen.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
@@ -40,7 +49,7 @@ pub enum CartGhost {
 impl Game {
     /// Darf jetzt ein Schreck kommen? Gross: ab "falsch", klein: ab "unruhig".
     pub(super) fn can_scare(&self, big: bool) -> bool {
-        let stage = if big { Tier::Wrong } else { Tier::Uneasy };
+        let stage = if big { Tier::Uneasy } else { Tier::Calm };
         self.tipped
             && self.tier >= stage
             && self.scare_cd <= 0.0
@@ -73,6 +82,7 @@ impl Game {
         self.update_cart_ghost(dt);
         self.update_ceiling_scares(dt);
         self.update_monitor_scare(dt);
+        self.update_blackout(dt);
     }
 
     // ------------------------------------------------------------ Hinter dir
@@ -98,7 +108,11 @@ impl Game {
         }
         // abgelenkt: Zettel offen oder Blick ins Regal, dazu ein bisschen Zufall
         let distracted = input.list_open || matches!(self.focus, Some(Focus::Shelf(_)));
-        let chance = if distracted { 0.25 } else { 0.01 } * dt;
+        let chance = if distracted {
+            BEHIND_CHANCE.0
+        } else {
+            BEHIND_CHANCE.1
+        } * dt;
         if !self.rng.gen_bool(chance.clamp(0.0, 1.0) as f64) {
             return;
         }
@@ -145,6 +159,81 @@ impl Game {
         }
     }
 
+    // ------------------------------------------------------------ Stromausfall
+
+    fn update_blackout(&mut self, dt: f32) {
+        if let Some((t, figure)) = self.blackout {
+            let now = t + dt;
+            let mut figure = figure;
+            if t < BLACKOUT_PLACE && now >= BLACKOUT_PLACE {
+                figure = self.place_blackout_figure();
+            }
+            if now >= BLACKOUT_TIME {
+                self.blackout = None;
+                if figure.is_some() {
+                    self.fire_scare(1.0);
+                } else {
+                    self.sfx.push((Sfx::Sting, 0.6));
+                }
+            } else {
+                self.blackout = Some((now, figure));
+            }
+            return;
+        }
+        if !self.can_scare(true) || self.checking_out() {
+            return;
+        }
+        if !self
+            .rng
+            .gen_bool((BLACKOUT_CHANCE * dt).clamp(0.0, 1.0) as f64)
+        {
+            return;
+        }
+        self.blackout = Some((0.0, None));
+        self.sfx.push((Sfx::Spark, 1.0));
+        self.hush_t = HUSH_TIME;
+    }
+
+    /// Im Dunkeln: eine (harmlose) Kundin direkt vor den Spieler stellen.
+    fn place_blackout_figure(&mut self) -> Option<usize> {
+        let player = self.player.pos;
+        let fwd = self.view_dir();
+        let flat = vec3(fwd.x, 0.0, fwd.z).normalize_or_zero();
+        let want = player + flat * BLACKOUT_DIST;
+        let spot = self.world.collide(want, 0.25);
+        if (spot - want).length() > 0.3 || !self.sees(spot + vec3(0.0, 1.2, 0.0)) {
+            return None;
+        }
+        let i = (0..self.customers.len())
+            .filter(|&i| !self.customers[i].stalker)
+            .max_by(|&a, &b| {
+                let da = (self.customers[a].pos - player).length();
+                let db = (self.customers[b].pos - player).length();
+                da.total_cmp(&db)
+            })?;
+        let c = &mut self.customers[i];
+        c.pos = spot;
+        c.yaw = npc::yaw_towards(spot, player);
+        c.stare = 3.0;
+        c.field.clear();
+        Some(i)
+    }
+
+    /// Wie dunkel der Stromausfall das Bild gerade macht (0..1); am Ende flackert das Licht.
+    pub fn blackout(&self) -> f32 {
+        match self.blackout {
+            Some((t, _)) if t > BLACKOUT_TIME - 0.3 => {
+                if ((t * 30.0) as i32) % 2 == 0 {
+                    1.0
+                } else {
+                    0.3
+                }
+            }
+            Some(_) => 1.0,
+            None => 0.0,
+        }
+    }
+
     /// Steht die Kassiererin gerade (statt zu sitzen)?
     pub fn cashier_standing(&self) -> bool {
         self.cashier_scare.is_some()
@@ -172,7 +261,7 @@ impl Game {
                     self.trolley.pos = p;
                     self.cart_ghost = CartGhost::Gone(CART_GONE);
                     self.cart_unseen = 0.0;
-                    self.scare_cd = self.rng.gen_range(40.0..70.0);
+                    self.scare_cd = self.rng.gen_range(20.0..35.0);
                 }
             }
             CartGhost::Gone(t) => {
@@ -360,18 +449,19 @@ impl Game {
         // Tod: das leere Gesicht direkt vor der Kamera, bevor das Bild wegkippt
         if let (Some(k), Some(v)) = (self.dying_progress(), self.catcher_variant) {
             if k < 0.22 {
-                out.push(self.face_in_view(v));
+                out.push(self.face_in_view(v, 0.42));
             }
         }
     }
 
     /// Ein leeres Gesicht direkt vor der Kamera (Tod, Troll-Option im Menue).
-    pub fn face_in_view(&self, variant: usize) -> PersonDraw {
+    /// `dist` = Abstand vor dem Auge (Meter).
+    pub fn face_in_view(&self, variant: usize, dist: f32) -> PersonDraw {
         let eye = self.eye();
         let fwd = self.view_dir();
         let flat = vec3(fwd.x, 0.0, fwd.z).normalize_or_zero();
         let height = crate::people::height(variant);
-        let pos = vec3(eye.x, eye.y - height * 0.93, eye.z) + flat * 0.42;
+        let pos = vec3(eye.x, eye.y - height * 0.93, eye.z) + flat * dist;
         PersonDraw {
             variant,
             clip: Clip::Idle,

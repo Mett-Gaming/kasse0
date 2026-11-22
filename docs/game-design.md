@@ -149,12 +149,13 @@ Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `ce
 - **Füße rutschen nicht mehr:** Die Lauf- und Rennanimation läuft mit der zurückgelegten Strecke (`people::Gait`, gemessene Schrittgeschwindigkeit: Männer 1,21 m/s gehend, 2,5 m/s rennend; Frauen 0,97 bzw. 2,0 m/s). Ab 1,7 m/s rennen Figuren. Bodenkontakt aller Clips gemessen: Sohle höchstens 3 cm über bzw. 2 cm unter dem Boden.
 
 ## Jumpscares (v0.7)
-Selten und aus den Spielregeln heraus, nie zwei hintereinander: nach einem großen Schreck 75–130 s Ruhe (Start: 45 s). Kleine Schrecken ab „unruhig“, große erst ab „falsch“. Vor angekündigten Schrecken wird es kurz still (Musik `hush`).
+Aus den Spielregeln heraus, nie zwei direkt hintereinander: nach einem Schreck 25–45 s Ruhe (Start: 15 s nach dem Kippen). Kleine Schrecken sobald der Markt gekippt ist, große ab „unruhig“ (v0.8: deutlich häufiger als in v0.7). Vor angekündigten Schrecken wird es kurz still (Musik `hush`).
 - **Tod:** das leere Gesicht des Fängers kurz in Großaufnahme, dann kippt das Bild weg.
-- **Umdrehen:** Wer abgelenkt ist (Zettel offen, Blick ins Regal), hat manchmal einen Verfolger 1,6 m hinter sich, der wartet, bis man sich umdreht.
+- **Umdrehen:** Wer abgelenkt ist (Zettel offen, Blick ins Regal: 60 %/s, sonst 4 %/s), hat bald einen Verfolger 1,6 m hinter sich, der wartet, bis man sich umdreht.
+- **Stromausfall:** 1,4 s stockdunkel (Funkenknall, Stille), im Dunkeln wird eine Kundin 2,6 m vor einen gestellt; wenn das Licht flackernd zurückkommt, steht sie da und starrt.
 - **Kassiererin** steht nach dem letzten gescannten Artikel ruckartig auf und beugt sich vor.
 - **Wagen:** Ein abgestellter, unbeobachteter Wagen ist irgendwann weg und rollt dann quietschend von selbst heran.
-- **Fata Morgana:** Manche Hologramme drehen beim Auflösen den Kopf ruckartig zum Spieler.
+- **Fata Morgana:** Ab „unruhig“ drehen 60 % der Figuren-Hologramme beim Auflösen den Kopf ruckartig zum Spieler.
 - **Deckenloch:** Unter einem Loch stürzen Kabel funkensprühend herab; im Kollaps hängt beim Hochschauen jemand kopfüber darin.
-- **Überwachungsmonitor:** Hinter jedem Scanner hängt ein Monitor mit dem Livebild der Deckenkamera (zweite Kamera, Render-to-Texture 160×90, grau mit Zeilen und Rauschen). Man sieht sich selbst von hinten. Schaut man ab „unruhig“ 1,2 s hin, steht auf dem Bild eine gesichtslose Gestalt hinter einem, kommt näher, dann der Schreck. Dreht man sich um: niemand da. Einmal pro Run.
-- **Optionen → „Jumpscares“:** lässt sich nicht abschalten. Der Versuch löst einen Jumpscare aus: „Peasant, did you really think...“
+- **Überwachungsmonitor:** Hinter jedem Scanner hängt ein Monitor mit dem Livebild der Deckenkamera (zweite Kamera, Render-to-Texture 160×90, grau mit Zeilen und Rauschen). Man sieht sich selbst von hinten. Schaut man im gekippten Markt 0,8 s hin, steht auf dem Bild eine gesichtslose Gestalt hinter einem, kommt näher, dann der Schreck. Dreht man sich um: niemand da. Wiederholt sich nach der Abklingzeit.
+- **Optionen → „Jumpscares“:** lässt sich nicht abschalten. Der Versuch löst einen Jumpscare aus (3,4 s): weißer Blitz, gesichtsloses Gesicht 24 cm vor der Kamera, Stroboskop, Bildwackeln, voller Rotfilter und Bildriss, verzerrter Schrei (`Sfx::Shriek`) mit Basseinschlag; dann knallt Zeile für Zeile „PEASANT, / did you really think... / ...you could turn us off?“ zitternd ins Bild, mit zweitem Einschlag.

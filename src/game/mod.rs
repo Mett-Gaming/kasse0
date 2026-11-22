@@ -251,7 +251,8 @@ pub struct Game {
     /// Ueberwachungsmonitor: wie lange man hinschaut, laufender Spuk, schon passiert
     monitor_watch: f32,
     monitor_ghost: Option<f32>,
-    monitor_done: bool,
+    /// Stromausfall-Schreck: (Sekunden seit Beginn, Kundin, die im Dunkeln vor einen gestellt wurde)
+    blackout: Option<(f32, Option<usize>)>,
     pub holograms: Vec<mirage::Hologram>,
     mirage_timer: f32,
     tipped_time: f32,
@@ -397,7 +398,7 @@ impl Game {
             deaths: 0,
             dying: None,
             spark_bursts: Vec::new(),
-            scare_cd: 45.0,
+            scare_cd: 15.0,
             hush_t: 0.0,
             behind: None,
             cashier_scare: None,
@@ -410,7 +411,7 @@ impl Game {
             catcher_variant: None,
             monitor_watch: 0.0,
             monitor_ghost: None,
-            monitor_done: false,
+            blackout: None,
             holograms: Vec::new(),
             mirage_timer: 12.0,
             tipped_time: 0.0,

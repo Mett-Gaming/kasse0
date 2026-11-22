@@ -37,7 +37,7 @@ impl Game {
         // Aus der Naehe entpuppt sie sich: flackert kurz als Hologramm und ist weg
         let player = self.player.pos;
         let mut revealed_now = false;
-        let scary_now = self.tier >= Tier::Wrong && self.rng.gen_bool(0.35);
+        let scary_now = self.tier >= Tier::Uneasy && self.rng.gen_bool(0.6);
         let mut scared = false;
         self.holograms.retain_mut(|h| {
             h.life -= dt;

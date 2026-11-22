@@ -1,12 +1,13 @@
 //! Ueberwachungsmonitor an der Kasse: zeigt live das Bild der Deckenkamera (zweite Kamera,
 //! render-to-texture). Darauf sieht man sich selbst von hinten. Schaut man lange genug hin,
 //! steht auf dem Bildschirm jemand direkt hinter einem. Dreht man sich um: niemand da.
+//! Kann sich nach der Abklingzeit wiederholen.
 
 use super::*;
 use crate::people::{Clip, PersonDraw};
 
 /// So lange muss man auf den Monitor schauen, bis sich etwas tut
-const WATCH_TIME: f32 = 1.2;
+const WATCH_TIME: f32 = 0.8;
 /// Ab hier gilt "auf den Monitor schauen" (Abstand, Blickwinkel als Kosinus)
 const WATCH_DIST: f32 = 6.0;
 const WATCH_COS: f32 = 0.93;
@@ -60,7 +61,7 @@ impl Game {
             if cos < LOOK_AWAY_COS || now >= GHOST_END {
                 // umgedreht (oder vorbei): da ist niemand
                 self.monitor_ghost = None;
-                self.monitor_done = true;
+                self.monitor_watch = 0.0;
                 return;
             }
             if before < GHOST_STRIKE && now >= GHOST_STRIKE {
@@ -74,7 +75,7 @@ impl Game {
         } else {
             0.0
         };
-        if !self.monitor_done && self.monitor_watch > WATCH_TIME && self.can_scare(false) {
+        if self.monitor_watch > WATCH_TIME && self.can_scare(false) {
             self.monitor_ghost = Some(0.0);
             self.hush_t = HUSH_TIME_MONITOR;
         }
