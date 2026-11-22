@@ -39,7 +39,9 @@ Gearbeitet wird direkt auf `main`.
   - MAJOR nur, wenn die Person das ausdrücklich will.
 - Tag immer mit Beschreibung: `git tag -a v0.5.0 -m "KASSE 0 v0.5.0"`.
 - Ist der Tag beim Pushen schon vergeben (jemand war schneller): Tags neu holen, nächste freie Version nehmen.
+- Betas heißen `vX.Y.Z-beta.N` und werden auf GitHub als Prerelease markiert. Andere Tag-Formen (z. B. `nightly`) sieht der Launcher nicht (siehe 8.).
 - GitHub Actions baut aus jedem `v*`-Tag automatisch ein Release mit dem Zip. Der Agent wartet, bis es da ist, und nennt der Person den Link.
+- Danach ersetzt der Agent die automatischen Release-Notes durch einen kurzen, für Spieler lesbaren Changelog in Markdown (`gh release edit <tag> --notes-file …`). Der Launcher zeigt ihn an. Am Asset ändert er nichts mehr.
 
 ## 5. Lokaler Build zum Weitergeben
 Nach jedem Release auch lokal bauen und den Teilordner aktualisieren:
@@ -65,7 +67,15 @@ Nach jedem Release auch lokal bauen und den Teilordner aktualisieren:
 - Zugangsdaten, Tokens oder private Daten in Dateien, Commits oder Nachrichten schreiben
 - in andere Repositories pushen
 
-## 8. Wenn etwas schiefgeht
+## 8. Launcher (Mett-Launcher)
+Spieler installieren KASSE 0 über den Mett-Launcher. Das Repository liegt unter `Mett-Gaming/kasse0`, der Eintrag des Spiels in `Mett-Gaming/launcher-catalog` (`games.json`, Bilder unter `covers/`). Damit der Launcher Releases findet, installiert und startet:
+- **Pro Release genau ein Zip** passend zu `KASSE0-v*.zip` (kein zusätzliches `KASSE0-v…-debug.zip`). Andere Dateien (`.sha256`, `.txt`) stören nicht.
+- **Aufbau bleibt `KASSE0/KASSE0.exe`.** Ändern sich exe-Name, Ort, Zip-Schema oder Repo-Name, muss vorher `games.json` im Katalog angepasst werden.
+- **Assets nie nach dem Veröffentlichen hochladen oder ersetzen** (der Launcher prüft Größe und sha256). Fehlerhafte Releases mit neuer Patch-Version korrigieren, alte Releases nicht löschen (sie bleiben im Launcher wählbar).
+- **Das Spiel schreibt nichts neben die exe.** Bei jedem Update wird der Installordner ersetzt; Spielstände und Einstellungen gehören nach `%APPDATA%\kasse0`. Muss doch etwas im Installordner bleiben: Pfad unter `preserve` in `games.json` eintragen.
+- **`KASSE0.exe` läuft selbst, bis das Spiel endet** (kein Starter, der einen zweiten Prozess startet), braucht keine Adminrechte, hat **keinen eigenen Updater** und bleibt auch ohne Launcher direkt aus dem Zip startbar. Arbeitsverzeichnis ist der Installordner.
+
+## 9. Wenn etwas schiefgeht
 - Kaputter Build auf `main`: Wer ihn bemerkt, repariert ihn zuerst (mit eigenem Patch-Tag), bevor neue Funktionen dazukommen.
 - Ein Release ist fehlerhaft: nicht löschen, sondern mit einer neuen Patch-Version korrigieren.
 - Ist der Agent unsicher, ob eine Aktion etwas Fremdes zerstört: anhalten und die Person fragen.
