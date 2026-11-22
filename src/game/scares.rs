@@ -2,7 +2,7 @@
 //! Kleine Schrecken ab Stufe "unruhig", grosse erst ab "falsch". Nie zwei hintereinander.
 //!
 //! - Umdrehen: ein Verfolger steht ploetzlich direkt hinter einem
-//! - Kassiererin steht nach dem letzten gescannten Artikel auf ("Kundenkarte?")
+//! - Kassiererin steht nach dem letzten gescannten Artikel ruckartig auf
 //! - der abgestellte Wagen ist weg und rollt dann quietschend von selbst heran
 //! - Deckenloch: Kabel stuerzen funkensprühend herab; im Kollaps haengt jemand kopfueber darin
 //! (Tod mit Gesicht in Grossaufnahme: death.rs, Fata Morgana: mirage.rs,
@@ -48,6 +48,7 @@ impl Game {
             && self.dying.is_none()
             && self.dialog.is_none()
             && !self.paid
+            && !self.till_paying()
     }
 
     /// Schreck ausloesen: harter Klang, Bildriss, kurzer roter Blitz, danach Abklingzeit.
@@ -133,7 +134,6 @@ impl Game {
         self.cashier_done = true;
         self.cashier_scare = Some(0.0);
         self.fire_scare(1.0);
-        self.say("\"Kundenkarte?\"", 3.0);
     }
 
     fn update_cashier_scare(&mut self, dt: f32) {

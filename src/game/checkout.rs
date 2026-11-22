@@ -9,8 +9,6 @@ pub(super) const CART_AT_REGISTER: f32 = 3.2;
 const BELT_SPEED: f32 = 0.45;
 /// Abstand zwischen Waren auf dem Band
 const BELT_GAP: f32 = 0.05;
-/// Sekunden zwischen zwei Waren beim Ausraeumen des Wagens
-const UNLOAD_STEP: f32 = 0.35;
 /// Wie weit man von der Kasse weg sein darf, damit weiter gescannt wird
 const SCAN_PRESENCE: f32 = 3.0;
 /// Abstand des Absperrbands vor und hinter den Kassengassen
@@ -44,9 +42,9 @@ impl Game {
         ))
     }
 
-    /// Wird gerade kassiert? (Band belegt oder Wagen wird ausgeraeumt)
+    /// Wird gerade kassiert? (Ware liegt auf dem Band)
     pub fn checking_out(&self) -> bool {
-        !self.belt.is_empty() || self.unloading
+        !self.belt.is_empty()
     }
 
     /// Alles, was der Spieler eingesammelt hat: Wagen, Band und bereits gescannte Ware.
@@ -57,8 +55,9 @@ impl Game {
             .chain(self.scanned.iter())
     }
 
-    /// Ware hinten aufs Band legen.
+    /// Ware hinten aufs Band legen (startet das Kassen-Minispiel und prueft die Band-Regeln).
     pub(super) fn put_on_belt(&mut self, data: ItemData) {
+        self.till_on_place(&data);
         let s = self
             .belt
             .last()
@@ -67,7 +66,34 @@ impl Game {
         self.play(Sfx::Click, 0.3);
     }
 
-    /// E auf das Band: Ware aus der Hand ablegen oder den Wagen ausraeumen.
+    /// Welche Ware aus dem Wagen als naechstes aufs Band kommt (Mausrad waehlt).
+    pub fn belt_pick(&self) -> Option<usize> {
+        if self.cart.is_empty() {
+            return None;
+        }
+        Some(
+            self.cart_sel
+                .filter(|&i| i < self.cart.len())
+                .unwrap_or(self.cart.len() - 1),
+        )
+    }
+
+    /// Steht der Wagen nah genug an der Kasse zum Ausraeumen?
+    pub fn cart_at_register(&self) -> bool {
+        self.open_lane()
+            .is_some_and(|l| (self.trolley.pos - l.scan_point).length() <= CART_AT_REGISTER)
+    }
+
+    /// Fuer Screenshots: den ganzen Wagen richtig sortiert (Getraenke zuerst) aufs Band.
+    pub fn debug_unload_cart(&mut self) {
+        let mut items: Vec<ItemData> = self.cart.drain(..).collect();
+        items.sort_by_key(|i| !i.is_drink());
+        for item in items {
+            self.put_on_belt(item);
+        }
+    }
+
+    /// E auf das Band: Ware aus der Hand ablegen oder die gewaehlte Ware aus dem Wagen.
     pub(super) fn use_belt(&mut self) {
         if self.paid {
             self.hint("Du hast schon bezahlt.");
@@ -77,15 +103,18 @@ impl Game {
             self.put_on_belt(item);
             return;
         }
-        let Some(lane) = self.open_lane() else { return };
+        if self.open_lane().is_none() {
+            return;
+        }
         if self.cart.is_empty() {
             self.hint("Dein Wagen ist leer.");
-        } else if (self.trolley.pos - lane.scan_point).length() > CART_AT_REGISTER {
+        } else if !self.cart_at_register() {
             self.say("Bring deinen Wagen zur Kasse.", 3.0);
             self.play(Sfx::Error, 0.5);
-        } else {
-            self.unloading = true;
-            self.unload_timer = 0.0;
+        } else if let Some(i) = self.belt_pick() {
+            let item = self.cart.remove(i);
+            self.cart_sel = None;
+            self.put_on_belt(item);
         }
     }
 
@@ -94,7 +123,7 @@ impl Game {
         if self.paid {
             return;
         }
-        if !self.belt.is_empty() || self.unloading {
+        if !self.belt.is_empty() {
             self.hint("Warte, bis alles gescannt ist.");
             return;
         }
@@ -107,7 +136,8 @@ impl Game {
             self.play(Sfx::Error, 0.5);
             return;
         }
-        self.pay();
+        // Karte durchziehen, dann PIN (till.rs)
+        self.start_swipe();
     }
 
     /// Ist jeder Zettelpunkt unter der gescannten Ware?
@@ -121,7 +151,7 @@ impl Game {
         self.scanned.iter().map(|c| c.cents).sum::<i64>().max(0)
     }
 
-    fn pay(&mut self) {
+    pub(super) fn pay(&mut self) {
         self.paid = true;
         self.params.door_open = true;
         self.rebuild_world();
@@ -143,26 +173,9 @@ impl Game {
         }
     }
 
-    /// Band bewegen, Wagen ausraeumen, scannen.
+    /// Band bewegen, scannen.
     pub(super) fn update_belt(&mut self, dt: f32) {
         let Some(lane) = self.open_lane() else { return };
-        // Wagen Stueck fuer Stueck aufs Band
-        if self.unloading {
-            self.unload_timer -= dt;
-            if self.unload_timer <= 0.0 {
-                self.unload_timer = UNLOAD_STEP;
-                let room = self.belt.last().is_none_or(|b| b.s > b.data.half().z * 2.0);
-                if room {
-                    match self.cart.pop() {
-                        Some(item) => self.put_on_belt(item),
-                        None => self.unloading = false,
-                    }
-                }
-            }
-            if (self.trolley.pos - lane.scan_point).length() > CART_AT_REGISTER {
-                self.unloading = false;
-            }
-        }
         // Band faehrt; Waren stauen sich vor dem Scanner
         let len = Self::belt_len(&lane);
         let mut front = len;
@@ -190,20 +203,24 @@ impl Game {
         let item = self.belt.remove(0).data;
         match item.kind {
             PickupKind::Product { fake: true, .. } => {
-                // Die Kassierer:in legt die falsche Ware einfach weg
-                self.play(Sfx::Error, 0.6);
-                self.suspicion += 0.15;
-                self.glitch = self.glitch.max(0.4);
-                self.say(format!("ARTIKEL UNBEKANNT: {}", item.name), 2.0);
+                // Die Kassierer:in legt die falsche Ware weg - und merkt sich das
+                self.till_doubt(
+                    super::till::SUS_FAKE,
+                    format!(
+                        "ARTIKEL UNBEKANNT: {}. Die Kassiererin legt ihn zur Seite.",
+                        item.name
+                    ),
+                );
             }
             _ => {
                 self.play(Sfx::Beep, 0.6);
                 self.scanned.push(item);
+                self.till_after_scan();
             }
         }
-        if self.belt.is_empty() && !self.unloading {
+        if self.belt.is_empty() {
             if self.scanned_complete() {
-                // Schreck: die Kassiererin steht auf und beugt sich vor ("Kundenkarte?")
+                // Schreck: die Kassiererin steht ruckartig auf und beugt sich vor
                 self.start_cashier_scare();
             }
             let s = if self.scanned_complete() {

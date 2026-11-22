@@ -1,5 +1,7 @@
 //! HUD, Menues und End-Screens (alles im 480x270-Raster, unter dem VHS-Effekt).
 
+mod till;
+
 use crate::game::dialog::CART_OPENER;
 use crate::game::tutorial::{Tutorial, STEPS as TUTORIAL_STEPS};
 use crate::game::{Focus, Game, Outcome, PickupKind};
@@ -240,7 +242,8 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
 
     // Auffaelligkeit (nur im gekippten Markt): Balken unten links, gruen -> gelb -> rot
     // Leisten nur, wenn etwas fehlt bzw. anliegt
-    if g.tipped && g.suspicion > 0.01 {
+    // An der Kasse zaehlt stattdessen das Misstrauen der Kassiererin (till::draw)
+    if g.tipped && g.suspicion > 0.01 && !g.till_active() {
         suspicion_meter(u, g.suspicion, time);
     }
     if g.player.stamina < 0.999 {
@@ -302,23 +305,38 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                     1.0,
                 );
             }
-            Some(Focus::Belt) => {
-                let s = if g.unloading {
-                    "Du räumst den Wagen aufs Band ...".to_string()
-                } else if g.cart.is_empty() {
-                    "Kassenband".to_string()
-                } else {
-                    format!("[E] Wagen aufs Band räumen ({} Stück)", g.cart.len())
-                };
-                u.text_center(y, &s, YELLOW, 1.0);
-            }
+            Some(Focus::Belt) => match g.belt_pick() {
+                Some(i) if g.cart_at_register() => {
+                    let s = format!(
+                        "[E] Aufs Band: {}   ({}/{}, Mausrad)",
+                        g.cart[i].name,
+                        i + 1,
+                        g.cart.len()
+                    );
+                    u.text_center(y, &s, YELLOW, 1.0);
+                    u.text_center(
+                        y + 11.0,
+                        "Getränke zuerst. Nichts Falsches aufs Band.",
+                        DIM,
+                        1.0,
+                    );
+                }
+                Some(_) => u.text_center(y, "Kassenband - bring deinen Wagen her", YELLOW, 1.0),
+                None => u.text_center(y, "Kassenband", YELLOW, 1.0),
+            },
             Some(Focus::Terminal) => {
+                let asking = g
+                    .till
+                    .as_ref()
+                    .is_some_and(|t| t.asked.is_some() || t.questions_left());
                 let s = if g.checking_out() {
                     "Die Kassiererin scannt noch ...".to_string()
                 } else if g.scanned.is_empty() {
                     "Kartenterminal - erst aufs Band legen".to_string()
+                } else if g.scanned_complete() && asking {
+                    "Die Kassiererin will noch etwas wissen ...".to_string()
                 } else if g.scanned_complete() {
-                    format!("[E] Mit Karte bezahlen   {}", euro(g.scanned_value()))
+                    format!("[E] Karte durchziehen   {}", euro(g.scanned_value()))
                 } else {
                     "Zettel nicht vollständig gescannt".to_string()
                 };
@@ -410,6 +428,9 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
             }
         }
     }
+
+    // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN
+    till::draw(u, g, time);
 }
 
 /// Alle Tasten auf einen Blick; erledigte abgehakt, aktuelle hervorgehoben.
@@ -508,7 +529,12 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
         _ => {
             osd(u, time, "STOP");
             u.text_center(70.0, "DU BIST AUFGEFALLEN", RED, 2.0);
-            u.text_center(100.0, "Sie haben dich erreicht.", WHITE, 1.0);
+            let why = if g.till_caught {
+                "Die Kassiererin hat dich durchschaut."
+            } else {
+                "Sie haben dich erreicht."
+            };
+            u.text_center(100.0, why, WHITE, 1.0);
             let t = g.run_time as u32;
             u.text_center(
                 124.0,
@@ -573,6 +599,11 @@ mod tests {
 
 /// Auffaelligkeits-Meter: schmaler Balken unten links, blinkt bei 100 %.
 fn suspicion_meter(u: &mut Ui, s: f32, time: f32) {
+    meter(u, "AUFFÄLLIG", s, time);
+}
+
+/// Balken unten links mit Beschriftung (gruen -> gelb -> rot).
+fn meter(u: &mut Ui, label: &str, s: f32, time: f32) {
     let s = s.clamp(0.0, 1.0);
     let (x, y, w, h) = (12.0, 250.0, 72.0, 5.0);
     let color = if s < 0.5 {
@@ -583,7 +614,7 @@ fn suspicion_meter(u: &mut Ui, s: f32, time: f32) {
         [0.95, 0.85 - 0.7 * k, 0.2 - 0.1 * k, 0.9]
     };
     let blink = s >= 1.0 && (time * 4.0).fract() < 0.5;
-    u.text_s(x, y - 11.0, "AUFFÄLLIG", if blink { RED } else { DIM }, 1.0);
+    u.text_s(x, y - 11.0, label, if blink { RED } else { DIM }, 1.0);
     u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.0, 0.0, 0.0, 0.6]);
     u.rect(x, y, w * s, h, if blink { RED } else { color });
 }

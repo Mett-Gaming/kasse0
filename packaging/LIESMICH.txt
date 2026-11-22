@@ -21,22 +21,36 @@ SO SPIELST DU
   5. Die gesichtslosen Mitarbeiter sprechen dich an: unauffällig antworten (1, 2, 3).
   6. Die Kassen sind abgesperrt, bis dein Zettel komplett ist. Unten links zeigt ein
      Balken, wie auffällig du bist.
-  7. An der offenen Kasse den Wagen aufs Band räumen (E aufs Band), warten, bis
-     alles gescannt ist, am Kartenterminal bezahlen (E) und raus durch die Tür.
+  7. An der offenen Kasse die Ware Stück für Stück aufs Band legen (E, Mausrad wählt).
+     Ab jetzt läuft das Kassen-Minispiel, und raus geht es erst nach dem Bezahlen.
+
+DAS KASSEN-MINISPIEL
+  An der Kasse sind Kunden und Mitarbeiter harmlos, solange du dort bleibst.
+  Dafür beobachtet dich die Kassiererin. Fall ihr nicht auf:
+    - Getränke zuerst aufs Band, keine falsch beschriftete Ware.
+    - Ihre Fragen unauffällig beantworten (1, 2, 3), nicht schweigen.
+    - Am Kartenterminal (E) die Karte mit der Maus ruhig nach unten ziehen.
+      Zu schnell = Karte nicht gelesen.
+    - Die PIN, die das Terminal kurz zeigt, eintippen (0-9).
+    - Nicht von der Kasse weggehen.
+  Fehler füllen ihr Misstrauen (Balken unten links). Ist es voll, verlierst du
+  eines von drei Kassen-Leben. Nach dem dritten ist der Einkauf vorbei.
 
 STEUERUNG
   WASD               Gehen            Shift   Rennen (fällt auf!)
   Maus               Umsehen          TAB     Einkaufszettel
-  E / Linksklick     Ware greifen, in den Wagen / aufs Band legen, bezahlen
+  E / Linksklick     Ware greifen, in den Wagen / aufs Band legen, Karte durchziehen
   Q                  Wagen stehen lassen / schieben
   Shift halten       Rennen (kostet Ausdauer)
   F                  Ware aus dem Wagen nehmen (die anvisierte leuchtet auf)
-  Mausrad            am Wagen: andere Ware anwählen
-  1 / 2 / 3          Antwort im Gespräch
+  Mausrad            am Wagen / Band: andere Ware anwählen
+  1 / 2 / 3          Antwort im Gespräch und an der Kasse
+  0 - 9              PIN am Kartenterminal
   Esc                Pause            F12     Screenshot (Ordner "Bilder")
 
-Du hast drei Leben: zweimal erwischt wachst du am Eingang auf (der Wagen bleibt,
-wo es passiert ist), beim dritten Mal ist Schluss.
+Du hast drei Leben im Markt: zweimal erwischt wachst du am Eingang auf (der Wagen
+bleibt, wo es passiert ist), beim dritten Mal ist Schluss. Die drei Kassen-Leben
+zählen getrennt davon.
 
 Jumpscares lassen sich in den Optionen nicht abschalten. Probier es ruhig.
 

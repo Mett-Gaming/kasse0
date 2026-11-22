@@ -299,7 +299,9 @@ impl Game {
             c.wait = 0.0;
             let dist = vec3(c.pos.x - player.x, 0.0, c.pos.z - player.z).length();
             // Waehrend eines Gespraechs (und kurz danach) ist man sicher
-            let safe = self.god || self.dialog.is_some() || self.grace > 0.0;
+            // ... und an der Kasse, solange das Kassen-Minispiel laeuft
+            let safe =
+                self.god || self.dialog.is_some() || self.grace > 0.0 || self.till_protects();
             if dist < CATCH_DIST && !self.paid_and_outside() && !safe {
                 let (at, variant) = (self.customers[i].pos, self.customers[i].variant);
                 self.caught_by(at, variant);
@@ -464,8 +466,10 @@ impl Game {
                 continue;
             }
             let dist = (e.pos - player).length();
-            let interested =
-                (e.follow > 0.0 || e.heard > 0.0 || (dist < 7.0 && los)) && e.ignore <= 0.0;
+            // An der Kasse lassen die Mitarbeiter einen in Ruhe
+            let interested = (e.follow > 0.0 || e.heard > 0.0 || (dist < 7.0 && los))
+                && e.ignore <= 0.0
+                && !self.till_protects();
             if interested {
                 let busy = self.checking_out();
                 let e = &mut self.employees[i];

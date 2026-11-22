@@ -46,7 +46,6 @@ impl Game {
             });
         }
         self.trolley.pushing = false;
-        self.unloading = false;
     }
 
     /// Wie weit die Todesanimation ist (0..1), None = man lebt.

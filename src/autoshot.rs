@@ -316,7 +316,7 @@ impl App {
                     - (self.game.player.pos + vec3(0.0, game::EYE_HEIGHT, 0.0));
                 self.game.player.yaw = to.x.atan2(-to.z);
                 self.game.player.pitch = (to.y / to.length()).asin();
-                self.game.unloading = true;
+                self.game.debug_unload_cart();
                 if step == 54 {
                     self.game.held = None;
                 }

@@ -12,7 +12,7 @@ Analog/liminaler Horror, 3D First-Person, kurze Runs mit zufälligem Seed, damit
 2. **Schwelle Getränkeabteilung:** Betreten und wieder Verlassen kippt den Markt. Er ist dann leer, die Neonröhren brummen und flackern, die Gänge sind länger, und draußen hinter der Glastür ist es schwarz.
 3. Den **Zettel abarbeiten** und die Waren in den Einkaufswagen legen.
 4. **Der Warenwert im Wagen (€) bestimmt die Eskalation**, nicht die Anzahl der Artikel.
-5. An der **Kasse** den Wagen aufs Band räumen, die gesichtslose Kassiererin scannt (das dauert und ist verwundbare Zeit), am **Kartenterminal** bezahlen, dann den Laden verlassen. Damit ist der Run gewonnen.
+5. An der **Kasse** beginnt das **Kassen-Minispiel**: Ware richtig aufs Band, die Fragen der gesichtslosen Kassiererin beantworten, am **Kartenterminal** die Karte durchziehen und die PIN eintippen, ohne ihr aufzufallen. Dann den Laden verlassen. Damit ist der Run gewonnen.
 
 ## Kunden (uncanny)
 - Sie roleplayen das Einkaufen und greifen immer nur zu einer Sorte **abgelaufenem Tomatensaft**.
@@ -82,7 +82,23 @@ Neue Wände werden nur gebaut, wenn danach Getränkeraum, Kassen, Wagenbox und a
 
 ## Kasse
 - Band mit Warentrennern, Scannerfenster, Ablage, Kartenterminal auf der Stange, sitzende Kassiererin (Quaternius-Mannequin, Pose `Driving_Loop`), Schrank mit Zigaretten-Rollo, Überwachungskamera, Quengelware.
-- Ablauf: Wagen ausräumen (0,35 s pro Ware) oder Ware einzeln aufs Band legen; Band 0,45 m/s; Scannen 0,9 s pro Ware, nur solange man an der Kasse steht; falsche Ware wird aussortiert (+0,15 Auffälligkeit); bezahlen am Terminal, wenn der ganze Zettel gescannt ist.
+- Ablauf: Ware Stück für Stück aus dem Wagen (Mausrad wählt) oder aus der Hand aufs Band legen; Band 0,45 m/s; Scannen 0,9 s pro Ware, nur solange man an der Kasse steht; falsche Ware wird aussortiert; bezahlen am Terminal (Karte + PIN), wenn der ganze Zettel gescannt ist.
+
+## Kassen-Minispiel (v0.5, `src/game/till.rs`)
+Die Kasse ist ein eigenes Minispiel. Es beginnt mit der ersten Ware auf dem Band und endet mit dem Bezahlen.
+- **NPCs harmlos:** Solange das Minispiel läuft und man höchstens 3,5 m von der Kasse entfernt ist, können Kunden nicht erwischen und Mitarbeiter sprechen einen nicht an. Im übrigen Markt bleibt alles wie bisher.
+- **Misstrauen der Kassiererin** (0–100 %, Balken unten links statt der Auffälligkeit) und **drei Kassen-Leben**, getrennt von den drei Leben im Markt. Bei 100 % ist ein Leben weg und der Balken startet wieder bei 0. Nach dem dritten ist der Run vorbei ("Die Kassiererin hat dich durchschaut.").
+
+| Handlung | Regel | Fehler kostet |
+|---|---|---|
+| Ware aufs Band | Getränke zuerst (Getränk nach anderer Ware) | 35 % |
+| | falsch beschriftete Ware wird beim Scannen aussortiert | 30 % |
+| Fragen (2 pro Einkauf, 7 s Zeit, 1/2/3) | gut: nichts, neutral, schlecht, Schweigen | 0 / 20 / 45 / 35 % |
+| Karte durchziehen (Maus nach unten, Blick steht still) | ganz durchziehen in mindestens 0,45 s | 25 % |
+| PIN (4 Ziffern, 2,5 s angezeigt, 10 s zum Tippen) | falsche Ziffer / Zeit abgelaufen, danach wird sie wieder angezeigt | 30 / 20 % |
+| An der Kasse bleiben | weiter als 3,5 m weg: steigt laufend, und man ist nicht mehr geschützt | 8 % pro Sekunde |
+
+Die Fragen kommen nach der 1.–2. gescannten Ware und 2–3 Waren später. Hat man weniger Ware, stellt sie die restlichen am Ende, bevor man bezahlen darf. Im Kollaps wandert die Kasse nicht, solange das Minispiel läuft.
 - Gekippt: alle Kassen zeigen "0 Kasse", das Rollo ist offen (Zigaretten), die Kameras folgen dem Spieler.
 
 ## Umsetzung im Detail
@@ -91,7 +107,7 @@ Neue Wände werden nur gebaut, wenn danach Getränkeraum, Kassen, Wagenbox und a
 | Nicht hinsehen | Sichtkegel und Sichtlinie (Strahl gegen Regale). Unbeobachtete Kunden laufen über ein Distanzfeld (Breitensuche) zum Spieler. |
 | Erwischt | Ein Kunde unter 0,8 m beendet den Run ("DU BIST AUFGEFALLEN"). |
 | Nicht stören | Anrempeln: +0,15. Ihren Tomatensaft nehmen: +0,35, und dieser Kunde wird schneller. |
-| Nicht auffallen | Rennen in Sichtweite: +0,15/s. Anstarren (über 1,5 s): +0,12/s. Falsche Ware: +0,25. Unbekannter Artikel an der Kasse: +0,15. |
+| Nicht auffallen | Rennen in Sichtweite: +0,15/s. Anstarren (über 1,5 s): +0,12/s. Falsche Ware: +0,25. Unbekannter Artikel an der Kasse: zählt zum Misstrauen der Kassiererin (siehe Kassen-Minispiel). |
 | Auffälligkeit 100 % | Die Kunden bewegen sich auch unter Beobachtung (langsam). |
 | Gesprächs-Schutz | Während eines Gesprächs und 2,5 s danach kann kein Kunde erwischen. |
 | Vorbeisprinten | Wer schneller als 2,4 m/s an einem Mitarbeiter vorbeirennt, wird nicht angesprochen, bekommt aber +0,2 Auffälligkeit und wird 12 s verfolgt. |
@@ -132,7 +148,7 @@ Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `ce
 - **Eskalation erreichbar:** Stufe = Maximum aus Warenwert (10/25/50 €), Zettel-Fortschritt (40 %/70 %/komplett) und Zeit im gekippten Markt (3/6/9 min). Der komplette Zettel löst den Kollaps aus: der Weg zur Kasse ist das Finale.
 - **Füße rutschen nicht mehr:** Die Lauf- und Rennanimation läuft mit der zurückgelegten Strecke (`people::Gait`, gemessene Schrittgeschwindigkeit: Männer 1,21 m/s gehend, 2,5 m/s rennend; Frauen 0,97 bzw. 2,0 m/s). Ab 1,7 m/s rennen Figuren. Bodenkontakt aller Clips gemessen: Sohle höchstens 3 cm über bzw. 2 cm unter dem Boden.
 
-## Jumpscares (v0.6)
+## Jumpscares (v0.7)
 Selten und aus den Spielregeln heraus, nie zwei hintereinander: nach einem großen Schreck 75–130 s Ruhe (Start: 45 s). Kleine Schrecken ab „unruhig“, große erst ab „falsch“. Vor angekündigten Schrecken wird es kurz still (Musik `hush`).
 - **Tod:** das leere Gesicht des Fängers kurz in Großaufnahme, dann kippt das Bild weg.
 - **Umdrehen:** Wer abgelenkt ist (Zettel offen, Blick ins Regal), hat manchmal einen Verfolger 1,6 m hinter sich, der wartet, bis man sich umdreht.

@@ -20,7 +20,17 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 4. Falsch beschriftete Ware ("Mlich", unsinnige Preise) gehört nicht auf den Zettel.
 5. Die **Kunden** kaufen ganz normal ein, solange du hinsiehst. Siehst du weg, starren sie herüber, und einige verfolgen dich: Sie schleichen sich an und holen deutlich auf, wenn du rennst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
-7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und räum ihn mit **E aufs Band** (oder leg einzelne Ware aus der Hand aufs Band). Die Kassiererin scannt Stück für Stück, falsche Ware sortiert sie als "ARTIKEL UNBEKANNT" aus. Bezahl mit **E am Kartenterminal** und verlass den Laden durch die Tür.
+7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und leg die Ware **Stück für Stück mit E aufs Band** (Mausrad wählt, welche). Dann beginnt das **Kassen-Minispiel** (siehe unten). Bezahlt ist, wenn die Karte durchgezogen und die PIN eingetippt ist. Danach verlässt du den Laden durch die Tür.
+
+### Das Kassen-Minispiel
+Sobald die erste Ware auf dem Band liegt, sind **Kunden und Mitarbeiter harmlos**, solange du an der Kasse bleibst. Dafür beobachtet dich jetzt die **Kassiererin**. Unten links zeigt ein Balken ihr Misstrauen, daneben stehen deine **drei Kassen-Leben**.
+- **Ware richtig aufs Band:** Getränke (schwer) zuerst. Falsch beschriftete Ware sortiert sie als "ARTIKEL UNBEKANNT" aus, und das fällt auf.
+- **Fragen beantworten (1, 2, 3):** Während sie scannt, fragt sie zweimal etwas ("Sammeln Sie Punkte?"). Antworte unauffällig. Schweigen fällt auch auf.
+- **Karte durchziehen:** E am Kartenterminal, dann die Maus ruhig nach unten ziehen. Zu schnell, und die Karte wird nicht gelesen.
+- **PIN eintippen (0–9):** Das Terminal zeigt die PIN kurz an. Merk sie dir und tipp sie ein, bevor die Zeit abläuft.
+- **Nicht weggehen:** Entfernst du dich von der Kasse, steigt ihr Misstrauen, und die Verfolger können dich wieder erwischen.
+
+Ist der Balken voll, hebt sie den Kopf: **ein Kassen-Leben weg**, und der Balken beginnt wieder bei null. Nach dem dritten Mal hat sie dich durchschaut, und der Run ist vorbei. Die Kassen-Leben sind getrennt von den drei Leben im Markt.
 
 Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (grün → gelb → rot, blinkt bei 100 %), sobald sie über null liegt.
 
@@ -32,12 +42,14 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 | WASD / Pfeile | Gehen |
 | Shift | Rennen (fällt auf, kostet Ausdauer; die Leiste erscheint, wenn sie nicht voll ist) |
 | Maus | Umsehen |
-| E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: Wagen ausräumen; am Kartenterminal: bezahlen |
+| E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: die gewählte Ware aus dem Wagen aufs Band; am Kartenterminal: Karte durchziehen (nochmal E bricht ab) |
 | Q (oder E auf den Wagen) | Wagen stehen lassen / wieder schieben |
 | F (am Wagen) | Ware wieder herausnehmen: die anvisierte (sie leuchtet auf), sonst die zuletzt eingelegte |
-| Mausrad (am Wagen) | Andere Ware im Wagen anwählen |
+| Mausrad (am Wagen oder Band) | Andere Ware im Wagen anwählen |
+| Maus nach unten (am Terminal) | Karte durchziehen, ruhig und nicht zu schnell |
 | TAB (halten) | Einkaufszettel und Warenwert |
-| 1 / 2 / 3 | Antwort im Gespräch |
+| 1 / 2 / 3 | Antwort im Gespräch und an der Kasse |
+| 0–9 | PIN am Kartenterminal |
 | Esc / P | Pause (mit Tastenübersicht) |
 | F1 | Cheat-Menü zum Testen (u. a. "Mitarbeiter nimmt deinen Wagen mit") |
 | F12 | Screenshot (Ordner *Bilder*) |
@@ -118,7 +130,7 @@ D:\Apps\Blender\blender.exe -b --factory-startup -P tools/prepare_assets.py -- F
 | `src/world/` | Seedbarer Markt-Generator (`gen.rs`, Einrichtungen in `gen/fixtures.rs`), Abteilungs-Layout (`layout.rs`), Kollision, Sichtlinien, Navigationsraster |
 | `src/catalog.rs`, `tools/catalog.json` | Warenkatalog: Unterabteilungen, Modelle, Preise, Zettel-Einträge |
 | `src/signs.rs` | Schild-Atlas: alle Schriftzüge (Archivo Black) werden beim Start gerendert |
-| `src/game/` | Run-Logik, Hände und Wagen (`hands.rs`), Kasse mit Band (`checkout.rs`), NPCs (`crowd.rs`), Dialoge und Ereignisse (`tension.rs`), Eskalation |
+| `src/game/` | Run-Logik, Hände und Wagen (`hands.rs`), Kasse mit Band (`checkout.rs`), Kassen-Minispiel (`till.rs`, HUD in `src/hud/till.rs`), NPCs (`crowd.rs`), Dialoge und Ereignisse (`tension.rs`), Eskalation |
 | `src/people.rs`, `shaders/skin.wgsl` | Animierte Figuren: Knochen-Gewichte, Animationen abtasten, Skinning |
 | `src/hud.rs`, `src/ui.rs` | Menüs, HUD, Bitmap-Text |
 | `src/audio.rs` | Synthetisierte Musik und Effekte (rodio) |

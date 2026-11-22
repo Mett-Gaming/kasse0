@@ -1,6 +1,6 @@
 use super::*;
 
-fn step(g: &mut Game, secs: f32, input: Input) {
+pub(super) fn step(g: &mut Game, secs: f32, input: Input) {
     let mut inp = input;
     for _ in 0..(secs * 60.0) as usize {
         g.update(1.0 / 60.0, &mut inp);
@@ -8,7 +8,7 @@ fn step(g: &mut Game, secs: f32, input: Input) {
 }
 
 /// Eine echte (nicht falsche, nicht genommene) Regalware fuer einen Zettel-Eintrag.
-fn shelf_item(g: &Game, entry: usize, pricey: bool) -> Option<usize> {
+pub(super) fn shelf_item(g: &Game, entry: usize, pricey: bool) -> Option<usize> {
     let cat = catalog();
     g.world.items.iter().position(|it| {
         let p = &cat.products[it.product as usize];
@@ -231,7 +231,7 @@ fn look_from(g: &mut Game, stand: Vec3, target: Vec3) {
     g.player.pitch = (to.y / to.length()).asin();
 }
 
-fn press_e(g: &mut Game) {
+pub(super) fn press_e(g: &mut Game) {
     let mut inp = Input {
         interact: true,
         ..Default::default()
@@ -240,14 +240,73 @@ fn press_e(g: &mut Game) {
 }
 
 /// Spieler an die offene Kasse, Blick aufs Band.
-fn look_at_belt(g: &mut Game) {
+pub(super) fn look_at_belt(g: &mut Game) {
     let lane = g.open_lane().unwrap();
     let mid = (lane.belt_start + lane.belt_end) * 0.5;
     look_from(g, lane.scan_point, mid);
     g.update(1.0 / 60.0, &mut Input::default());
 }
 
-fn look_at_terminal(g: &mut Game) {
+/// Den ganzen Wagen richtig aufs Band legen: Getraenke zuerst (Wagen steht an der Kasse).
+pub(super) fn put_all_on_belt(g: &mut Game) {
+    look_at_belt(g);
+    while !g.cart.is_empty() {
+        let drink = g.cart.iter().position(|c| c.is_drink());
+        g.cart_sel = Some(drink.unwrap_or(g.cart.len() - 1));
+        press_e(g);
+    }
+}
+
+/// Eine Frage der Kassiererin gut beantworten, falls eine offen ist.
+pub(super) fn answer_well(g: &mut Game) {
+    let k = g
+        .till
+        .as_ref()
+        .and_then(|t| t.asked.as_ref())
+        .filter(|a| a.reply.is_none())
+        .map(|a| a.order.iter().position(|&o| o == 0).unwrap());
+    let mut inp = Input {
+        choice: k,
+        ..Default::default()
+    };
+    g.update(1.0 / 60.0, &mut inp);
+}
+
+/// Scannen lassen und alle Fragen gut beantworten, bis nichts mehr offen ist.
+pub(super) fn scan_and_answer(g: &mut Game) {
+    for _ in 0..60 * 90 {
+        answer_well(g);
+        let t = g.till.as_ref().unwrap();
+        if g.belt.is_empty() && t.asked.is_none() && !t.questions_left() {
+            break;
+        }
+    }
+}
+
+/// Karte durchziehen; `secs` = wie lange das Durchziehen dauert.
+pub(super) fn swipe(g: &mut Game, secs: f32) {
+    let frames = (secs * 60.0) as usize;
+    let per_rad = 1.0 / (BASE_SENSITIVITY * g.sensitivity) * till::SWIPE_TRAVEL;
+    for _ in 0..frames + 2 {
+        g.look(0.0, per_rad / frames as f32);
+        g.update(1.0 / 60.0, &mut Input::default());
+    }
+}
+
+/// Angezeigte PIN abwarten und eintippen.
+pub(super) fn type_pin(g: &mut Game) {
+    step(g, till::PIN_SHOW + 0.1, Input::default());
+    let pin = g.till.as_ref().unwrap().pin;
+    for d in pin {
+        let mut inp = Input {
+            digit: Some(d),
+            ..Default::default()
+        };
+        g.update(1.0 / 60.0, &mut inp);
+    }
+}
+
+pub(super) fn look_at_terminal(g: &mut Game) {
     let lane = g.open_lane().unwrap();
     look_from(g, lane.scan_point, lane.terminal + vec3(0.0, 0.08, 0.0));
     g.update(1.0 / 60.0, &mut Input::default());
@@ -274,28 +333,30 @@ fn full_run_checkout_and_exit_wins() {
     g.update(1.0 / 60.0, &mut Input::default());
     assert_eq!(g.focus, Some(Focus::Belt));
     press_e(&mut g);
-    assert!(!g.unloading && g.belt.is_empty(), "Ausraeumen ohne Wagen");
-    // Wagen zur Kasse, alles aufs Band
+    assert!(
+        g.belt.is_empty() && g.till.is_none(),
+        "Ausraeumen ohne Wagen"
+    );
+    // Wagen zur Kasse, Stueck fuer Stueck aufs Band (Getraenke zuerst)
     let n = g.cart.len();
     g.trolley.pos = lane.scan_point + vec3(0.0, 0.0, -1.0);
-    press_e(&mut g);
-    assert!(g.unloading, "Ausraeumen startet nicht");
-    for _ in 0..60 {
-        if g.cart.is_empty() && g.belt.is_empty() && !g.unloading {
-            break;
-        }
-        step(&mut g, 1.0, Input::default());
-    }
-    assert!(g.cart.is_empty() && g.belt.is_empty(), "Band nicht leer");
+    put_all_on_belt(&mut g);
+    assert!(g.cart.is_empty(), "Wagen nicht ausgeraeumt");
+    assert!(g.till_active(), "Kassen-Minispiel startet nicht");
+    scan_and_answer(&mut g);
+    assert!(g.belt.is_empty(), "Band nicht leer");
     assert_eq!(g.scanned.len(), n);
     assert!(g.scanned_complete());
     assert!(!g.paid, "ohne Terminal bezahlt");
-    // am Terminal bezahlen
+    // am Terminal: Karte ruhig durchziehen, PIN eintippen
     look_at_terminal(&mut g);
     g.update(1.0 / 60.0, &mut Input::default());
     assert_eq!(g.focus, Some(Focus::Terminal));
     press_e(&mut g);
+    swipe(&mut g, 1.0);
+    type_pin(&mut g);
     assert!(g.paid, "nicht bezahlt");
+    assert_eq!(g.till.as_ref().unwrap().lives, till::TILL_LIVES);
     // zur Tuer und raus
     g.player.pos = g.world.door_center - vec3(0.0, 0.0, 0.8);
     g.player.yaw = std::f32::consts::PI; // nach Sueden
@@ -590,7 +651,9 @@ fn held_item_goes_on_belt_and_fakes_are_rejected() {
     step(&mut g, 7.0, Input::default());
     assert!(g.belt.is_empty());
     assert!(g.scanned.is_empty(), "falsche Ware wurde gescannt");
-    assert!(g.suspicion > before);
+    // An der Kasse merkt sich das die Kassiererin (nicht die Kundschaft)
+    assert!(g.till.as_ref().unwrap().doubt > 0.0);
+    assert!(g.suspicion <= before);
     // Wertstufe zaehlt Band und Gescanntes mit
     g.held = Some(ItemData::from_shelf(&g.world.items[i]));
     press_e(&mut g);
@@ -942,14 +1005,14 @@ fn cashier_stands_up_after_the_last_item() {
     let lane = g.open_lane().unwrap();
     g.trolley.pushing = false;
     g.trolley.pos = lane.scan_point + vec3(0.0, 0.0, -1.0);
-    look_at_belt(&mut g);
-    press_e(&mut g);
+    put_all_on_belt(&mut g);
     g.sfx.clear();
-    for _ in 0..60 {
+    // scannen lassen, Fragen der Kassiererin gut beantworten
+    for _ in 0..60 * 90 {
         if g.cashier_standing() {
             break;
         }
-        step(&mut g, 1.0, Input::default());
+        answer_well(&mut g);
     }
     assert!(g.cashier_standing(), "Kassiererin steht nicht auf");
     assert!(scared(&g));
