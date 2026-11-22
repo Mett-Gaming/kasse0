@@ -99,6 +99,10 @@ pub struct PoseFx {
     pub step_fps: f32,
     /// Zufallswert der Figur (fuer Zucken)
     pub seed: f32,
+    /// Kopf um die Blickachse gedreht (Radiant; PI = kopfueber)
+    pub head_roll: f32,
+    /// Zerreissen der Figur im Shader (0..1)
+    pub distort: f32,
 }
 
 pub struct AnimSet {
@@ -311,6 +315,19 @@ impl AnimSet {
                 };
                 if share > 0.0 {
                     g = look_towards(g, &self.rest_inv[b], target, fx.look_limit, share);
+                }
+            }
+            if fx.head_roll != 0.0 && Some(b) == self.head {
+                // Kopf um die eigene Blickachse drehen (bis kopfueber)
+                let pivot = g.w_axis.truncate();
+                let axis = (g * self.rest_inv[b])
+                    .transform_vector3(Vec3::Z)
+                    .normalize_or_zero();
+                if axis != Vec3::ZERO {
+                    g = Mat4::from_translation(pivot)
+                        * Mat4::from_quat(Quat::from_axis_angle(axis, fx.head_roll))
+                        * Mat4::from_translation(-pivot)
+                        * g;
                 }
             }
             global.push(g);
@@ -613,6 +630,24 @@ mod tests {
             },
         );
         assert!(back.z < -0.8, "Kopf dreht sich nicht nach hinten: {back}");
+    }
+
+    #[test]
+    fn head_can_be_turned_upside_down() {
+        let a = anims(false);
+        let mut m = Vec::new();
+        a.pose(
+            Clip::Idle,
+            0.0,
+            &PoseFx {
+                head_roll: std::f32::consts::PI,
+                ..Default::default()
+            },
+            &mut m,
+        );
+        let h = a.bone("Head").unwrap();
+        let up = m[h].transform_vector3(Vec3::Y).normalize();
+        assert!(up.y < -0.8, "Kopf nicht kopfueber: {up}");
     }
 
     #[test]

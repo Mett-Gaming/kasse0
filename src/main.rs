@@ -427,6 +427,22 @@ impl App {
             for (s, v) in self.game.sfx.drain(..) {
                 a.play_vol(s, v);
             }
+            // Geraeusche mit Ort: leiser mit der Entfernung, links/rechts nach Richtung
+            let eye = self.game.eye();
+            let right = self
+                .game
+                .view_dir()
+                .cross(glam::Vec3::Y)
+                .normalize_or_zero();
+            for (s, v, at) in self.game.sfx_at.drain(..) {
+                let d = at - eye;
+                let dist = d.length();
+                let fall = (1.0 - dist / audio::HEAR_RANGE).clamp(0.0, 1.0).powf(1.5);
+                if fall > 0.0 {
+                    let pan = right.dot(d / dist.max(0.01)).clamp(-1.0, 1.0);
+                    a.play_at(s, v * fall, pan);
+                }
+            }
             a.update(&Mood {
                 playing: self.screen != Screen::Title,
                 tipped: self.game.tipped,
@@ -472,6 +488,25 @@ impl App {
                 hud::MENU_SCARE_TIME - self.menu_scare,
                 self.clock,
             );
+        }
+        // Cheat: Zustand der NPCs ueber ihren Koepfen
+        if self.screen == Screen::Playing && self.game.npc_debug {
+            let vp = self.game.view_proj(aspect);
+            let labels: Vec<(f32, f32, String)> = self
+                .game
+                .npc_debug_labels()
+                .into_iter()
+                .filter_map(|(at, text)| {
+                    let c = vp * at.extend(1.0);
+                    if c.w <= 0.05 {
+                        return None;
+                    }
+                    let (x, y) = (c.x / c.w, c.y / c.w);
+                    (x.abs() < 1.0 && y.abs() < 1.0)
+                        .then(|| ((x * 0.5 + 0.5) * ui::W, (0.5 - y * 0.5) * ui::H, text))
+                })
+                .collect();
+            hud::draw_npc_debug(&mut self.ui, &labels, &self.game);
         }
 
         let Some(r) = self.running.as_mut() else {
@@ -879,6 +914,7 @@ fn add_skins(
             tint: p.tint,
             first_bone,
             ghost: p.ghost,
+            distort: p.fx.distort,
         });
     }
 }

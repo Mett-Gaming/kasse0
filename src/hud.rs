@@ -705,6 +705,14 @@ mod tests {
     }
 
     #[test]
+    fn npc_debug_overlay_draws() {
+        let g = Game::new(2);
+        let mut u = Ui::default();
+        draw_npc_debug(&mut u, &[(100.0, 50.0, "jagt".into())], &g);
+        assert!(u.verts.len() > 12);
+    }
+
+    #[test]
     fn jumpscares_cannot_be_switched_off() {
         let rows = option_rows(&Settings::default());
         assert_eq!(rows.len(), OPTION_COUNT);
@@ -805,3 +813,35 @@ pub fn draw_menu_scare(u: &mut Ui, e: f32, clock: f32) {
 /// Dauer des Troll-Jumpscares und wie lange davon das Gesicht zu sehen ist
 pub const MENU_SCARE_TIME: f32 = 3.4;
 pub const MENU_SCARE_FACE: f32 = 1.1;
+
+/// Cheat "NPC-Zustände": Text ueber den Koepfen und die Phase des Directors oben.
+pub fn draw_npc_debug(u: &mut Ui, labels: &[(f32, f32, String)], g: &Game) {
+    for (x, y, text) in labels {
+        let w = Ui::text_width(text, 1.0);
+        u.rect(
+            x - w * 0.5 - 2.0,
+            y - 2.0,
+            w + 4.0,
+            12.0,
+            [0.0, 0.0, 0.0, 0.55],
+        );
+        u.text(x - w * 0.5, *y, text, YELLOW, 1.0);
+    }
+    let d = &g.director;
+    let phase = match d.phase {
+        crate::game::director::Phase::Build => "Aufbau",
+        crate::game::director::Phase::Peak => "Höhepunkt",
+        crate::game::director::Phase::Relax => "Ruhe",
+    };
+    u.text_s(
+        8.0,
+        24.0,
+        &format!(
+            "Director: {phase} {:.0} s  Druck {:.0} %",
+            d.t,
+            d.pressure * 100.0
+        ),
+        YELLOW,
+        1.0,
+    );
+}

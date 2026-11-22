@@ -237,3 +237,51 @@ impl Game {
         std::mem::take(&mut self.troll_request)
     }
 }
+
+impl Game {
+    /// Cheats fuer NPCs, Stufen und die Spannungskurve.
+    pub(super) fn npc_cheat(&mut self, k: usize) -> String {
+        match k {
+            0 => {
+                self.tip();
+                let next = match self.tier {
+                    Tier::Calm => Tier::Uneasy,
+                    Tier::Uneasy => Tier::Wrong,
+                    _ => Tier::Collapse,
+                };
+                self.force_tier(next);
+                format!("Stufe: {}", self.tier.name())
+            }
+            1 => {
+                self.director.pressure = 1.0;
+                self.director.phase = super::director::Phase::Peak;
+                self.director.t = 0.0;
+                "Director: Höhepunkt (alle Verfolger rücken heran).".into()
+            }
+            2 => {
+                self.director.calm_down(30.0);
+                "Director: 30 s Ruhe.".into()
+            }
+            3 => {
+                self.tip();
+                let i = self.cheat_customer(true);
+                let p = self.player.pos;
+                let f = self.view_dir();
+                let back = vec3(-f.x, 0.0, -f.z).normalize_or_zero();
+                let spot = self.world.collide(p + back * 6.0, 0.25);
+                let c = &mut self.customers[i];
+                c.pos = spot;
+                c.field.clear();
+                c.brain.notice(p, true);
+                "Ein Verfolger steht 6 m hinter dir.".into()
+            }
+            _ => {
+                self.npc_debug = !self.npc_debug;
+                format!(
+                    "NPC-Zustände: {}",
+                    if self.npc_debug { "AN" } else { "AUS" }
+                )
+            }
+        }
+    }
+}

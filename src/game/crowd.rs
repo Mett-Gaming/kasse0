@@ -236,6 +236,17 @@ impl Game {
         self.update_mimicry(dt);
         self.separate_people();
         self.keep_npcs_out_of_checkout(&before);
+        // Schritte und Schluesselbund (Strecke je NPC in diesem Bild)
+        let moved: Vec<f32> = self
+            .customers
+            .iter()
+            .map(|c| c.pos)
+            .chain(self.employees.iter().map(|e| e.pos))
+            .chain(self.shoppers.iter().map(|s| s.pos))
+            .zip(&before)
+            .map(|(a, b)| vec3(a.x - b.x, 0.0, a.z - b.z).length().min(0.3))
+            .collect();
+        self.npc_sounds(&moved);
         self.update_whispers(dt);
         // Gangart: Animationszeit an die zurueckgelegte Strecke koppeln (Fuesse rutschen nicht)
         // im Gespraech (oder erstarrt): Kunden-Posen eingefroren (Animationszeit steht)
@@ -993,9 +1004,10 @@ impl Game {
                     continue;
                 }
                 let mid = (people[i].0 + people[j].0) * 0.5;
-                let hear = 1.0 - (mid - player).length() / WHISPER_HEAR;
-                if hear > 0.0 {
-                    self.sfx.push((Sfx::Whisper, hear * 0.4));
+                if (mid - player).length() < WHISPER_HEAR {
+                    // Fluestern kommt aus ihrer Richtung
+                    self.sfx_at
+                        .push((Sfx::Whisper, 0.55, mid + vec3(0.0, 1.5, 0.0)));
                 }
                 people[i].1 = self.rng.gen_range(WHISPER_PAUSE.0..WHISPER_PAUSE.1);
                 people[j].1 = self.rng.gen_range(WHISPER_PAUSE.0..WHISPER_PAUSE.1);

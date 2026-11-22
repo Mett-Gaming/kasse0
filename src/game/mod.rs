@@ -332,6 +332,10 @@ pub struct Game {
     noises: Vec<(Vec3, f32)>,
     /// Spannungskurve (director.rs)
     pub director: director::Director,
+    /// Geraeusche mit Ort: (Klang, Lautstaerke, Ort); main.rs verteilt sie im Stereobild
+    pub sfx_at: Vec<(Sfx, f32, Vec3)>,
+    /// Cheat: Zustand der NPCs ueber ihren Koepfen anzeigen
+    pub npc_debug: bool,
     /// wie lange der Spieler schon stillsteht; hat er gerade ins Regal gegriffen?
     player_still: f32,
     player_reached: bool,
@@ -514,6 +518,8 @@ impl Game {
             player_field: Vec::new(),
             noises: Vec::new(),
             director: Default::default(),
+            sfx_at: Vec::new(),
+            npc_debug: false,
             player_still: 0.0,
             player_reached: false,
             cart_field: Vec::new(),
@@ -653,6 +659,23 @@ impl Game {
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn list_complete(&self) -> bool {
         self.list.iter().all(|&i| self.list_done(i))
+    }
+
+    /// Stufe sofort setzen (Cheat): wie ein Aufstieg in check_tier.
+    pub(super) fn force_tier(&mut self, new: Tier) {
+        if new <= self.tier {
+            return;
+        }
+        let old = self.tier;
+        self.tier = new;
+        self.apply_tier_params();
+        self.rebuild_world();
+        self.glitch = 0.8;
+        let extra_c = new.customers().saturating_sub(old.customers());
+        let extra_e = new.employees().saturating_sub(old.employees());
+        self.spawn_customers(extra_c);
+        self.assign_stalkers();
+        self.spawn_employees(extra_e);
     }
 
     fn check_tier(&mut self) {

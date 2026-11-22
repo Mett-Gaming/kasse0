@@ -44,7 +44,14 @@ pub enum Sfx {
     Stomp,
     /// Herzschlag (Flucht): zwei dumpfe Schlaege
     Heartbeat,
+    /// schlurfender Schritt (Untote im Kollaps)
+    Shuffle,
+    /// Schluesselbund des Personals
+    Keys,
 }
+
+/// Bis zu dieser Entfernung hoert man Geraeusche mit Ort (Meter)
+pub const HEAR_RANGE: f32 = 18.0;
 
 /// Was die Musik gerade tun soll.
 pub struct Mood {
@@ -211,6 +218,30 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 let env = (t * 400.0).min(1.0) * (1.0 - ((t - 1.9) / 0.7).max(0.0)).max(0.0);
                 let mix = (scream * 0.9 + metal + noise) * env + boom;
                 (mix * 2.2).tanh() * 0.95
+            })
+        }
+        Sfx::Shuffle => {
+            // Schleifen ueber den Boden: gefiltertes Rauschen, das an- und abschwillt
+            let mut lp = 0.0;
+            gen(0.5, &mut |t| {
+                let n = rng.next();
+                lp += (n - lp) * 0.08;
+                let env = (t / 0.08).min(1.0) * (1.0 - t / 0.5).max(0.0).powi(2);
+                lp * 0.9 * env
+            })
+        }
+        Sfx::Keys => {
+            // Schluessel: kurze, hohe, unharmonische Klingeltoene nacheinander
+            gen(0.45, &mut |t| {
+                let mut s = 0.0;
+                for (k, f) in [3150.0f32, 4210.0, 5370.0, 3720.0].iter().enumerate() {
+                    let t0 = k as f32 * 0.08;
+                    if t > t0 {
+                        let u = t - t0;
+                        s += (TAU * f * u).sin() * (-u * 28.0).exp();
+                    }
+                }
+                s * 0.18
             })
         }
         Sfx::Spark => {
@@ -405,6 +436,8 @@ impl Audio {
             Sfx::Heartbeat,
             Sfx::Scare,
             Sfx::Shriek,
+            Sfx::Shuffle,
+            Sfx::Keys,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -427,6 +460,26 @@ impl Audio {
 
     pub fn play(&self, sfx: Sfx) {
         self.play_vol(sfx, 1.0);
+    }
+
+    /// Wie `play_vol`, aber im Stereobild verteilt: `pan` -1 = links, 1 = rechts.
+    pub fn play_at(&self, sfx: Sfx, vol: f32, pan: f32) {
+        let Some((_, data)) = self
+            .sounds
+            .iter()
+            .find(|(s, _)| std::mem::discriminant(s) == std::mem::discriminant(&sfx))
+        else {
+            return;
+        };
+        // gleiche Lautheit in der Mitte (Sinus/Kosinus-Verteilung)
+        let a = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
+        let (l, r) = (a.cos(), a.sin());
+        let stereo: Vec<f32> = data.iter().flat_map(|&x| [x * l, x * r]).collect();
+        if let Ok(sink) = Sink::try_new(&self.handle) {
+            sink.set_volume(self.master * vol);
+            sink.append(SamplesBuffer::new(2, RATE, stereo));
+            sink.detach();
+        }
     }
 
     pub fn play_vol(&self, sfx: Sfx, vol: f32) {
@@ -497,6 +550,8 @@ mod tests {
             Sfx::Heartbeat,
             Sfx::Scare,
             Sfx::Shriek,
+            Sfx::Shuffle,
+            Sfx::Keys,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

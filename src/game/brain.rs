@@ -43,6 +43,16 @@ impl Activity {
     }
 }
 
+/// Kopf verkehrt herum: Chance beim Ins-Blickfeld-Kommen (Kollaps), Dauer
+const ROLL_CHANCE: f64 = 0.2;
+const ROLL_TIME: f32 = 2.0;
+/// Zerreissen: so genau muss man hinsehen (Kosinus), so nah
+const DISTORT_COS: f32 = 0.97;
+const DISTORT_DIST: f32 = 12.0;
+/// Schritt-Geraeusche: Abstand der Schritte (Meter), Klimpern des Schluesselbunds
+const STEP_EVERY: f32 = 0.65;
+const KEYS_EVERY: f32 = 6.0;
+
 /// Erstarren, wenn man einen Verfolger beim Heranschleichen ertappt (Sekunden)
 pub const FREEZE_CAUGHT: f32 = 1.8;
 /// Nachahmen: so lange muss der Spieler stillstehen, so nah, so lange greifen sie mit
@@ -74,11 +84,18 @@ impl Game {
         let view = self.view_dir();
         let eye = self.eye();
         let mimic_still = self.player_still > MIMIC_STILL;
+        let collapse = self.tier >= Tier::Collapse;
         for c in &mut self.customers {
             let b = &mut c.brain;
             b.freeze = (b.freeze - dt).max(0.0);
             b.mimic_pick = (b.mimic_pick - dt).max(0.0);
             b.grab = (b.grab - dt).max(0.0);
+            b.roll = (b.roll - dt).max(0.0);
+            // im Kollaps: wer gerade ins Blickfeld kommt, hat manchmal den Kopf verkehrt herum
+            if collapse && c.seen && !b.was_seen && self.rng.gen_bool(ROLL_CHANCE) {
+                b.roll = ROLL_TIME;
+            }
+            b.was_seen = c.seen;
             if b.hunting || !c.seen {
                 continue;
             }
@@ -101,6 +118,156 @@ impl Game {
                 c.yaw = lerp_angle(c.yaw, away, (dt * 3.0).min(1.0));
             }
         }
+    }
+
+    /// Verformung einer Kundin je Stufe: schiefer Kopf und Ruckler (unruhig), langer Hals,
+    /// Zucken, Stop-Motion (falsch), lange Glieder, Kopf verkehrt herum und Zerreissen beim
+    /// direkten Hinsehen (Kollaps).
+    pub(super) fn customer_fx(&self, c: &npc::Customer, fx: &mut crate::people::PoseFx) {
+        if !self.tipped {
+            return;
+        }
+        let t = self.time;
+        // Ruckel-Fenster: ab und zu ein paar Sekunden Stop-Motion
+        let window = ((t * 0.25 + c.seed).floor() * 3.3 + c.seed).sin().abs() > 0.8;
+        let moving = c.gait.moving;
+        match self.tier {
+            Tier::Calm => {}
+            Tier::Uneasy => {
+                fx.twitch = 0.15;
+                if window {
+                    fx.step_fps = 8.0;
+                }
+            }
+            Tier::Wrong => {
+                fx.stretch = 0.3;
+                fx.twitch = 0.45;
+                if moving || window {
+                    fx.step_fps = 10.0;
+                }
+            }
+            Tier::Collapse => {
+                fx.stretch = 0.75;
+                fx.twitch = 0.75;
+                if moving || window {
+                    fx.step_fps = 7.0;
+                }
+                if c.brain.roll > 0.0 {
+                    fx.head_roll = std::f32::consts::PI;
+                }
+            }
+        }
+        if self.tier >= Tier::Wrong && c.seen {
+            let to = c.pos + vec3(0.0, 1.3, 0.0) - self.eye();
+            let dist = to.length();
+            if dist < DISTORT_DIST && self.view_dir().dot(to / dist) > DISTORT_COS {
+                // flackert: nicht durchgehend
+                let on = ((t * 9.0).floor() * 1.7 + c.seed).sin().abs() > 0.4;
+                if on {
+                    fx.distort = if self.tier >= Tier::Collapse {
+                        1.0
+                    } else {
+                        0.25
+                    };
+                }
+            }
+        }
+    }
+
+    /// Schritte und Schluesselbund der NPCs (mit Ort, Stereo). Verfolger hoert man nur,
+    /// solange man sie nicht sieht: schaut man hin, verstummen sie.
+    pub(super) fn npc_sounds(&mut self, moved: &[f32]) {
+        let mut k = 0;
+        let collapse = self.tier >= Tier::Collapse;
+        for c in &mut self.customers {
+            let d = moved.get(k).copied().unwrap_or(0.0);
+            k += 1;
+            c.brain.step_acc += d;
+            if c.brain.step_acc < STEP_EVERY {
+                continue;
+            }
+            c.brain.step_acc = 0.0;
+            if c.seen || !self.tipped {
+                continue;
+            }
+            let (sfx, vol) = if c.brain.hunting && collapse {
+                (Sfx::Shuffle, 0.7)
+            } else if c.gait.run {
+                (Sfx::Step, 0.6)
+            } else {
+                (Sfx::Step, if c.brain.hunting { 0.4 } else { 0.18 })
+            };
+            self.sfx_at.push((sfx, vol, c.pos));
+        }
+        for e in &mut self.employees {
+            let d = moved.get(k).copied().unwrap_or(0.0);
+            k += 1;
+            e.brain.step_acc += d;
+            e.brain.keys_acc += d;
+            if e.brain.step_acc >= STEP_EVERY {
+                e.brain.step_acc = 0.0;
+                self.sfx_at.push((Sfx::Step, 0.22, e.pos));
+            }
+            if e.brain.keys_acc >= KEYS_EVERY {
+                e.brain.keys_acc = 0.0;
+                self.sfx_at.push((Sfx::Keys, 0.5, e.pos));
+            }
+        }
+        for s in &mut self.shoppers {
+            let d = moved.get(k).copied().unwrap_or(0.0);
+            k += 1;
+            s.brain.step_acc += d;
+            if s.brain.step_acc >= STEP_EVERY {
+                s.brain.step_acc = 0.0;
+                self.sfx_at.push((Sfx::Step, 0.12, s.pos));
+            }
+        }
+    }
+
+    /// Cheat "NPC-Debug": Zustand je NPC (Ort ueber dem Kopf, Text).
+    pub fn npc_debug_labels(&self) -> Vec<(Vec3, String)> {
+        if !self.npc_debug {
+            return Vec::new();
+        }
+        let pushers = self.pushers();
+        let mut out = Vec::new();
+        for (i, c) in self.customers.iter().enumerate() {
+            let b = &c.brain;
+            let state = if b.freeze > 0.0 {
+                "erstarrt"
+            } else if b.hunting && b.fresh() && pushers.contains(&i) {
+                "jagt"
+            } else if b.hunting && b.fresh() {
+                "lauert"
+            } else if b.hunting {
+                "sucht"
+            } else if c.stalker {
+                "Verfolger"
+            } else {
+                "kauft"
+            };
+            out.push((c.pos + vec3(0.0, 2.05, 0.0), state.to_string()));
+            if let (Some(m), true) = (b.memory, b.hunting && !b.fresh()) {
+                out.push((m + vec3(0.0, 0.3, 0.0), "x".to_string()));
+            }
+        }
+        for e in &self.employees {
+            let state = if e.carrying {
+                "Wagen"
+            } else if e.brain.restock > 0.0 {
+                "raeumt ein"
+            } else if e.brain.investigate.is_some() {
+                "horcht"
+            } else {
+                match e.state {
+                    EmpState::Talking => "redet",
+                    EmpState::Approach => "kommt",
+                    EmpState::Patrol => "Streife",
+                }
+            };
+            out.push((e.pos + vec3(0.0, 2.1, 0.0), state.to_string()));
+        }
+        out
     }
 
     /// Animation einer Kundin aus Zustand und Stufe.
@@ -304,6 +471,63 @@ mod tests {
         assert_eq!(g.employee_clip(&e), Clip::Push);
         e.state = EmpState::Talking;
         assert_eq!(g.employee_clip(&e), Clip::Talk);
+    }
+
+    #[test]
+    fn late_stages_deform_the_customers() {
+        let mut g = behaving_game(11);
+        let i = customer_in_view(&mut g, 5.0);
+        g.update(1.0 / 60.0, &mut Input::default());
+        let fx = |g: &Game| {
+            let mut f = crate::people::PoseFx::default();
+            g.customer_fx(&g.customers[i], &mut f);
+            f
+        };
+        g.tier = Tier::Calm;
+        let calm = fx(&g);
+        assert!(calm.stretch == 0.0 && calm.twitch == 0.0);
+        g.tier = Tier::Wrong;
+        let wrong = fx(&g);
+        assert!(wrong.stretch > 0.0 && wrong.twitch > calm.twitch);
+        g.tier = Tier::Collapse;
+        let late = fx(&g);
+        assert!(late.stretch > wrong.stretch && late.twitch > wrong.twitch);
+        // direkt hinsehen: im Kollaps zerreisst sie zeitweise
+        let mut torn = false;
+        for _ in 0..120 {
+            g.time += 1.0 / 60.0;
+            torn |= fx(&g).distort > 0.5;
+        }
+        assert!(torn, "kein Zerreissen beim Hinsehen");
+    }
+
+    #[test]
+    fn unseen_hunters_can_be_heard_seen_ones_go_silent() {
+        let mut g = behaving_game(12);
+        g.god = true;
+        let p = g.player.pos;
+        g.spawn_customer_at(g.world.collide(p + vec3(0.0, 0.0, 5.0), 0.25));
+        let c = g.customers.last_mut().unwrap();
+        c.stalker = true;
+        c.angry = 0.0;
+        g.player.yaw = 0.0;
+        g.player.pitch = -1.4;
+        let mut steps = 0;
+        for _ in 0..(3 * 60) {
+            g.customers[0].brain.notice(p, true);
+            g.update(1.0 / 60.0, &mut Input::default());
+            steps += g.sfx_at.iter().filter(|s| matches!(s.0, Sfx::Step)).count();
+            g.sfx_at.clear();
+        }
+        assert!(steps > 0, "Verfolger schleicht lautlos");
+        // gesehen: stumm (und erstarrt)
+        g.customers[0].seen = true;
+        g.customers[0].brain.step_acc = 10.0;
+        g.npc_sounds(&[1.0]);
+        assert!(
+            !g.sfx_at.iter().any(|s| matches!(s.0, Sfx::Step)),
+            "gesehen und trotzdem hoerbar"
+        );
     }
 
     #[test]

@@ -904,15 +904,17 @@ fn customers_whisper_when_they_meet() {
         c.whisper_cd = 0.0;
     }
     g.sfx.clear();
+    g.sfx_at.clear();
     g.update(1.0 / 60.0, &mut Input::default());
     assert!(
-        g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Whisper)),
+        g.sfx_at.iter().any(|(s, _, _)| matches!(s, Sfx::Whisper)),
         "kein Fluestern"
     );
     // danach eine Weile Ruhe
     g.sfx.clear();
+    g.sfx_at.clear();
     step(&mut g, 2.0, Input::default());
-    assert!(!g.sfx.iter().any(|(s, _)| matches!(s, Sfx::Whisper)));
+    assert!(!g.sfx_at.iter().any(|(s, _, _)| matches!(s, Sfx::Whisper)));
 }
 
 #[test]
@@ -1014,6 +1016,7 @@ fn stalker_appears_behind_you_when_distracted() {
     assert!(g.hush() > 0.0, "keine Stille davor");
     // umdrehen: Schreck, aber kein Fang
     g.sfx.clear();
+    g.sfx_at.clear();
     g.player.yaw = std::f32::consts::PI;
     step(&mut g, 0.5, Input::default());
     assert!(scared(&g), "kein Schreck beim Umdrehen");
@@ -1040,6 +1043,7 @@ fn cashier_stands_up_after_the_last_item() {
     g.trolley.pos = lane.scan_point + vec3(0.0, 0.0, -1.0);
     put_all_on_belt(&mut g);
     g.sfx.clear();
+    g.sfx_at.clear();
     // scannen lassen, Fragen der Kassiererin gut beantworten
     for _ in 0..60 * 90 {
         if g.cashier_standing() {
@@ -1103,6 +1107,7 @@ fn ceiling_hole_drops_cables_when_you_pass_under_it() {
     let h = *g.world.ceiling_holes.first().expect("keine Deckenloecher");
     g.player.pos = g.world.collide(vec3(h.x, 0.0, h.z), 0.3);
     g.sfx.clear();
+    g.sfx_at.clear();
     g.update(1.0 / 60.0, &mut Input::default());
     assert!(!g.cable_drops.is_empty(), "keine Kabel gefallen");
     assert!(scared(&g));
@@ -1169,6 +1174,7 @@ fn figure_behind_you_only_on_the_monitor() {
     g.customers.clear();
     watch_monitor(&mut g);
     g.sfx.clear();
+    g.sfx_at.clear();
     for _ in 0..90 {
         if g.monitor_ghost_visible() {
             break;
@@ -1238,6 +1244,7 @@ fn blackout_puts_someone_in_front_of_you() {
     g.player.yaw += std::f32::consts::PI; // weg vom Regal, in den Gang
     g.player.pitch = 0.0;
     g.sfx.clear();
+    g.sfx_at.clear();
     g.blackout = Some((0.0, None));
     let mut dark = false;
     for _ in 0..120 {
@@ -1282,6 +1289,7 @@ fn jumpscares_come_regularly() {
             .filter(|(s, _)| matches!(s, Sfx::Scare))
             .count();
         g.sfx.clear();
+        g.sfx_at.clear();
         if g.outcome != Outcome::Running {
             break;
         }

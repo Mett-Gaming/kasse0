@@ -33,7 +33,15 @@ pub const CHEATS: &[&str] = &[
     "Schreck: Monitor",
     "Schreck: Tod (Gesicht)",
     "Schreck: Troll-Option",
+    "Stufe +1 (sofort)",
+    "Director: Höhepunkt",
+    "Director: Ruhe",
+    "Verfolger 6 m hinter dir",
+    "NPC-Zustände an/aus",
 ];
+
+/// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
+pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 10;
 
 /// Kategorien des Cheat-Menues: Name, kurze Beschreibung, Cheats (Index in `CHEATS`).
 /// Jeder Cheat steht in genau einer Kategorie (siehe Test).
@@ -62,7 +70,12 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         (
             "Schrecken",
             "Jeden Jumpscare einzeln auslösen",
-            (FIRST_SCARE_CHEAT..CHEATS.len()).collect(),
+            (FIRST_SCARE_CHEAT..FIRST_NPC_CHEAT).collect(),
+        ),
+        (
+            "NPCs & Stufen",
+            "Stufe, Spannungskurve, Verfolger, Zustände anzeigen",
+            (FIRST_NPC_CHEAT..CHEATS.len()).collect(),
         ),
     ]
 }
@@ -193,6 +206,7 @@ impl Game {
                     "Kartenzahlung.".into()
                 }
             }
+            i if i >= FIRST_NPC_CHEAT => self.npc_cheat(i - FIRST_NPC_CHEAT),
             i if i >= FIRST_SCARE_CHEAT => self.scare_cheat(i - FIRST_SCARE_CHEAT),
             _ => {
                 // Wagen 2 m vor dir abstellen, ein Mitarbeiter schnappt ihn sich
@@ -283,7 +297,7 @@ mod tests {
 
     #[test]
     fn every_scare_cheat_scares() {
-        for i in FIRST_SCARE_CHEAT..CHEATS.len() {
+        for i in FIRST_SCARE_CHEAT..FIRST_NPC_CHEAT {
             let mut g = Game::new(56);
             g.cheat(i);
             let mut scared = false;
@@ -312,6 +326,25 @@ mod tests {
             );
             assert_eq!(g.deaths, 0, "Cheat {:?} kostet ein Leben", CHEATS[i]);
         }
+    }
+
+    #[test]
+    fn npc_cheats_work() {
+        let mut g = Game::new(58);
+        g.cheat(FIRST_NPC_CHEAT);
+        assert!(g.tipped && g.tier >= Tier::Uneasy, "Stufe steigt nicht");
+        g.cheat(FIRST_NPC_CHEAT + 1);
+        assert_eq!(g.director.phase, super::super::director::Phase::Peak);
+        g.cheat(FIRST_NPC_CHEAT + 2);
+        assert_eq!(g.director.phase, super::super::director::Phase::Relax);
+        g.cheat(FIRST_NPC_CHEAT + 3);
+        let behind = g
+            .customers
+            .iter()
+            .any(|c| c.stalker && c.brain.fresh() && (c.pos - g.player.pos).length() < 7.5);
+        assert!(behind, "kein Verfolger hinter dir");
+        g.cheat(FIRST_NPC_CHEAT + 4);
+        assert!(g.npc_debug && !g.npc_debug_labels().is_empty());
     }
 
     #[test]

@@ -83,6 +83,8 @@ Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Übers
 - Sie **ahmen dich nach**: Stehst du still, erstarren sie. Greifst du ins Regal, greifen sie mit. Starrst du eine an, dreht sie sich weg.
 - Erwischst du einen Verfolger beim Heranschleichen, **erstarrt er mitten im Schritt**. Ab „falsch“ schleichen Verfolger geduckt, im Kollaps wie Untote. Auf den letzten Metern holen sie zum Griff aus.
 - Mitarbeiter **räumen kniend Regale ein** (später endlos dieselbe Lücke), schieben deinen Wagen weg und reden mit dir.
+- Ab „unruhig“ werden die Kunden **körperlich falsch**: Kopf zu weit gedreht, kurze Ruckler wie Stop-Motion. Ab „falsch“ langer Hals, Zucken, zu lange Arme. Im Kollaps lange Glieder, Köpfe bis ganz herum oder verkehrt herum, und wer genau hinsieht, sieht sie **zerreißen**.
+- **Du hörst sie:** Schritte der Verfolger mit Richtung (links/rechts), im Kollaps ein Schlurfen, das Schlüsselbund des Personals, Flüstern aus der Richtung der Flüsternden. Schaust du einen Verfolger an, verstummt er.
 - Ein **Director** steuert die Spannung: Erst rücken einzelne Verfolger heran, dann alle, dann ist eine Weile Ruhe, und die anderen lauern nur auf Abstand. Nach einem Tod sind 20 s Ruhe, auf dem Höhepunkt gibt es keine Scares.
 
 ### Gespräche

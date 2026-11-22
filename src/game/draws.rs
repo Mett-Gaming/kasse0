@@ -114,6 +114,7 @@ impl Game {
                 d.look_at = Some(eye);
                 d.fx.look_limit = limit;
             }
+            self.customer_fx(c, &mut d.fx);
             out.push(d);
         }
 
@@ -132,6 +133,10 @@ impl Game {
             if self.tipped && (e.pos - self.player.pos).length() < STAFF_LOOK_DIST {
                 d.look_at = Some(eye);
                 d.fx.look_limit = std::f32::consts::PI;
+            }
+            if self.tipped && self.tier >= Tier::Collapse {
+                d.fx.stretch = 0.4;
+                d.fx.twitch = 0.3;
             }
             out.push(d);
         }

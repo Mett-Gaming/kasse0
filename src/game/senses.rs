@@ -58,6 +58,14 @@ pub struct Brain {
     /// Personal: raeumt kniend ein (Sekunden), mit Blick zum Regal
     pub restock: f32,
     pub restock_face: Option<Vec3>,
+    /// Kopf kopfueber gedreht (Sekunden, Kollaps)
+    pub roll: f32,
+    /// im letzten Bild gesehen
+    pub was_seen: bool,
+    /// Strecke seit dem letzten Schritt-Geraeusch
+    pub step_acc: f32,
+    /// Strecke seit dem letzten Schluesselklimpern (Personal)
+    pub keys_acc: f32,
 }
 
 impl Default for Brain {
@@ -78,6 +86,10 @@ impl Default for Brain {
             grab: 0.0,
             restock: 0.0,
             restock_face: None,
+            roll: 0.0,
+            was_seen: false,
+            step_acc: 0.0,
+            keys_acc: 0.0,
         }
     }
 }
