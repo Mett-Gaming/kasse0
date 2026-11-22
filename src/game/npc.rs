@@ -90,7 +90,8 @@ pub fn step_along(
     let Some((cx, cz)) = nearest_walkable(nav, pos) else {
         return pos;
     };
-    let here = field[cz * nav.w + cx];
+    // noch kein Feld berechnet: direkt aufs Ziel zu
+    let here = field.get(cz * nav.w + cx).copied().unwrap_or(1);
     let target = if here <= 1 {
         goal
     } else {

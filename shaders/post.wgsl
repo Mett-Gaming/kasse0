@@ -3,7 +3,7 @@
 struct Push {
     params: vec4<f32>, // x = Zeit, y = Glitch (0..1), z = gekippt, w = VHS-Staerke (Option)
     res: vec4<f32>,    // xy = Ausgabegroesse, zw = Quellgroesse
-    extra: vec4<f32>,  // x = Schwarzblende (0..1), y = Rotblitz (0..1)
+    extra: vec4<f32>,  // x = Schwarzblende (0..1), y = Rotblitz (0..1), z = Farbumkehr, w = Ueberbelichtung
 };
 var<push_constant> pc: Push;
 
@@ -85,6 +85,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     col = col * (1.0 - dot(d, d) * 0.9 * min(vhs + 0.3, 1.0));
     // Posterize (billiges Band-Feeling)
     col = floor(col * 40.0 + 0.5) / 40.0;
+
+    // Schreck: grell ausschlagendes Licht, dann Farbumkehr (Negativ)
+    let flash = clamp(pc.extra.w, 0.0, 1.0);
+    col = clamp(col * (1.0 + flash * 2.5) + vec3<f32>(flash * 0.12), vec3<f32>(0.0), vec3<f32>(1.0));
+    col = mix(col, vec3<f32>(1.0) - col, clamp(pc.extra.z, 0.0, 1.0));
 
     // Blenden
     col = mix(col, vec3<f32>(0.7, 0.0, 0.0), pc.extra.y * 0.6);

@@ -113,6 +113,9 @@ pub struct FrameParams {
     pub decay: f32,
     /// Live-Verbiegen der Gaenge (siehe world::sway)
     pub sway: Vec4,
+    /// Farbumkehr (0..1) und Ueberbelichtung (0..1) beim Schreck
+    pub invert: f32,
+    pub flash: f32,
     /// Kamera des Ueberwachungsmonitors (view_proj, Position); None = Bild bleibt schwarz
     pub monitor: Option<(Mat4, Vec3)>,
 }

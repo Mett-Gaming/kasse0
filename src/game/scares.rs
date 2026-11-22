@@ -14,24 +14,29 @@ use super::*;
 use crate::people::{Clip, PersonDraw};
 
 /// Abklingzeit nach einem grossen Schreck (Sekunden, zufaellig dazwischen)
-const SCARE_COOLDOWN: (f32, f32) = (25.0, 45.0);
+const SCARE_COOLDOWN: (f32, f32) = (18.0, 32.0);
 /// Stille vor einem angekuendigten Schreck
-const HUSH_TIME: f32 = 2.5;
+const HUSH_TIME: f32 = 1.2;
 /// "Hinter dir": wie weit hinter dem Spieler, wie lange er wartet
-const BEHIND_DIST: f32 = 1.6;
+const BEHIND_DIST: f32 = 1.2;
 const BEHIND_WAIT: f32 = 9.0;
 /// Wagen-Spuk: so lange unbeobachtet, bevor er verschwindet; Rolltempo; Halteabstand
-const CART_UNSEEN: f32 = 4.0;
-const CART_GONE: f32 = 5.0;
-const CART_ROLL_SPEED: f32 = 0.65;
+const CART_UNSEEN: f32 = 3.0;
+const CART_GONE: f32 = 2.5;
+const CART_ROLL_SPEED: f32 = 1.6;
 const CART_STOP: f32 = 2.3;
 /// Kassiererin: Dauer des Aufstehens
-const CASHIER_TIME: f32 = 2.6;
+const CASHIER_TIME: f32 = 1.8;
 /// Stromausfall: Dauer, ab wann die Gestalt steht, wie weit vor einem, Chance pro Sekunde
-const BLACKOUT_TIME: f32 = 1.4;
-const BLACKOUT_PLACE: f32 = 0.5;
+const BLACKOUT_TIME: f32 = 1.0;
+const BLACKOUT_PLACE: f32 = 0.35;
 const BLACKOUT_DIST: f32 = 2.6;
-const BLACKOUT_CHANCE: f32 = 0.025;
+const BLACKOUT_CHANCE: f32 = 0.035;
+/// Schreck-Effekt: so lange laufen Farbumkehr-Stroboskop, Lichtblitz und Zoom-Ruck
+const SCARE_FX: f32 = 0.55;
+/// Unterschwellige Farbumkehr-Blitze ab "falsch": Abstand in Sekunden, Dauer
+const SUBLIMINAL_EVERY: (f32, f32) = (14.0, 30.0);
+const SUBLIMINAL_TIME: f32 = 0.09;
 /// "Hinter dir": Chance pro Sekunde, abgelenkt bzw. sonst
 const BEHIND_CHANCE: (f32, f32) = (0.6, 0.04);
 
@@ -67,6 +72,72 @@ impl Game {
         self.red = self.red.max(0.35 * strength);
         self.hush_t = 0.0;
         self.scare_cd = self.rng.gen_range(SCARE_COOLDOWN.0..SCARE_COOLDOWN.1);
+        self.scare_fx = SCARE_FX;
+        self.scare_fx_strength = strength;
+    }
+
+    /// 0..1 wie weit der Schreck-Effekt noch laeuft (1 = gerade ausgeloest)
+    fn scare_fx_k(&self) -> f32 {
+        (self.scare_fx / SCARE_FX).clamp(0.0, 1.0)
+    }
+
+    /// Farbumkehr (0/1): Stroboskop beim Schreck, Flackern am Ende des Stromausfalls,
+    /// einzelne unterschwellige Blitze.
+    pub fn scare_invert(&self) -> f32 {
+        let t = self.time;
+        let k = self.scare_fx_k();
+        let strobe = |hz: f32| ((t * hz) as i64 % 2 == 0) as i32 as f32;
+        let mut inv = 0.0f32;
+        if k > 0.35 {
+            inv = strobe(18.0);
+        }
+        if let Some((bt, _)) = self.blackout {
+            if bt > BLACKOUT_TIME - 0.3 {
+                inv = inv.max(strobe(24.0));
+            }
+        }
+        if self.subliminal > 0.0 && self.subliminal < SUBLIMINAL_TIME {
+            inv = 1.0;
+        }
+        inv
+    }
+
+    /// Ueberbelichtung: das Licht schlaegt beim Schreck grell aus und flackert ab.
+    pub fn scare_flash(&self) -> f32 {
+        let k = self.scare_fx_k();
+        if k <= 0.0 {
+            return 0.0;
+        }
+        let flick = 0.6 + 0.4 * ((self.time * 40.0).sin() * 0.5 + 0.5);
+        k * k * flick * (0.5 + 0.5 * self.scare_fx_strength)
+    }
+
+    /// Zoom-Ruck: das Sichtfeld zieht beim Schreck ruckartig zusammen (Faktor < 1).
+    pub fn scare_zoom(&self) -> f32 {
+        let k = self.scare_fx_k();
+        1.0 - 0.3 * k * k * (0.5 + 0.5 * self.scare_fx_strength)
+    }
+
+    fn update_scare_fx(&mut self, dt: f32) {
+        self.scare_fx = (self.scare_fx - dt).max(0.0);
+        // unterschwellige Blitze: nur im gekippten Markt ab "falsch"
+        if !self.tipped || self.tier < Tier::Wrong || self.dying.is_some() {
+            self.subliminal = -1.0;
+            return;
+        }
+        if self.subliminal < 0.0 {
+            self.subliminal_wait = self.rng.gen_range(SUBLIMINAL_EVERY.0..SUBLIMINAL_EVERY.1);
+            self.subliminal = SUBLIMINAL_TIME;
+        }
+        if self.subliminal < SUBLIMINAL_TIME {
+            self.subliminal += dt;
+        } else {
+            self.subliminal_wait -= dt;
+            if self.subliminal_wait <= 0.0 {
+                self.subliminal = 0.0;
+                self.subliminal_wait = self.rng.gen_range(SUBLIMINAL_EVERY.0..SUBLIMINAL_EVERY.1);
+            }
+        }
     }
 
     /// 0..1: wie still es gerade ist (fuer die Musik)
@@ -77,6 +148,7 @@ impl Game {
     pub(super) fn update_scares(&mut self, dt: f32, input: &Input) {
         self.scare_cd = (self.scare_cd - dt).max(0.0);
         self.hush_t = (self.hush_t - dt).max(0.0);
+        self.update_scare_fx(dt);
         self.update_behind(dt, input);
         self.update_cashier_scare(dt);
         self.update_cart_ghost(dt);
@@ -277,11 +349,15 @@ impl Game {
                 };
             }
             CartGhost::Rolling => {
-                if self.trolley.pushing
-                    || carried
-                    || (self.trolley.pos - player).length() < CART_STOP
-                {
+                if self.trolley.pushing || carried {
                     self.cart_ghost = CartGhost::Idle;
+                    return;
+                }
+                if (self.trolley.pos - player).length() < CART_STOP {
+                    // knallt direkt vor einem zum Stehen
+                    self.cart_ghost = CartGhost::Idle;
+                    self.sfx.push((Sfx::Rattle, 1.0));
+                    self.fire_scare(0.7);
                     return;
                 }
                 let old = self.trolley.pos;

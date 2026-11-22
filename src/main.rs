@@ -133,6 +133,14 @@ impl App {
         }
     }
 
+    /// Troll-Jumpscare starten (Optionen, oder Cheat).
+    fn start_menu_scare(&mut self) {
+        self.menu_scare = hud::MENU_SCARE_TIME;
+        self.sfx_vol(Sfx::Shriek, 1.5);
+        self.sfx_vol(Sfx::Scare, 1.3);
+        self.sfx_vol(Sfx::Sting, 1.2);
+    }
+
     /// Sekunden seit dem Troll-Jumpscare (None = laeuft nicht)
     fn menu_scare_elapsed(&self) -> Option<f32> {
         (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare)
@@ -233,10 +241,7 @@ impl App {
                     5 => s.tutorial = !s.tutorial,
                     6 => {
                         // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
-                        self.menu_scare = hud::MENU_SCARE_TIME;
-                        self.sfx_vol(Sfx::Shriek, 1.5);
-                        self.sfx_vol(Sfx::Scare, 1.3);
-                        self.sfx_vol(Sfx::Sting, 1.2);
+                        self.start_menu_scare();
                         return;
                     }
                     _ => {
@@ -262,6 +267,9 @@ impl App {
                     self.game.cheat(self.sel);
                 }
                 self.go(Screen::Playing);
+                if self.game.take_troll_request() {
+                    self.start_menu_scare();
+                }
             }
             Screen::Playing => {}
         }
@@ -495,7 +503,14 @@ impl App {
         }
         let strobe = troll
             .is_some_and(|e| e > 0.07 && e < hud::MENU_SCARE_FACE && ((e * 14.0) as i32) % 2 == 1);
+        let troll_inv = troll.is_some_and(|e| e > 0.07 && ((e * 9.0) as i32) % 3 == 1);
         let params = render::FrameParams {
+            invert: if troll_inv { 1.0 } else { g.scare_invert() },
+            flash: if troll.is_some_and(|e| e < 0.3) {
+                1.0
+            } else {
+                g.scare_flash()
+            },
             view_proj,
             cam_pos: g.eye(),
             time: g.time,
@@ -615,6 +630,18 @@ impl App {
                 if matches!(self.screen, Screen::Options { .. }) && self.sel < 7 =>
             {
                 self.activate(event_loop, 1)
+            }
+            // Cheat-Menue: zwei Spalten, links/rechts wechselt die Spalte
+            KeyCode::ArrowLeft | KeyCode::KeyA | KeyCode::ArrowRight | KeyCode::KeyD
+                if self.screen == Screen::Cheats =>
+            {
+                let rows = n.div_ceil(2);
+                self.sel = if self.sel >= rows {
+                    self.sel - rows
+                } else {
+                    (self.sel + rows).min(n - 1)
+                };
+                self.sfx(Sfx::Blip);
             }
             KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::KeyE if !repeat => {
                 self.activate(event_loop, 1)

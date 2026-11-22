@@ -7,15 +7,15 @@ use super::*;
 use crate::people::{Clip, PersonDraw};
 
 /// So lange muss man auf den Monitor schauen, bis sich etwas tut
-const WATCH_TIME: f32 = 0.8;
+const WATCH_TIME: f32 = 0.6;
 /// Ab hier gilt "auf den Monitor schauen" (Abstand, Blickwinkel als Kosinus)
 const WATCH_DIST: f32 = 6.0;
 const WATCH_COS: f32 = 0.93;
 /// Schaut man weiter weg als das (Kosinus), verschwindet die Gestalt
 const LOOK_AWAY_COS: f32 = 0.6;
 /// Ablauf der Gestalt: erst naeherkommen, dann Schreck, dann weg
-const GHOST_STRIKE: f32 = 1.4;
-const GHOST_END: f32 = 3.2;
+const GHOST_STRIKE: f32 = 0.8;
+const GHOST_END: f32 = 2.0;
 /// Abstand der Gestalt hinter dem Spieler: anfangs, beim Schreck
 const GHOST_FAR: f32 = 1.1;
 const GHOST_NEAR: f32 = 0.4;
