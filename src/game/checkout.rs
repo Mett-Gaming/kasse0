@@ -134,6 +134,9 @@ impl Game {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos() as u64);
         self.params.corridor_seed = now ^ self.rng.gen::<u64>();
+        // je laenger der Run, desto laenger der Gang (40 bis 140 m)
+        self.params.corridor_len = crate::world::corridor_len_for(self.run_time);
+        self.corridor_run = None;
         self.rebuild_world();
         self.play(Sfx::Beep, 0.5);
         self.play(Sfx::Chime, 0.5);

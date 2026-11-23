@@ -5,7 +5,13 @@ use super::*;
 
 pub(super) const CART_OFFSET: f32 = 0.85;
 /// Hoehe des Korbbodens im Wagenmodell (gemessen am Modell)
-const CART_FLOOR: f32 = 0.57;
+pub(super) const CART_FLOOR: f32 = 0.57;
+/// Korbboden laengs (Wagenmodell): von z = -0,5 bis +0,24. Plaetze: 3 quer, 4 laengs
+pub(super) const CART_CELLS: usize = 12;
+const CART_ROW0: f32 = -0.4;
+const CART_ROW: f32 = 0.175;
+/// So weit sinkt Ware in den Drahtboden ein (sie soll aufliegen, nicht schweben)
+const CART_SINK: f32 = 0.01;
 /// Kollisionsradius des geschobenen Wagens (breiter als ein Durchgang)
 const CART_PUSH_RADIUS: f32 = 0.42;
 /// Radius des abgestellten Wagens fuer die Spielerkollision
@@ -17,6 +23,28 @@ const SQUEAK_EVERY: (f32, f32) = (3.0, 5.5);
 const SQUEAK_EVERY_RUN: (f32, f32) = (1.6, 3.0);
 /// Ab so viel Drehung (Bogenmass) seit dem letzten Geraeusch klappert der Wagen statt zu quietschen
 const RATTLE_TURN: f32 = 0.9;
+/// Springen: Absprungtempo (m/s) und Schwerkraft - gut 0,6 m hoch, 0,7 s in der Luft
+pub const JUMP_SPEED: f32 = 3.4;
+pub const GRAVITY: f32 = 9.8;
+/// Sprung mit geschobenem Wagen: nur knapp 0,3 m hoch (der Wagen hopst mit)
+pub const CART_JUMP_SPEED: f32 = 2.4;
+/// Beim Aufsetzen mit dem Wagen: so oft faellt nichts heraus bzw. genau eine Ware,
+/// sonst mehrere (2 bis alle)
+pub const SPILL_NONE: f32 = 0.25;
+pub const SPILL_ONE: f32 = 0.4;
+
+/// Wie viele von `n` Waren beim Aufsetzen herausfallen (`roll` zufaellig in 0..1).
+pub fn spill_count(n: usize, roll: f32, rng: &mut impl Rng) -> usize {
+    if n == 0 || roll < SPILL_NONE {
+        0
+    } else if roll < SPILL_NONE + SPILL_ONE || n == 1 {
+        1
+    } else {
+        rng.gen_range(2..=n)
+    }
+}
+/// Geduckt: Anteil des Renntempos
+pub const CROUCH_SPEED: f32 = 0.55;
 
 impl Game {
     pub(super) fn update_movement(&mut self, dt: f32, input: &Input) {
@@ -36,9 +64,39 @@ impl Game {
         if input.left {
             wish -= right;
         }
-        // Ausdauer: Rennen kostet, Gehen und Stehen erholen
+        // im Fluchtkorridor: Ausdauer unendlich; dort auch Tempo-Grenzen (Stolpern, Engstellen)
+        let endless = self.corridor_endless_stamina();
+        let (slow, cap) = self.corridor_speed();
+        let pushing = self.trolley.pushing;
+        // Ducken (weich) und Springen (nur am Boden, nicht geduckt)
         let p = &mut self.player;
-        p.running = input.run && !p.exhausted && wish.length_squared() > 0.0;
+        let want = if input.crouch && p.jump_y <= 0.0 {
+            1.0
+        } else {
+            0.0
+        };
+        p.crouch += (want - p.crouch) * (dt * 10.0).min(1.0);
+        if input.jump && p.jump_y <= 0.0 && p.jump_v <= 0.0 && p.crouch < 0.3 {
+            // mit dem Wagen springt man nur ein kleines Stueck (der Wagen hopst mit)
+            p.jump_v = if pushing { CART_JUMP_SPEED } else { JUMP_SPEED };
+            p.cart_jump = pushing;
+        }
+        let mut landed = false;
+        if p.jump_y > 0.0 || p.jump_v > 0.0 {
+            p.jump_y += p.jump_v * dt;
+            p.jump_v -= GRAVITY * dt;
+            if p.jump_y <= 0.0 {
+                p.jump_y = 0.0;
+                p.jump_v = 0.0;
+                landed = true;
+            }
+        }
+        if endless {
+            p.stamina = 1.0;
+            p.exhausted = false;
+        }
+        // Ausdauer: Rennen kostet, Gehen und Stehen erholen (geduckt rennt man nicht)
+        p.running = input.run && !p.exhausted && wish.length_squared() > 0.0 && p.crouch < 0.5;
         if p.running {
             p.stamina -= dt / STAMINA_RUN;
             if p.stamina <= 0.0 {
@@ -52,14 +110,27 @@ impl Game {
             }
         }
         let running = p.running;
+        // geduckt: immer gut die Haelfte des Renntempos (geduckt rennen geht nicht)
+        let crouch = p.crouch;
         if wish.length_squared() > 0.0 {
-            wish = wish.normalize() * if running { RUN_SPEED } else { WALK_SPEED };
+            let base = if running { RUN_SPEED } else { WALK_SPEED };
+            let v = (base + (RUN_SPEED * CROUCH_SPEED - base) * crouch) * slow;
+            wish = wish.normalize() * v.min(cap);
+        }
+        if landed {
+            self.play(Sfx::Step, 0.6);
+            // mit dem Wagen gelandet: es scheppert, Ware fliegt heraus
+            if std::mem::take(&mut self.player.cart_jump) && self.trolley.pushing {
+                self.spill_cart();
+            }
         }
         let old = self.player.pos;
         self.player.vel = self.player.vel.lerp(wish, (dt * 10.0).min(1.0));
         let mut pos = self
             .world
             .collide(old + self.player.vel * dt, PLAYER_RADIUS);
+        // Huerden, Tueren, Regale ... im Fluchtkorridor
+        pos = self.corridor_collide(pos, PLAYER_RADIUS);
 
         if self.trolley.pushing {
             // Der geschobene Wagen ist breiter als ein Mensch: schmale Durchgaenge gehen nicht
@@ -153,17 +224,97 @@ impl Game {
         )
     }
 
+    /// So hoch ist der Wagen gerade (er hopst beim Sprung mit, wenn man ihn schiebt).
+    pub fn cart_lift(&self) -> f32 {
+        if self.trolley.pushing {
+            self.player.jump_y
+        } else {
+            0.0
+        }
+    }
+
+    /// Mit dem Wagen gelandet: zufaellig fliegt mal nichts, mal eine, mal mehrere Waren heraus
+    /// und liegt dann am Boden (mit E wieder aufheben).
+    pub(super) fn spill_cart(&mut self) {
+        self.play(Sfx::Rattle, 1.0);
+        self.play(Sfx::Thud, 0.6);
+        self.make_noise(super::senses::NOISE_RUN);
+        let n = spill_count(self.cart.len(), self.rng.gen_range(0.0..1.0), &mut self.rng);
+        if n == 0 {
+            return;
+        }
+        let mut idx: Vec<usize> = (0..self.cart.len()).collect();
+        idx.shuffle(&mut self.rng);
+        let mut out: Vec<usize> = idx[..n].to_vec();
+        // von hinten entfernen, damit die Indizes stimmen
+        out.sort_unstable_by(|a, b| b.cmp(a));
+        let (s, c) = self.trolley.yaw.sin_cos();
+        let fwd = vec3(s, 0.0, -c);
+        let side = vec3(c, 0.0, s);
+        for i in out {
+            let from = self.cart_item_model(i).w_axis.truncate() + vec3(0.0, 0.1, 0.0);
+            let data = self.cart.remove(i);
+            let push = fwd * self.rng.gen_range(0.6..1.6) + side * self.rng.gen_range(-1.2..1.2);
+            self.loose.push(Loose {
+                data,
+                pos: from,
+                vel: push + vec3(0.0, self.rng.gen_range(1.2..2.2), 0.0),
+                yaw: self.rng.gen_range(0.0..std::f32::consts::TAU),
+            });
+        }
+        self.cart_sel = None;
+        self.hint("Es scheppert: Ware ist aus dem Wagen gefallen.");
+    }
+
     /// Lage der i-ten Ware im Wagenkorb (Weltkoordinaten).
     pub(super) fn cart_item_model(&self, i: usize) -> Mat4 {
-        let base = self.trolley.pos + vec3(0.0, self.sway_at(self.trolley.pos).y, 0.0);
+        let base = self.trolley.pos
+            + vec3(
+                0.0,
+                self.sway_at(self.trolley.pos).y + self.cart_lift(),
+                0.0,
+            );
         let m = Mat4::from_rotation_translation(Quat::from_rotation_y(-self.trolley.yaw), base);
-        let col = (i % 3) as f32 - 1.0;
-        let row = ((i / 3) % 4) as f32 - 1.5;
-        let layer = (i / 12) as f32;
-        // auf dem Korbboden (Wagenmodell: Boden bei ~0,56 m), in Lagen uebereinander
-        let local = vec3(col * 0.13, CART_FLOOR + layer * 0.15, row * 0.17);
-        let spin = Quat::from_rotation_y(i as f32 * 1.7);
-        m * Mat4::from_rotation_translation(spin, local)
+        m * self.cart_item_local(i)
+    }
+
+    /// Lage der i-ten Ware im Korb (Koordinaten des Wagenmodells): Sie liegt wie
+    /// hineingelegt auf dem Korbboden oder auf der Ware darunter - hohe Waren (Flaschen,
+    /// Kartons) umgekippt, alles leicht schief und verdreht.
+    pub(super) fn cart_item_local(&self, i: usize) -> Mat4 {
+        // bisherige Hoehe der Stapel je Platz (3 quer x 4 laengs)
+        let mut tops = [CART_FLOOR; CART_CELLS];
+        let mut out = Mat4::IDENTITY;
+        for (k, item) in self.cart.iter().enumerate().take(i + 1) {
+            let h = item.half();
+            // hohe, schmale Ware liegt auf der Seite (laengs in den Korb gekippt)
+            let lying = h.y > h.x.max(h.z) * 1.15;
+            let height = if lying { 2.0 * h.z } else { 2.0 * h.y };
+            let cell = k % CART_CELLS;
+            let (col, row) = ((cell % 3) as f32 - 1.0, (cell / 3) as f32);
+            // kleine, feste Unordnung je Ware
+            let j = |s: f32| ((k as f32 * 12.9898 + s * 78.233).sin() * 43_758.547).fract();
+            let x = col * 0.135 + (j(1.0) - 0.5) * 0.03;
+            let z = CART_ROW0 + row * CART_ROW + (j(2.0) - 0.5) * 0.03;
+            let y = tops[cell] - CART_SINK;
+            // naechste Ware liegt obenauf (etwas ineinander gerutscht)
+            tops[cell] += height * 0.9;
+            if k == i {
+                let spin = Quat::from_rotation_y(k as f32 * 1.7);
+                let tilt = Quat::from_rotation_x((j(3.0) - 0.5) * 0.12)
+                    * Quat::from_rotation_z((j(4.0) - 0.5) * 0.12);
+                out = if lying {
+                    // um die Querachse gekippt: liegt mit der Seite auf, Mitte ueber dem Platz
+                    let tip = Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
+                    let rot = spin * tilt * tip;
+                    let shift = spin * tilt * vec3(0.0, h.z, -h.y);
+                    Mat4::from_rotation_translation(rot, vec3(x, y, z) + shift)
+                } else {
+                    Mat4::from_rotation_translation(spin * tilt, vec3(x, y, z))
+                };
+            }
+        }
+        out
     }
 
     /// Ware, die F herausnehmen wuerde (nur wenn man den Wagen anschaut und die Hand frei ist).
@@ -210,6 +361,14 @@ impl Game {
         let eye = self.eye();
         let dir = self.view_dir();
         let mut best = REACH;
+
+        // Tueren im Fluchtkorridor (auch mit etwas in der Hand)
+        for (i, b) in self.corridor_doors() {
+            if let Some(t) = b.ray(eye, dir, best) {
+                best = t;
+                self.focus = Some(Focus::Door(i));
+            }
+        }
 
         // Der Wagen selbst
         if let Some(t) = self.cart_box().ray(eye, dir, REACH + 0.4) {
@@ -337,6 +496,8 @@ impl Game {
             // E am Band oeffnet das Kassenfenster (belt_window.rs)
             Some(Focus::Belt) => return self.open_belt_window(),
             Some(Focus::Terminal) => return self.use_terminal(),
+            // E an einer Tuer im Fluchtkorridor: aufdruecken (game/corridor/obstacles.rs)
+            Some(Focus::Door(i)) => return self.push_door(i),
             _ => {}
         }
         if self.held.is_some() {
@@ -616,7 +777,12 @@ impl Game {
         }
 
         // Wagen + Inhalt
-        let cart_pos = self.trolley.pos + vec3(0.0, self.sway_at(self.trolley.pos).y, 0.0);
+        let cart_pos = self.trolley.pos
+            + vec3(
+                0.0,
+                self.sway_at(self.trolley.pos).y + self.cart_lift(),
+                0.0,
+            );
         let m = Mat4::from_rotation_translation(rot(-self.trolley.yaw), cart_pos);
         out.push(MeshDraw {
             mesh: MeshId::Cart as usize,

@@ -79,7 +79,10 @@ impl Game {
             self.red = self.red.max(0.35);
             self.glitch = self.glitch.max(0.3);
         }
-        self.update_chase_sounds(dt);
+        // im Fluchtkorridor hoert man die Front (game/corridor/front.rs), nicht die Meute
+        if !self.corridor_entered() {
+            self.update_chase_sounds(dt);
+        }
     }
 
     /// Abstand zum naechsten Verfolger und wie viele in der Naehe sind.
@@ -124,13 +127,9 @@ impl Game {
         }
     }
 
-    /// Tempo der Verfolger: im engen Fluchtkorridor etwas langsamer als im Markt.
-    pub(super) fn chase_speed_at(&self, p: Vec3) -> f32 {
-        if self.world.corridor.is_some_and(|c| c.contains(p)) {
-            super::corridor::CORRIDOR_CHASE_SPEED
-        } else {
-            CHASE_SPEED
-        }
+    /// Tempo der Verfolger (in den Fluchtkorridor kommen sie nicht mit).
+    pub(super) fn chase_speed_at(&self, _p: Vec3) -> f32 {
+        CHASE_SPEED
     }
 
     /// Mitarbeiter in der Flucht: rennen hinterher und koennen jetzt selbst zupacken.
@@ -165,6 +164,36 @@ mod tests {
         g.player.pos = lane.scan_point;
         g.pay();
         g
+    }
+
+    #[test]
+    fn cashier_stays_seated_and_does_not_turn_during_the_escape() {
+        // gekippt, Flucht laeuft: wo man auch hinlaeuft, sie sitzt fest auf ihrem Stuhl
+        let mut g = paid_game(48);
+        assert!(g.tipped && g.chasing());
+        let lane = g.open_lane().unwrap();
+        let cashier = |g: &Game| {
+            let mut people = Vec::new();
+            g.collect_people(&mut people);
+            people
+                .into_iter()
+                .find(|p| p.variant == g.cashier_variant && p.clip == crate::people::Clip::Sit)
+                .expect("Kassiererin sitzt nicht")
+        };
+        let first = cashier(&g);
+        for off in [
+            vec3(3.0, 0.0, 0.0),
+            vec3(-3.0, 0.0, 2.0),
+            vec3(0.0, 0.0, -4.0),
+        ] {
+            g.player.pos = lane.scan_point + off;
+            g.update(1.0 / 60.0, &mut Input::default());
+            let c = cashier(&g);
+            assert!((c.yaw - first.yaw).abs() < 1e-4, "dreht sich mit");
+            assert!((c.pos - first.pos).length() < 1e-3, "rutscht vom Stuhl");
+            assert!(c.look_at.is_none(), "schaut einem hinterher");
+        }
+        assert!((first.yaw - crate::game::draws::CASHIER_YAW).abs() < 1e-4);
     }
 
     #[test]

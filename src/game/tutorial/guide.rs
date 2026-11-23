@@ -236,9 +236,10 @@ impl Game {
             }
             Phase::Shopping => nearest(&self.guide_candidates(phase)),
             Phase::ToTill => self.open_lane().map(|l| l.scan_point),
-            // durch den Korridor bis kurz vor sein Ende, ohne Korridor zur Ladentuer
-            Phase::Escape => Some(match self.world.corridor {
-                Some(c) => vec3((c.x0 + c.x1) * 0.5, 0.0, c.z1 - 1.0),
+            // erst zur Ladentuer, im Korridor zur Ausgangstuer am Ende
+            Phase::Escape => Some(match &self.world.corridor {
+                Some(c) if c.contains(self.player.pos) => corridor_exit_point(c),
+                Some(c) => c.door_center,
                 None => self.world.door_center - vec3(0.0, 0.0, 1.0),
             }),
             _ => None,
@@ -264,10 +265,22 @@ impl Game {
         marked.truncate(MARK_MAX);
 
         let goal = self.guide_goal();
+        // im Korridor: Pfeile entlang seiner Mittellinie (dort gibt es kein Wegeraster)
+        let corridor_path = self
+            .world
+            .corridor
+            .as_ref()
+            .filter(|c| phase == Phase::Escape && c.contains(p))
+            .map(|c| corridor_path_from(c, p));
         let nav = &self.world.nav;
         let Some(t) = &mut self.tutorial else { return };
         let g = &mut t.guide;
         g.marked = marked;
+        if let Some(path) = corridor_path {
+            g.goal = None;
+            g.arrows = arrows_along(&path);
+            return;
+        }
         let Some(goal) = goal else {
             g.goal = None;
             g.arrows.clear();
@@ -285,6 +298,40 @@ impl Game {
             g.arrows = arrows_along(&descend(nav, &g.field, p));
         }
     }
+}
+
+/// Ziel im Korridor: mitten in der Ausgangstuer am Ende.
+fn corridor_exit_point(c: &crate::world::Corridor) -> Vec3 {
+    c.stations
+        .iter()
+        .find(|s| s.kind == crate::world::StationKind::ExitDoor)
+        .map_or(*c.pts.last().unwrap(), |s| {
+            s.at + s.side * (crate::world::CORRIDOR_HALF_W + 0.6)
+        })
+}
+
+/// Weg vom Spieler entlang der Mittellinie des Korridors bis zur Ausgangstuer.
+fn corridor_path_from(c: &crate::world::Corridor, p: Vec3) -> Vec<Vec3> {
+    let s = c.progress(p);
+    let exit = c
+        .stations
+        .iter()
+        .find(|st| st.kind == crate::world::StationKind::ExitDoor)
+        .map_or(c.len, |st| st.s);
+    let mut path = vec![vec3(p.x, 0.0, p.z)];
+    let mut acc = 0.0;
+    for k in 0..c.segments() {
+        let (_, _, l, cum) = c.segment(k);
+        let corner = cum + l;
+        if corner > s + 0.3 && corner < exit {
+            path.push(c.pts[k + 1]);
+        }
+        acc += l;
+    }
+    let _ = acc;
+    path.push(c.point_at(exit));
+    path.push(corridor_exit_point(c));
+    path
 }
 
 /// So hoch schweben die Pfeile ueber dem (ggf. verzerrten) Boden

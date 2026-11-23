@@ -827,7 +827,12 @@ impl App {
                 KeyCode::KeyQ if pressed && !repeat => self.input.cart_toggle = true,
                 KeyCode::KeyF if pressed && !repeat => self.input.take_out = true,
                 KeyCode::KeyR if pressed && !repeat => self.input.complain = true,
-                KeyCode::KeyE | KeyCode::Space if pressed && !repeat => self.input.interact = true,
+                KeyCode::KeyE if pressed && !repeat => self.input.interact = true,
+                // Leertaste springt, C oder Strg duckt (gehalten)
+                KeyCode::Space if pressed && !repeat => self.input.jump = true,
+                KeyCode::KeyC | KeyCode::ControlLeft | KeyCode::ControlRight => {
+                    self.input.crouch = pressed
+                }
                 // Esc schliesst zuerst das Kassenfenster, sonst Pause
                 KeyCode::Escape if pressed && !repeat && self.game.belt_window_open() => {
                     self.game.close_belt_window();

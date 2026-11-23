@@ -47,10 +47,16 @@ pub const CHEATS: &[&str] = &[
     "Verfolger 6 m hinter dir",
     "NPC-Zustände an/aus",
     "Tutorial starten",
+    "Flucht: langer Korridor",
+    "Sofort sterben",
 ];
 
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 1;
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 3;
+/// Direkt in den laengsten Fluchtkorridor (140 m)
+pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 2;
+/// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
+pub const DIE_CHEAT: usize = CHEATS.len() - 1;
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
@@ -62,7 +68,7 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         (
             "Spieler",
             "Unverwundbar, Leben, Tutorial, Auffälligkeit",
-            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5],
+            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5, DIE_CHEAT],
         ),
         (
             "Markt & Einkauf",
@@ -72,7 +78,7 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         (
             "Kasse & Flucht",
             "Direkt zur Kasse, zum Bezahlen, in den Korridor",
-            vec![6, 12, 13, 16],
+            vec![6, 12, 13, 16, LONG_CORRIDOR_CHEAT],
         ),
         (
             "Leute",
@@ -93,6 +99,28 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
 }
 
 impl Game {
+    /// Cheat: sofort tot - wie erwischt (rotes Bild, Schreck, Gesicht), dann der Endbildschirm
+    /// mit einem der gruseligen Schriftzuege. Gilt auch im Tutorial und mit Unverwundbar.
+    pub fn debug_die(&mut self) {
+        if self.outcome != Outcome::Running {
+            return;
+        }
+        self.dying = None;
+        self.dialog = None;
+        self.close_belt_window();
+        self.outcome = Outcome::Caught;
+        self.outcome_timer = 0.0;
+        self.red = 1.0;
+        self.glitch = 1.0;
+        self.fire_scare(1.0);
+        self.play(Sfx::Shriek, 1.2);
+        self.play(Sfx::Sting, 1.0);
+        let pool = crate::people::people_of(false);
+        self.catcher_variant = Some(pool[self.seed as usize % pool.len()]);
+        let f = self.view_dir();
+        self.catcher = Some(self.player.pos + vec3(f.x, 0.0, f.z).normalize_or_zero() * 0.6);
+    }
+
     pub fn cheat(&mut self, i: usize) {
         let msg: String = match i {
             0 => {
@@ -208,8 +236,16 @@ impl Game {
                 "Tutorial übersprungen.".into()
             }
             16 => {
-                self.debug_jump_to_corridor();
+                self.debug_jump_to_corridor(None);
                 "Lauf! Nicht umdrehen.".into()
+            }
+            LONG_CORRIDOR_CHEAT => {
+                self.debug_jump_to_corridor(Some(crate::world::CORRIDOR_LEN_MAX));
+                "Langer Korridor. Lauf!".into()
+            }
+            DIE_CHEAT => {
+                self.debug_die();
+                "Du bist tot.".into()
             }
             12 | 13 => {
                 let cash = i == 13;
@@ -317,6 +353,18 @@ mod tests {
         g.cheat(TUTORIAL_CHEAT);
         assert!(g.take_tutorial_request());
         assert!(!g.take_tutorial_request());
+        // "Sofort sterben": auch unverwundbar und im Tutorial ist der Run vorbei
+        assert_eq!(CHEATS[DIE_CHEAT], "Sofort sterben");
+        assert_eq!(CHEATS[LONG_CORRIDOR_CHEAT], "Flucht: langer Korridor");
+        assert!(cheat_groups()[0].2.contains(&DIE_CHEAT));
+        let mut d = Game::new_tutorial(58);
+        d.god = true;
+        d.cheat(DIE_CHEAT);
+        assert_eq!(d.outcome, Outcome::Caught);
+        for _ in 0..200 {
+            d.update(1.0 / 60.0, &mut Input::default());
+        }
+        assert_eq!(d.outcome, Outcome::Caught, "wieder lebendig");
         // Unverwundbar: Kunde direkt neben dem Spieler erwischt ihn nicht
         g.spawn_customer_at(g.player.pos + vec3(0.3, 0.0, 0.0));
         g.update(1.0 / 60.0, &mut Input::default());
