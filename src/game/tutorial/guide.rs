@@ -1,4 +1,4 @@
-//! Wegweiser im Tutorial: Pfeile am Boden zum naechsten Ziel und rot umrandete Waren, die
+//! Wegweiser im Tutorial: Pfeile am Boden zum naechsten Ziel und leuchtende Waren, die
 //! noch auf dem Zettel fehlen. Der Weg kommt aus einem eigenen Distanzfeld ueber das
 //! Begehbarkeitsraster (wie bei den NPCs, aber der Kassenbereich ist fuer den Spieler offen).
 //! Gezeichnet wird alles aus Boxen (draws.rs: collect_guide_draws).
@@ -8,7 +8,7 @@ use crate::world::NavGrid;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
-/// Waren in diesem Umkreis werden umrandet, hoechstens so viele
+/// Waren in diesem Umkreis leuchten, hoechstens so viele
 pub const MARK_RADIUS: f32 = 12.0;
 pub const MARK_MAX: usize = 40;
 /// Abstand der Pfeile entlang des Wegs, Anzahl sichtbarer Pfeile
@@ -38,7 +38,7 @@ pub struct Guide {
     timer: f32,
     /// Pfeile: (Mitte am Boden, Richtung in der Ebene)
     pub arrows: Vec<(Vec3, Vec3)>,
-    /// Indizes in `world.items`, die umrandet werden
+    /// Indizes in `world.items`, die leuchten
     pub marked: Vec<usize>,
 }
 
@@ -245,12 +245,12 @@ impl Game {
         }
     }
 
-    /// Umrandete Waren und Pfeile nachfuehren.
+    /// Leuchtende Waren und Pfeile nachfuehren.
     pub(super) fn update_guide(&mut self, dt: f32) {
         let Some(phase) = self.tutorial_phase() else {
             return;
         };
-        // umranden: die naechsten fehlenden Waren im Umkreis
+        // leuchten lassen: die naechsten fehlenden Waren im Umkreis
         let mut marked: Vec<usize> = self
             .guide_candidates(phase)
             .into_iter()
@@ -298,7 +298,7 @@ impl Game {
         g + self.sway_at(g) + vec3(0.0, ARROW_LIFT, 0.0)
     }
 
-    /// Pfeile am Boden und rote Rahmen um die benoetigten Waren (alles aus Boxen).
+    /// Pfeile am Boden (aus Boxen) und leuchtende benoetigte Waren.
     pub(in crate::game) fn collect_guide_draws(&self, out: &mut Vec<MeshDraw>) {
         let Some(g) = self.tutorial.as_ref().map(|t| &t.guide) else {
             return;
@@ -309,6 +309,7 @@ impl Game {
                 mesh: cube,
                 model: Mat4::from_scale_rotation_translation(size, rot, pos),
                 tint,
+                ..Default::default()
             });
         };
         // Pfeile: Schaft und zwei schraege Spitzen, leuchten gelb-gruen und pulsieren nach vorn
@@ -335,35 +336,14 @@ impl Game {
                 seg(tip, tip + d * 0.23);
             }
         }
-        // rote Rahmen: 12 duenne Kanten um die Bounding-Box jeder benoetigten Ware
-        let red = Vec4::new(1.0, 0.08, 0.06, 1.3);
-        let t = 0.008;
+        // benoetigte Waren: leuchten wie die Hervorhebung des normalen Spiels (highlight.rs),
+        // nur eben alle im Umkreis statt nur der naechsten in Griffweite
         for &i in &g.marked {
-            let it = &self.world.items[i];
-            let h = it.half() + Vec3::splat(0.012);
-            let rot = Quat::from_rotation_y(it.yaw);
-            // das Regal bewegt sich mit dem verzerrten Boden, der Rahmen auch
-            let c = it.pos + vec3(0.0, it.half().y, 0.0) + self.sway_at(it.pos);
-            for (a, b) in [(-1.0f32, -1.0f32), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)] {
-                // Kanten entlang x, y und z
-                bar(
-                    vec3(h.x * 2.0 + t, t, t),
-                    rot,
-                    c + rot * vec3(0.0, a * h.y, b * h.z),
-                    red,
-                );
-                bar(
-                    vec3(t, h.y * 2.0 + t, t),
-                    rot,
-                    c + rot * vec3(a * h.x, 0.0, b * h.z),
-                    red,
-                );
-                bar(
-                    vec3(t, t, h.z * 2.0 + t),
-                    rot,
-                    c + rot * vec3(a * h.x, b * h.y, 0.0),
-                    red,
-                );
+            if self.highlight == Some(super::super::highlight::Highlight::Shelf(i)) {
+                continue; // leuchtet schon (nicht doppelt zeichnen)
+            }
+            if let Some(d) = self.shelf_glow(i) {
+                out.push(d);
             }
         }
     }
@@ -466,14 +446,24 @@ mod tests {
         g.player.pos = g.world.items[w].pos + vec3(0.0, 0.0, 1.0);
         g.update_guide(0.1);
         let marked = g.tutorial.as_ref().unwrap().guide.marked.clone();
-        assert!(!marked.is_empty(), "Wasser nicht umrandet");
+        assert!(!marked.is_empty(), "Wasser leuchtet nicht");
+        // jede markierte Ware wird leuchtend darueber gezeichnet (wie die Hervorhebung)
+        g.tutorial.as_mut().unwrap().guide.arrows.clear();
+        let mut out = Vec::new();
+        g.collect_guide_draws(&mut out);
+        let glowing = out.iter().filter(|d| d.tint.w > 0.4).count();
+        assert!(
+            glowing + 1 >= marked.len(),
+            "{glowing} von {} leuchten",
+            marked.len()
+        );
         let cat = catalog();
         for &i in &marked {
             let it = &g.world.items[i];
             assert!(!it.fake && !it.taken);
             assert_eq!(cat.products[it.product as usize].list, Some(water));
         }
-        // eingepackt: kein Wasser mehr umrandet, Pfeile fuehren hinaus
+        // eingepackt: kein Wasser leuchtet mehr, Pfeile fuehren hinaus
         g.take(w);
         g.update_guide(0.1);
         assert!(g.tutorial.as_ref().unwrap().guide.marked.is_empty());

@@ -1,7 +1,7 @@
 //! Tutorial-Modus (eigener Punkt im Hauptmenue): fuehrt durch einen ganzen Einkauf.
 //! Phase 1 zeigt alle Tasten und hakt sie ab, danach erklaert ein Kasten die jeweilige Phase
 //! (aus dem Spielzustand abgeleitet), Pfeile am Boden zeigen den Weg und benoetigte Waren
-//! sind rot umrandet (guide.rs). Im Tutorial kann man nicht verlieren: Fehler werden nur
+//! leuchten (guide.rs, wie die Hervorhebung in highlight.rs). Im Tutorial kann man nicht verlieren: Fehler werden nur
 //! erklaert (`Game::tutorial_forgive`). Im normalen Einkauf gibt es nichts davon.
 
 use super::*;
@@ -34,7 +34,7 @@ pub struct Tutorial {
     pub timer: f32,
     /// Im Korridor umgedreht und schon gewarnt (erst nach vorn schauen, dann wieder)
     pub turn_warned: bool,
-    /// Wegweiser: Pfeile am Boden und umrandete Waren
+    /// Wegweiser: Pfeile am Boden und leuchtende Waren
     pub guide: guide::Guide,
 }
 
@@ -112,8 +112,8 @@ impl Phase {
             Phase::Shopping => &[
                 &[
                     "Der Markt ist gekippt. Kauf, was",
-                    "auf dem Zettel steht (TAB): rot",
-                    "umrandet. Falsch Beschriftetes",
+                    "auf dem Zettel steht (TAB): es",
+                    "leuchtet. Falsch Beschriftetes",
                     "liegen lassen, nicht rennen.",
                 ],
                 &[

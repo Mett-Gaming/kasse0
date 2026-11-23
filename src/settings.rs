@@ -1,4 +1,4 @@
-//! Optionen, gespeichert als key=value in %APPDATA%\kasse0\settings.txt.
+//! Optionen, gespeichert als key=value in %APPDATA%\.mettlauncher\kasse0\settings.txt.
 
 use std::path::PathBuf;
 
@@ -22,7 +22,7 @@ impl Default for Settings {
             volume: 0.8,
             vhs: 1.0,
             fov: 70.0,
-            fullscreen: false,
+            fullscreen: true,
             tutorial_asked: false,
             tutorial_done: false,
         }
@@ -30,10 +30,7 @@ impl Default for Settings {
 }
 
 fn path() -> Option<PathBuf> {
-    let base = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .or_else(|| std::env::current_dir().ok())?;
-    Some(base.join("kasse0").join("settings.txt"))
+    crate::crash::data_dir("kasse0").map(|d| d.join("settings.txt"))
 }
 
 impl Settings {
@@ -50,7 +47,7 @@ impl Settings {
                 "volume" => s.volume = f.unwrap_or(s.volume).clamp(0.0, 1.0),
                 "vhs" => s.vhs = f.unwrap_or(s.vhs).clamp(0.0, 1.5),
                 "fov" => s.fov = f.unwrap_or(s.fov).clamp(55.0, 100.0),
-                "fullscreen" => s.fullscreen = v == "true",
+                "fullscreen" => s.fullscreen = v != "false",
                 "tutorial_asked" => s.tutorial_asked = v == "true",
                 "tutorial_done" => s.tutorial_done = v == "true",
                 // frueher gab es "tutorial" (an/aus): wird ignoriert
@@ -98,6 +95,13 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn starts_fullscreen_unless_switched_off() {
+        assert!(Settings::default().fullscreen);
+        assert!(Settings::parse("volume=0.5").fullscreen);
+        assert!(!Settings::parse("fullscreen=false").fullscreen);
+    }
 
     #[test]
     fn roundtrip_and_clamping() {

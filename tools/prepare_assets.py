@@ -25,6 +25,8 @@ from mathutils import Matrix, Vector
 args = sys.argv[sys.argv.index("--") + 1:]
 QUAT, DL, OUT = args[0], args[1], args[2]
 os.makedirs(OUT, exist_ok=True)
+# eigene Modelle im Projektarchiv
+MODELS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 
 UAL1 = os.path.join(QUAT, "universal-animation-library", "Universal Animation Library[Standard]",
                     "Unreal-Godot", "UAL1_Standard.glb")
@@ -44,12 +46,13 @@ JOBS = [
     # Kasse: Kassen-Station mit Bildschirm, Schublade und Bondrucker (J-Toastie, CC-BY 3.0,
     # poly.pizza/m/ju1CrAV1UY, Datei static.poly.pizza/8e168263-...glb als pos_machine.glb)
     dict(name="register", src=os.path.join(DL, "pos_machine.glb"), size=0.5, tris=1500),
-    # Kasse: Stuhl, Zigaretten-Rollo, Kamera, Kartenterminal (Multimeter auf Stange), Zigaretten
+    # Kasse: Stuhl, Zigaretten-Rollo, Kamera, Kartenterminal, Zigaretten
     # Buerostuhl der Kassiererin (Kenney, CC0, poly.pizza/m/CKSz6PB1vO, als desk_chair.glb)
     dict(name="chair", src=os.path.join(DL, "desk_chair.glb"), height=1.05, tris=1500),
     dict(name="shutter", src=os.path.join(DL, "rollershutter_window_01", "rollershutter_window_01_1k.gltf"), size=1.3, tris=800),
     dict(name="camera", src=os.path.join(DL, "security_camera_01", "security_camera_01_1k.gltf"), size=0.4, tris=800),
-    dict(name="terminal", src=os.path.join(DL, "retro_multimeter", "retro_multimeter_1k.gltf"), height=0.2, tris=600),
+    # eigenes Modell (tools/models/kartenterminal.blend), schon in Metern, Ursprung = Stange
+    dict(name="terminal", src=os.path.join(MODELS, "kartenterminal.glb"), keep=True),
     dict(name="cigarettes", src=os.path.join(DL, "cigarette_pack", "cigarette_pack_1k.gltf"), height=0.09, tris=200),
     # einzelne Zigarette zum Rauchen (Zgeal, CC-BY 3.0, poly.pizza/m/2RL6h8MbDPb), 8,5 cm lang,
     # Datei von static.poly.pizza/18dd85e2-b7aa-4e42-9ae6-a5cb536102f0.glb als cigarette.glb
@@ -189,6 +192,8 @@ def collect(objs, job):
 
 
 def normalize(verts, job):
+    if job.get("keep"):  # Groesse und Ursprung des Modells beibehalten
+        return verts
     xs = [v[0] for v in verts]
     ys = [v[1] for v in verts]
     zs = [v[2] for v in verts]

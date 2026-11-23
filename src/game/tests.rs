@@ -1657,3 +1657,22 @@ fn freezer_scare_works_on_short_freezer_pieces() {
         }
     }
 }
+
+#[test]
+fn card_terminal_sits_on_its_pole_inside_its_target_box() {
+    // Modell: Fuss auf der Stange (y = 0, Mitte), im anvisierbaren Bereich, Front bei +z
+    let meshes = crate::assets::load_all();
+    let m = &meshes[MeshId::Terminal as usize];
+    assert!(m.min.y.abs() < 1e-3, "schwebt oder steckt in der Stange");
+    assert!(m.max.y > 0.18 && m.max.y < 0.24, "Hoehe {}", m.max.y);
+    assert!(m.min.x > -0.12 && m.max.x < 0.12);
+    assert!(m.min.z > -0.12 && m.max.z < 0.12);
+    // das helle Display schaut nach vorn (+z) und oben
+    let screen = m
+        .vertices
+        .iter()
+        .filter(|v| v.color[1] > 0.85 && v.color[0] < 0.8 && v.color[2] > 0.75)
+        .filter(|v| v.normal[2] > 0.5 && v.normal[1] > 0.4)
+        .count();
+    assert!(screen > 3, "Display zeigt nicht zum Kunden");
+}

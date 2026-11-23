@@ -15,6 +15,7 @@ SO SPIELST DU
   2. Danach ist der Markt gekippt. Arbeite den Einkaufszettel ab (TAB halten).
   3. Je teurer dein Einkauf, je mehr vom Zettel erledigt und je länger du brauchst,
      desto schlimmer wird es. Billige Ware liegt ganz oben oder unten.
+     Passende Ware in deiner Nähe (1 m) pulsiert hell, auch falsch beschriftete!
   4. Rennen ist laut, Verfolger merken sich, wo sie dich zuletzt gesehen oder gehört
      haben. Wer leise verschwindet, hängt sie ab.
      Die meisten Kunden kaufen nur ein. Einige verfolgen dich, sobald du wegsiehst -
@@ -83,16 +84,17 @@ zählen getrennt davon.
 
 Beim allerersten Einkauf fragt das Spiel, ob du das Tutorial spielen willst
 (nur einmal). Das Tutorial ist ein ganzer Einkauf mit Anleitung, Pfeilen
-am Boden und rot umrandeten Waren. Dort verfolgt dich niemand, und Fehler werden
+am Boden und leuchtenden Waren. Dort verfolgt dich niemand, und Fehler werden
 nur erklärt. Es erklärt auch Kunden und Mitarbeiter. Der normale Einkauf ("Neuer Einkauf") hat kein Tutorial-Fenster.
 Hast du das Tutorial einmal geschafft, kannst du es in den Optionen mit
 "Tutorial spielen" jederzeit wieder starten.
 
+Das Spiel startet im randlosen Vollbild; in den Optionen lässt es sich abschalten.
 Jumpscares lassen sich in den Optionen nicht abschalten. Probier es ruhig.
 
-Einstellungen werden unter %APPDATA%\kasse0\settings.txt gespeichert.
+Einstellungen werden unter %APPDATA%\.mettlauncher\kasse0\settings.txt gespeichert.
 Stürzt das Spiel ab, erscheint ein Fenster mit einem Absturzbericht. Den kannst du
-kopieren und den Entwicklern schicken. Alle Berichte liegen unter %APPDATA%\kasse0\crashes,
-das Protokoll unter %APPDATA%\kasse0\logs\latest.log.
+kopieren und den Entwicklern schicken. Alle Berichte liegen unter %APPDATA%\.mettlauncher\kasse0\crashes,
+das Protokoll unter %APPDATA%\.mettlauncher\kasse0\logs\latest.log.
 
 Modelle, Schrift und Lizenzen: siehe Credits.md und den Ordner Lizenzen.

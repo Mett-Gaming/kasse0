@@ -17,11 +17,12 @@ impl Game {
         let rot = |yaw: f32| Quat::from_rotation_y(yaw);
 
         self.collect_hand_draws(out);
+        self.collect_highlight_draw(out);
 
         // Kassen: Kassierer:in, Band, Terminal, Rollo, Kamera
         self.collect_checkout_draws(out);
         self.collect_barrier_draws(out);
-        // Tutorial-Modus: Pfeile am Boden, rote Rahmen um benoetigte Waren
+        // Tutorial-Modus: Pfeile am Boden, benoetigte Waren leuchten
         self.collect_guide_draws(out);
         // Zigarette vor der Kamera und weggeschnippte Kippen
         self.collect_cigarette_draws(out);
@@ -49,6 +50,7 @@ impl Game {
                         p,
                     ),
                     tint: Vec4::new(0.02, 0.02, 0.02, 0.0),
+                    ..Default::default()
                 });
             }
             swarms += 1;
@@ -65,6 +67,7 @@ impl Game {
                 mesh: MeshId::WetFloorSign as usize,
                 model: Mat4::from_rotation_translation(rot(yaw), pos),
                 tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+                ..Default::default()
             });
         }
     }
@@ -233,6 +236,7 @@ impl Game {
                         p,
                     ),
                     tint: Vec4::new(0.03, 0.02, 0.02, 0.0),
+                    ..Default::default()
                 });
             }
         }
@@ -263,6 +267,7 @@ impl Game {
                     on_floor(pos) + vec3(0.0, hop, 0.0),
                 ),
                 tint: Vec4::new(0.55, 0.5, 0.48, 0.0),
+                ..Default::default()
             });
         }
         // Blut: Tropfen fallen von der Decke, kleiner Spritzer auf der Lache
@@ -282,6 +287,7 @@ impl Game {
                             + vec3(0.0, self.sway_at(d).y * (1.0 - y / d.y), 0.0),
                     ),
                     tint: red,
+                    ..Default::default()
                 });
             } else if c < fall + 0.15 {
                 // Spritzer: zwei gedrehte flache Scheiben (rund)
@@ -295,6 +301,7 @@ impl Game {
                             on_floor(vec3(d.x, 0.01, d.z)),
                         ),
                         tint: red,
+                        ..Default::default()
                     });
                 }
             }
@@ -322,6 +329,7 @@ impl Game {
                         p,
                     ),
                     tint: Vec4::new(1.0, 0.85, 0.45, 4.0 * (1.0 - c / 0.35)),
+                    ..Default::default()
                 });
             }
         }

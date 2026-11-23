@@ -227,12 +227,14 @@ impl Game {
                     lane.register,
                 ),
                 tint: white,
+                ..Default::default()
             });
             // Buerostuhl; an der offenen Kasse sitzt die Kassiererin darauf (draws.rs)
             out.push(MeshDraw {
                 mesh: MeshId::Chair as usize,
                 model: Mat4::from_rotation_translation(to_cashier, lane.seat),
                 tint: Vec4::new(0.8, 0.8, 0.82, 0.0),
+                ..Default::default()
             });
             // Zigaretten-Rollo: im gekippten Markt hochgezogen, dahinter Zigaretten
             let rolled = self.tipped;
@@ -245,6 +247,7 @@ impl Game {
                     vec3(lane.shutter.x, y, lane.shutter.z),
                 ),
                 tint: Vec4::new(0.8, 0.8, 0.82, 0.0),
+                ..Default::default()
             });
             if rolled {
                 for row in 0..3 {
@@ -258,6 +261,7 @@ impl Game {
                             mesh: MeshId::Cigarettes as usize,
                             model: Mat4::from_rotation_translation(face_x, p),
                             tint: white,
+                            ..Default::default()
                         });
                     }
                 }
@@ -266,6 +270,7 @@ impl Game {
                 mesh: MeshId::Terminal as usize,
                 model: Mat4::from_rotation_translation(face_x, lane.terminal),
                 tint: white,
+                ..Default::default()
             });
             // Ueberwachungskamera: im gekippten Markt folgt sie dem Spieler
             let yaw = if self.tipped {
@@ -281,6 +286,7 @@ impl Game {
                     lane.camera - vec3(0.0, 0.21, 0.0),
                 ),
                 tint: white,
+                ..Default::default()
             });
         }
         // Band und Ablage der offenen Kasse
@@ -293,6 +299,7 @@ impl Game {
                 mesh: b.data.mesh,
                 model: Mat4::from_translation(p),
                 tint: b.data.tint.extend(0.0),
+                ..Default::default()
             });
         }
         for (i, item) in self.scanned.iter().enumerate() {
@@ -306,6 +313,7 @@ impl Game {
                 mesh: item.mesh,
                 model: Mat4::from_rotation_translation(Quat::from_rotation_y(i as f32 * 1.3), p),
                 tint: item.tint.extend(0.0),
+                ..Default::default()
             });
         }
     }
@@ -372,6 +380,7 @@ impl Game {
                         vec3(x, 0.5, z),
                     ),
                     tint: post,
+                    ..Default::default()
                 });
             }
             let segs = ((x1 - x0) / 0.3).ceil() as usize;
@@ -391,6 +400,7 @@ impl Game {
                         vec3(x, 0.92 - 0.08 + sag, z),
                     ),
                     tint,
+                    ..Default::default()
                 });
             }
         }

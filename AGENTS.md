@@ -86,6 +86,7 @@ Die Engine liegt als Git-Untermodul in `mettgine/` ([Mett-Gaming/mettgine](https
 - **Gehört eine Änderung in die Engine** (etwas, das auch andere Spiele brauchen könnten): erst im Ordner `mettgine/` nach `mettgine/AGENTS.md` eintragen, zusammenführen, markieren und hochladen. Danach hier den neuen Stand mit `git add mettgine` in den Eintrag des Spiels aufnehmen. Spielinhalte gehören nie in die Engine.
 - **Reihenfolge beim Hochladen:** erst die Engine, dann das Spiel. Sonst zeigt das Spiel auf einen Engine-Stand, den es auf dem Server noch nicht gibt, und der Bau schlägt fehl.
 - Hat jemand anderes die Engine geändert, holt `git submodule update --remote --merge` den Stand. Danach prüfen (`cargo test --release`) und den neuen Zeiger mit eintragen.
+- **Nur ein Renderer:** Alle Spiele benutzen `mettgine::render::Renderer`. Im Spiel gibt es keinen eigenen Renderer und keine Vulkan-Aufrufe; fehlt etwas, wird der Renderer der Engine erweitert (siehe `mettgine/AGENTS.md`, 2.).
 - Die Engine nie als normalen Ordner aufnehmen und `.gitmodules` nicht ändern, außer die Person verlangt es.
 
 ## 4. Versionen und Veröffentlichungen
@@ -129,7 +130,7 @@ Spieler installieren KASSE 0 über den Mett-Launcher. Das Projektarchiv liegt un
 - **Pro Veröffentlichung genau ein Zip** passend zu `KASSE0-v*.zip` (kein zusätzliches `KASSE0-v…-debug.zip`). Andere Dateien (`.sha256`, `.txt`) stören nicht.
 - **Aufbau bleibt `KASSE0/KASSE0.exe`.** Ändern sich exe-Name, Ort, Zip-Schema oder Archiv-Name, muss vorher `games.json` im Katalog angepasst werden.
 - **Dateien nie nach dem Veröffentlichen hochladen oder ersetzen** (der Launcher prüft Größe und sha256). Fehlerhafte Veröffentlichungen mit neuer Patch-Version korrigieren, alte nicht löschen (sie bleiben im Launcher wählbar).
-- **Das Spiel schreibt nichts neben die exe.** Bei jeder Aktualisierung wird der Installordner ersetzt; Spielstände und Einstellungen gehören nach `%APPDATA%\kasse0`. Muss doch etwas im Installordner bleiben: Pfad unter `preserve` in `games.json` eintragen.
+- **Das Spiel schreibt nichts neben die exe.** Bei jeder Aktualisierung wird der Installordner ersetzt; Spielstände und Einstellungen gehören nach `%APPDATA%\.mettlauncher\kasse0`. Muss doch etwas im Installordner bleiben: Pfad unter `preserve` in `games.json` eintragen.
 - **`KASSE0.exe` läuft selbst, bis das Spiel endet** (kein Starter, der einen zweiten Prozess startet), braucht keine Adminrechte, hat **keine eigene Aktualisierung** und bleibt auch ohne Launcher direkt aus dem Zip startbar. Arbeitsverzeichnis ist der Installordner.
 
 ## 9. Wenn etwas schiefgeht

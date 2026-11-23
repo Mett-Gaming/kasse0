@@ -203,6 +203,7 @@ impl Game {
                 mesh: MeshId::Cigarette as usize,
                 model: basis * local,
                 tint: Vec4::new(1.0, 1.0, 1.0, 0.08),
+                ..Default::default()
             });
             // Glut: kleines gluehendes Stueck an der Spitze, beim Zug heller
             let pulling = matches!(self.cig, Cigarette::Puff { .. });
@@ -218,6 +219,7 @@ impl Game {
                     tip.extend(1.0),
                 ),
                 tint: Vec4::new(1.0, 0.35, 0.06, glow),
+                ..Default::default()
             });
         }
         // Kippen am Boden
@@ -233,6 +235,7 @@ impl Game {
                 mesh: MeshId::Cigarette as usize,
                 model,
                 tint: Vec4::new(0.85, 0.83, 0.8, 0.0),
+                ..Default::default()
             });
             let tip = p + rot * vec3(0.0, CIG_HALF_Y, CIG_LEN * s);
             out.push(MeshDraw {
@@ -244,6 +247,7 @@ impl Game {
                     0.15,
                     1.5 * glow * (0.7 + 0.3 * (self.time * 9.0 + i as f32).sin()),
                 ),
+                ..Default::default()
             });
         }
     }

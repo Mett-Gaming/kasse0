@@ -1,4 +1,6 @@
 *.k0m binary
+*.blend binary
+*.glb binary
 *.k0s binary
 *.k0a binary
 *.ttf binary

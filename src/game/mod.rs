@@ -10,6 +10,7 @@ mod death;
 pub mod director;
 mod draws;
 pub mod escape;
+mod highlight;
 mod monitor;
 mod scare_cheats;
 pub mod scare_kinds;
@@ -348,6 +349,8 @@ pub struct Game {
     player_field: Vec<u16>,
     /// Geraeusche dieses Bilds: (Ort, Hoerweite)
     noises: Vec<(Vec3, f32)>,
+    /// passende Ware in Griffnaehe (highlight.rs)
+    highlight: Option<highlight::Highlight>,
     /// Spannungskurve (director.rs)
     pub director: director::Director,
     /// Schrecken dieses Bilds (main.rs leert die Liste) und die letzten Arten
@@ -546,6 +549,7 @@ impl Game {
             rng,
             player_field: Vec::new(),
             noises: Vec::new(),
+            highlight: None,
             director: Default::default(),
             scares: Vec::new(),
             recent_scares: Vec::new(),
@@ -991,6 +995,7 @@ impl Game {
         // Zeit im gekippten Markt kann die Stufe auch ohne Einkauf anheben
         self.check_tier();
         self.update_belt(dt);
+        self.update_highlight();
         self.update_npcs(dt, input);
         self.update_suspicion(dt, input);
         self.update_events(dt);

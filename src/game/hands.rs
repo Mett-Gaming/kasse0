@@ -611,6 +611,7 @@ impl Game {
                 mesh: MeshId::Cart as usize,
                 model: Mat4::from_translation(p),
                 tint: Vec4::new(0.85, 0.85, 0.85, 0.0),
+                ..Default::default()
             });
         }
 
@@ -621,6 +622,7 @@ impl Game {
             mesh: MeshId::Cart as usize,
             model: m,
             tint: white,
+            ..Default::default()
         });
         let selected = self.cart_selected();
         for (i, item) in self.cart.iter().enumerate() {
@@ -635,6 +637,7 @@ impl Game {
                 mesh: item.mesh as usize,
                 model,
                 tint,
+                ..Default::default()
             });
         }
 
@@ -653,6 +656,7 @@ impl Game {
                 mesh: item.mesh as usize,
                 model,
                 tint: item.tint.extend(0.05),
+                ..Default::default()
             });
         }
 
@@ -664,6 +668,7 @@ impl Game {
                     l.pos + vec3(0.0, self.sway_at(l.pos).y, 0.0),
                 ),
                 tint: l.data.tint.extend(0.0),
+                ..Default::default()
             });
         }
 
@@ -675,6 +680,7 @@ impl Game {
                     mesh: p.data.mesh,
                     model: Mat4::from_translation(p.pos + off + self.sway_at(p.pos)),
                     tint: white,
+                    ..Default::default()
                 });
             }
         }
