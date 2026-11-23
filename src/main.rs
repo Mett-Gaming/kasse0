@@ -8,6 +8,7 @@ mod audio;
 mod autoshot;
 mod catalog;
 // Engine-Teile aus Mettgine unter den gewohnten Namen
+use mettgine::presence::{Presence, Status};
 pub use mettgine::{crash, crash_window, render, ui};
 mod game;
 mod hud;
@@ -75,6 +76,7 @@ struct App {
     menu_scare: f32,
     /// bis zur naechsten Momentaufnahme fuer Absturzberichte
     crash_ctx_t: f32,
+    presence: Presence,
     /// Frame-Zeit-Log (KASSE0_PERF=1 oder im Autoshot): (Frames, Summe, schlechtester Frame)
     perf: Option<(u32, f32, f32)>,
 }
@@ -124,6 +126,7 @@ impl App {
             shot_request: None,
             menu_scare: 0.0,
             crash_ctx_t: 0.0,
+            presence: Presence::from_launcher(),
             perf: (std::env::var_os("KASSE0_PERF").is_some()
                 || std::env::var_os("KASSE0_AUTOSHOT").is_some())
             .then_some((0, 0.0, 0.0)),
@@ -183,6 +186,29 @@ impl App {
     fn wanted_fullscreen(&self) -> Option<Fullscreen> {
         (self.settings.fullscreen && self.autoshot.is_none())
             .then_some(Fullscreen::Borderless(None))
+    }
+
+    /// Was der Launcher in Discord zeigt. Verraet nicht, was im Markt passiert.
+    fn status(&self) -> Status {
+        match self.screen {
+            Screen::Playing | Screen::Paused | Screen::Cheats { .. } => {
+                let done = (0..self.game.list.len())
+                    .filter(|&i| self.game.list_done(self.game.list[i]))
+                    .count();
+                let what = if self.game.tutorial_run {
+                    "Im Tutorial"
+                } else {
+                    "Kauft ein"
+                };
+                let total = self.game.list.len();
+                Status::new(what, format!("Einkaufszettel: {done} von {total}"))
+            }
+            Screen::End if self.game.outcome == Outcome::Won => {
+                Status::new("Einkauf geschafft", "")
+            }
+            Screen::End => Status::new("Nicht mehr rausgekommen", ""),
+            _ => Status::new("Im Menü", ""),
+        }
     }
 
     fn apply_settings(&mut self) {
@@ -424,6 +450,8 @@ impl App {
         self.crash_ctx_t -= dt;
         if self.crash_ctx_t <= 0.0 {
             self.crash_ctx_t = 1.0;
+            let status = self.status();
+            self.presence.set(status);
             let g = &self.game;
             crash::context("Bildschirm", format!("{:?}", self.screen));
             crash::context("Seed", g.seed.to_string());
