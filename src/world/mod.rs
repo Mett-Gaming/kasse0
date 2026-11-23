@@ -257,6 +257,43 @@ impl ShelfItem {
     pub fn half(&self) -> Vec3 {
         catalog().products[self.product as usize].half
     }
+
+    /// So wird die Ware gezeichnet (mit Verfall: verfaerbt, schwebend, kopfueber).
+    pub fn draw(&self) -> MeshDraw {
+        let p = &catalog().products[self.product as usize];
+        let mut tint = if self.fake {
+            p.tint * vec3(0.7, 1.05, 0.85)
+        } else {
+            p.tint
+        };
+        let mut model = Mat4::from_rotation_translation(Quat::from_rotation_y(self.yaw), self.pos);
+        match self.rot {
+            // verdorben: braun-gruenlich, fleckig
+            1 => tint = tint * vec3(0.5, 0.55, 0.3) + vec3(0.04, 0.05, 0.0),
+            // kurios: schwebt, gekippt oder kopfueber
+            2 => {
+                let h = hash01(self.pos);
+                let lift = 0.04 + h * 0.08;
+                let tilt = if h > 0.6 {
+                    std::f32::consts::PI
+                } else {
+                    0.5 + h
+                };
+                let up = vec3(0.0, p.half.y, 0.0);
+                model = Mat4::from_translation(self.pos + up + vec3(0.0, lift, 0.0))
+                    * Mat4::from_quat(
+                        Quat::from_rotation_y(self.yaw + h * 9.0) * Quat::from_rotation_x(tilt),
+                    )
+                    * Mat4::from_translation(-up);
+            }
+            _ => {}
+        }
+        MeshDraw {
+            mesh: p.mesh,
+            model,
+            tint: Vec4::new(tint.x, tint.y, tint.z, 0.0),
+        }
+    }
 }
 
 /// Begehbarkeitsraster (0.5 m) fuer die NPC-Navigation.
@@ -412,6 +449,16 @@ impl World {
         }
     }
 
+    /// Waren in der Umgebung eines Punkts (grob, nach Rasterzellen).
+    pub fn items_near(&self, p: Vec3, r: f32) -> impl Iterator<Item = usize> + '_ {
+        let (k0, k1) = (grid_key(p - Vec3::splat(r)), grid_key(p + Vec3::splat(r)));
+        (k0.0..=k1.0)
+            .flat_map(move |x| (k0.1..=k1.1).map(move |z| (x, z)))
+            .filter_map(|k| self.item_grid.get(&k))
+            .flatten()
+            .map(|&i| i as usize)
+    }
+
     /// Naechste (nicht genommene) Ware entlang eines Strahls.
     pub fn item_ray(&self, o: Vec3, d: Vec3, max_t: f32) -> Option<(usize, f32)> {
         let (k0, k1) = (
@@ -449,39 +496,7 @@ impl World {
             if it.taken {
                 continue;
             }
-            let p = &cat.products[it.product as usize];
-            let mut tint = if it.fake {
-                p.tint * vec3(0.7, 1.05, 0.85)
-            } else {
-                p.tint
-            };
-            let mut model = Mat4::from_rotation_translation(Quat::from_rotation_y(it.yaw), it.pos);
-            match it.rot {
-                // verdorben: braun-gruenlich, fleckig
-                1 => tint = tint * vec3(0.5, 0.55, 0.3) + vec3(0.04, 0.05, 0.0),
-                // kurios: schwebt, gekippt oder kopfueber
-                2 => {
-                    let h = hash01(it.pos);
-                    let lift = 0.04 + h * 0.08;
-                    let tilt = if h > 0.6 {
-                        std::f32::consts::PI
-                    } else {
-                        0.5 + h
-                    };
-                    let up = vec3(0.0, p.half.y, 0.0);
-                    model = Mat4::from_translation(it.pos + up + vec3(0.0, lift, 0.0))
-                        * Mat4::from_quat(
-                            Quat::from_rotation_y(it.yaw + h * 9.0) * Quat::from_rotation_x(tilt),
-                        )
-                        * Mat4::from_translation(-up);
-                }
-                _ => {}
-            }
-            out.push(MeshDraw {
-                mesh: p.mesh,
-                model,
-                tint: Vec4::new(tint.x, tint.y, tint.z, 0.0),
-            });
+            out.push(it.draw());
         }
         // riesige Waren in den Gaengen
         for g in &self.giants {

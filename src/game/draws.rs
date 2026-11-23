@@ -17,6 +17,7 @@ impl Game {
         let rot = |yaw: f32| Quat::from_rotation_y(yaw);
 
         self.collect_hand_draws(out);
+        self.collect_highlight_draw(out);
 
         // Kassen: Kassierer:in, Band, Terminal, Rollo, Kamera
         self.collect_checkout_draws(out);

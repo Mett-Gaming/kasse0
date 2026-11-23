@@ -77,6 +77,9 @@ Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Übers
 - Sortiert ist logisch nach Warengruppen. Mit steigender Eskalation verschieben sich die Abteilungen: erst tauschen Unterabteilungen (Fisch ↔ Käse), dann wandern ganze Abteilungen in fremde Einrichtungen, am Ende steht Ware wild durcheinander und **die Schilder lügen**.
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
+### Passende Ware leuchtet
+Stehst du höchstens **1 m** neben einer Ware, die zu einem offenen Zettel-Eintrag passt, pulsiert sie hell. Es leuchtet immer nur **eine**, die nächste. Auch **falsch beschriftete** und teure Ware leuchtet: Hinsehen musst du selbst. Mit Ware in der Hand, in Gesprächen und an der Kasse leuchtet nichts.
+
 ### Was die NPCs wahrnehmen
 - **Verfolger** sehen dich rundum bis 22 m (ganz nah spüren sie dich immer) und hören deine Schritte: Rennen hört man 15 m weit, Gehen kaum, ein quietschender Wagen oder herunterfallende Ware locken sie an. Sie jagen die Stelle, an der sie dich zuletzt bemerkt haben. Hängst du sie ab, suchen sie dort und geben nach einer Weile auf.
 - Zwei oder mehr Verfolger **nehmen dich in die Zange**: Der zweite meidet den Weg des ersten und kommt durch einen anderen Gang.

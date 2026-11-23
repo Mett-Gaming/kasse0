@@ -222,3 +222,6 @@ Ziel: Die Figuren selbst sollen unheimlich sein, nicht nur die Scares. Erst unca
 
 ## Kartenterminal (v0.20.8)
 Eigenes Modell, ausdrücklich gewünschte Ausnahme von der Regel „keine selbst gebauten Modelle“: Quelle `tools/models/kartenterminal.blend`, umgewandelt mit `tools/prepare_assets.py` (`KASSE0_ONLY=terminal`). Durchzieh-Rille mit Pfeilen nach rechts (wie im Minispiel), Display, Tastenfeld mit Sichtschutz, Chip-Schlitz, Spiralkabel, 3532 Dreiecke.
+
+## Passende Ware leuchtet (v0.21)
+`game/highlight.rs`: Die nächste Ware im Umkreis von 1 m (in der Ebene), die zu einem offenen Zettel-Eintrag gehört, pulsiert hell und wird 6–10 % größer gezeichnet. Immer nur eine, entschieden nach Abstand zum Auge; eine andere muss 5 cm näher sein, damit es nicht flackert. Teure, verdorbene und falsch beschriftete Ausgaben zählen mit, die Hervorhebung verrät die Fälschung nicht. Auch fallen gelassene Ware leuchtet. Nicht durch Wände oder auf die andere Regalseite (Sichtlinie bis 40 cm vor die Ware). Aus mit Ware in der Hand, im Gespräch, beim Kassieren und beim Sterben.
