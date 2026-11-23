@@ -152,6 +152,13 @@ impl App {
         (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare)
     }
 
+    /// Laeuft noch das Startbild der Engine? Dann gibt es keine Eingaben.
+    fn splash_active(&self) -> bool {
+        self.running
+            .as_ref()
+            .is_some_and(|r| r.renderer.splash_active())
+    }
+
     fn set_grab(&mut self, grab: bool) {
         let Some(r) = &self.running else { return };
         if grab {
@@ -405,7 +412,8 @@ impl App {
             }
         }
         self.fade = (self.fade - dt * 1.2).max(0.0);
-        if let Some((dir, mut timer, step)) = self.autoshot.clone() {
+        let splash = self.splash_active();
+        if let Some((dir, mut timer, step)) = self.autoshot.clone().filter(|_| !splash) {
             timer -= dt;
             if timer <= 0.0 {
                 match self.autoshot_step(step, &dir) {
@@ -864,6 +872,16 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        if self.splash_active()
+            && matches!(
+                event,
+                WindowEvent::KeyboardInput { .. }
+                    | WindowEvent::MouseInput { .. }
+                    | WindowEvent::MouseWheel { .. }
+            )
+        {
+            return;
+        }
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => {

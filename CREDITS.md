@@ -59,3 +59,6 @@ Schilder und Werbung im Markt: **Archivo Black** von Omnibus-Type, SIL Open Font
 
 ## Werkzeuge
 Konvertierung: `tools/prepare_assets.py` (Blender, headless).
+
+## Startbild der Engine
+„Gemacht mit Mettgine“: Schriftzug in Archivo Black (OFL), Mettbrötchen eigene Zeichnung, Dino aus dem Logo des Mett Launchers (Herkunft und Lizenz des Fotos noch nicht belegt).
