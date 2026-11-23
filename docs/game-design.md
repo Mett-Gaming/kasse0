@@ -219,3 +219,6 @@ Ziel: Die Figuren selbst sollen unheimlich sein, nicht nur die Scares. Erst unca
   Klang mit Ort (`Game::sfx_at`, Stereo-Panorama in `Audio::play_at`, hörbar bis 18 m): Schritte alle 0,65 m (Verfolger auf der Jagd lauter, rennend am lautesten, im Kollaps synthetisches Schlurfen), Personal mit Schlüsselbund alle 6 m, normale Kundschaft leise; gesehene Kunden sind stumm. Flüstern kommt aus der Richtung der Flüsternden. Alle neuen Klänge sind synthetisiert (keine neuen Assets).
   Cheats (Kategorie „NPCs & Stufen“): Stufe +1, Director Höhepunkt/Ruhe, Verfolger 6 m hinter dir, NPC-Zustände über den Köpfen (kauft, Verfolger, jagt, lauert, sucht, erstarrt; Personal: Streife, kommt, horcht, räumt ein, Wagen, redet; „x“ = gemerkte Stelle) plus Director-Phase oben links.
 - **Gespräche:** Während eines Dialogs bewegt sich kein Kunde (v0.12.1).
+
+## Kartenterminal (v0.20.8)
+Eigenes Modell, ausdrücklich gewünschte Ausnahme von der Regel „keine selbst gebauten Modelle“: Quelle `tools/models/kartenterminal.blend`, umgewandelt mit `tools/prepare_assets.py` (`KASSE0_ONLY=terminal`). Durchzieh-Rille mit Pfeilen nach rechts (wie im Minispiel), Display, Tastenfeld mit Sichtschutz, Chip-Schlitz, Spiralkabel, 3532 Dreiecke.

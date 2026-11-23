@@ -49,7 +49,7 @@ Der Einkaufswagen steht unter CC-BY 3.0 und muss beim Weitergeben des Spiels gen
 ### Kasse (Poly Haven, CC0, https://polyhaven.com/a/<id>)
 - Zigaretten-Rollo: `rollershutter_window_01`, Zigaretten: `cigarette_pack`
 - Ueberwachungskamera: `security_camera_01`
-- Kartenterminal: `retro_multimeter` (als Terminal auf der Stange)
+- Kartenterminal: eigenes Modell (`tools/models/kartenterminal.blend`), nicht von Poly Haven
 - Kasse und Stuhl: siehe Tabelle oben (POS Machine, Desk Chair). Der Theken-Scanner ist Einrichtung aus Boxen.
 
 ## Schrift
