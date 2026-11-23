@@ -202,6 +202,7 @@ impl Game {
                     h.pos,
                 ),
                 tint: h.real_tint,
+                ..Default::default()
             });
         }
     }
@@ -217,6 +218,7 @@ impl Game {
                 mesh: h.mesh,
                 model,
                 tint: h.tint.extend(2.2),
+                ..Default::default()
             });
         }
     }

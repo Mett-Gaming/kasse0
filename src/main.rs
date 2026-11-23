@@ -647,19 +647,14 @@ impl App {
         let strobe = troll
             .is_some_and(|e| e > 0.07 && e < hud::MENU_SCARE_FACE && ((e * 14.0) as i32) % 2 == 1);
         let troll_inv = troll.is_some_and(|e| e > 0.07 && ((e * 9.0) as i32) % 3 == 1);
-        let params = render::FrameParams {
-            invert: if troll_inv { 1.0 } else { g.scare_invert() },
-            flash: if troll.is_some_and(|e| e < 0.3) {
-                1.0
-            } else {
-                g.scare_flash()
-            },
-            view_proj,
-            cam_pos: g.eye(),
-            time: g.time,
-            tipped: g.tipped,
-            fog_color: g.world.fog_color,
-            fog_density: g.world.fog_density,
+        let fade = self
+            .fade
+            .max(g.death_fade())
+            .max(g.blackout())
+            .max(if strobe { 0.85 } else { 0.0 });
+        let post = render::Vhs {
+            strength: self.settings.vhs,
+            dark: g.tipped,
             // In Menues lesbar bleiben
             glitch: if self.menu_scare > 0.0 {
                 1.0
@@ -668,29 +663,45 @@ impl App {
             } else {
                 0.0
             },
-            vhs: self.settings.vhs,
-            fade: self
-                .fade
-                .max(g.death_fade())
-                .max(g.blackout())
-                .max(if strobe { 0.85 } else { 0.0 }),
+            fade,
             red: g
                 .red
                 .max(g.death_vignette())
                 .max(if troll.is_some() { 1.0 } else { 0.0 }),
+            invert: if troll_inv { 1.0 } else { g.scare_invert() },
+            flash: if troll.is_some_and(|e| e < 0.3) {
+                1.0
+            } else {
+                g.scare_flash()
+            },
+        };
+        let rooms = render::Rooms {
+            dark: g.tipped,
+            fog_color: g.world.fog_color,
+            fog_density: g.world.fog_density,
             decay: g.poster_decay(),
             sway: g.sway_params(),
-            monitor: g.monitor_view(render::MONITOR_WIDTH as f32 / render::MONITOR_HEIGHT as f32),
         };
-        if let Err(e) = r.renderer.draw(
-            &params,
-            &self.draws,
-            &self.ghosts,
-            &self.skins,
-            &self.monitor_skins,
-            &self.bones,
-            &self.ui.verts,
-        ) {
+        let (mon_w, mon_h) = MONITOR_SIZE;
+        let input = render::FrameInput {
+            view: render::View {
+                view_proj,
+                pos: g.eye(),
+            },
+            second_camera: g
+                .monitor_view(mon_w as f32 / mon_h as f32)
+                .map(|(view_proj, pos)| render::View { view_proj, pos }),
+            time: g.time,
+            lighting: render::Lighting::Rooms(rooms),
+            post: render::Post::Vhs(post),
+            meshes: &self.draws,
+            ghosts: &self.ghosts,
+            skins: &self.skins,
+            camera_skins: &self.monitor_skins,
+            bones: &self.bones,
+            ui: &self.ui.verts,
+        };
+        if let Err(e) = r.renderer.draw(&input) {
             crash::fatal(
                 "Renderfehler",
                 &format!("{e}"),
@@ -841,10 +852,19 @@ impl ApplicationHandler for App {
         };
         let skins = people::load_skins();
         let meshes = assets::load_all();
-        let renderer = match render::Renderer::new(&window, &meshes, &skins, &ui::font_atlas(), {
-            let a = signs::atlas();
-            (&a.pixels, signs::ATLAS_W, a.height)
-        }) {
+        let font = ui::font_atlas();
+        let signs = signs::atlas();
+        let config = render::Config {
+            signs: Some((&signs.pixels, signs::ATLAS_W, signs.height)),
+            // grob aufgeloest und hart skaliert: Camcorder-Bild
+            resolution: render::Resolution::Fixed(ui::W as u32, ui::H as u32),
+            ui: render::UiSize::Fixed(ui::W as u32, ui::H as u32),
+            second_camera: Some(MONITOR_SIZE),
+            smooth: false,
+            last_wins: false,
+            ..render::Config::new(&meshes, &skins, (&font, 128, 128))
+        };
+        let renderer = match render::Renderer::new(&window, &config) {
             Ok(r) => r,
             Err(e) => {
                 crash::fatal(
@@ -1005,6 +1025,9 @@ fn digit_key(code: KeyCode) -> Option<u8> {
     })
 }
 
+/// Aufloesung des Ueberwachungsmonitors (zweite Kamera)
+const MONITOR_SIZE: (u32, u32) = (160, 90);
+
 /// Version aus dem Git-Tag (build.rs), fuer Absturzberichte
 pub const VERSION: &str = env!("KASSE0_VERSION");
 
@@ -1055,6 +1078,7 @@ fn add_skins(
             first_bone,
             ghost: p.ghost,
             distort: p.fx.distort,
+            ..Default::default()
         });
     }
 }

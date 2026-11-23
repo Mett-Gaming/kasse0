@@ -103,6 +103,7 @@ impl Game {
                         l.pos + vec3(0.0, self.sway_at(l.pos).y, 0.0),
                     ),
                     tint: l.data.tint.extend(0.0),
+                    ..Default::default()
                 };
                 (d, l.data.half().y)
             }

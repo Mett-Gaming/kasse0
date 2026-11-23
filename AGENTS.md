@@ -86,6 +86,7 @@ Die Engine liegt als Git-Untermodul in `mettgine/` ([Mett-Gaming/mettgine](https
 - **Gehört eine Änderung in die Engine** (etwas, das auch andere Spiele brauchen könnten): erst im Ordner `mettgine/` nach `mettgine/AGENTS.md` eintragen, zusammenführen, markieren und hochladen. Danach hier den neuen Stand mit `git add mettgine` in den Eintrag des Spiels aufnehmen. Spielinhalte gehören nie in die Engine.
 - **Reihenfolge beim Hochladen:** erst die Engine, dann das Spiel. Sonst zeigt das Spiel auf einen Engine-Stand, den es auf dem Server noch nicht gibt, und der Bau schlägt fehl.
 - Hat jemand anderes die Engine geändert, holt `git submodule update --remote --merge` den Stand. Danach prüfen (`cargo test --release`) und den neuen Zeiger mit eintragen.
+- **Nur ein Renderer:** Alle Spiele benutzen `mettgine::render::Renderer`. Im Spiel gibt es keinen eigenen Renderer und keine Vulkan-Aufrufe; fehlt etwas, wird der Renderer der Engine erweitert (siehe `mettgine/AGENTS.md`, 2.).
 - Die Engine nie als normalen Ordner aufnehmen und `.gitmodules` nicht ändern, außer die Person verlangt es.
 
 ## 4. Versionen und Veröffentlichungen

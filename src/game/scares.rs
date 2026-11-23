@@ -477,6 +477,7 @@ impl Game {
                     mesh: cube,
                     model,
                     tint: color.extend(0.0),
+                    ..Default::default()
                 });
             }
             // Funkenregen beim Aufschlag
@@ -498,6 +499,7 @@ impl Game {
                             q,
                         ),
                         tint: Vec4::new(1.0, 0.85, 0.45, 4.0 * (1.0 - c / 0.7)),
+                        ..Default::default()
                     });
                 }
             }

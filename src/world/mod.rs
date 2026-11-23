@@ -292,6 +292,7 @@ impl ShelfItem {
             mesh: p.mesh,
             model,
             tint: Vec4::new(tint.x, tint.y, tint.z, 0.0),
+            ..Default::default()
         }
     }
 }
@@ -509,6 +510,7 @@ impl World {
                     g.pos,
                 ),
                 tint: (p.tint * vec3(0.75, 0.72, 0.68)).extend(0.0),
+                ..Default::default()
             });
         }
     }
