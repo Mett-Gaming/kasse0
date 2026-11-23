@@ -19,7 +19,7 @@ impl Default for Settings {
             volume: 0.8,
             vhs: 1.0,
             fov: 70.0,
-            fullscreen: false,
+            fullscreen: true,
             tutorial: true,
         }
     }
@@ -46,7 +46,7 @@ impl Settings {
                 "volume" => s.volume = f.unwrap_or(s.volume).clamp(0.0, 1.0),
                 "vhs" => s.vhs = f.unwrap_or(s.vhs).clamp(0.0, 1.5),
                 "fov" => s.fov = f.unwrap_or(s.fov).clamp(55.0, 100.0),
-                "fullscreen" => s.fullscreen = v == "true",
+                "fullscreen" => s.fullscreen = v != "false",
                 "tutorial" => s.tutorial = v != "false",
                 _ => {}
             }
@@ -85,6 +85,13 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn starts_fullscreen_unless_switched_off() {
+        assert!(Settings::default().fullscreen);
+        assert!(Settings::parse("volume=0.5").fullscreen);
+        assert!(!Settings::parse("fullscreen=false").fullscreen);
+    }
 
     #[test]
     fn roundtrip_and_clamping() {

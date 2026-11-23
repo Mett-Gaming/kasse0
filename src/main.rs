@@ -169,6 +169,12 @@ impl App {
         }
     }
 
+    /// Randloses Vollbild laut Optionen; Autoshot bleibt im Fenster (feste Bildgroesse).
+    fn wanted_fullscreen(&self) -> Option<Fullscreen> {
+        (self.settings.fullscreen && self.autoshot.is_none())
+            .then_some(Fullscreen::Borderless(None))
+    }
+
     fn apply_settings(&mut self) {
         self.game.sensitivity = self.settings.sensitivity;
         self.game.fov_deg = self.settings.fov;
@@ -176,10 +182,9 @@ impl App {
             a.set_master(self.settings.volume);
         }
         if let Some(r) = &self.running {
-            let want = self.settings.fullscreen;
-            if r.window.fullscreen().is_some() != want {
-                r.window
-                    .set_fullscreen(want.then_some(Fullscreen::Borderless(None)));
+            let want = self.wanted_fullscreen();
+            if r.window.fullscreen().is_some() != want.is_some() {
+                r.window.set_fullscreen(want);
             }
         }
     }
@@ -812,7 +817,8 @@ impl ApplicationHandler for App {
         }
         let attrs = Window::default_attributes()
             .with_title("KASSE 0")
-            .with_inner_size(LogicalSize::new(1280.0, 720.0));
+            .with_inner_size(LogicalSize::new(1280.0, 720.0))
+            .with_fullscreen(self.wanted_fullscreen());
         let window = match event_loop.create_window(attrs) {
             Ok(w) => w,
             Err(e) => {

@@ -118,7 +118,7 @@ Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umd
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 
 ## Optionen
-Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
+Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Das Spiel startet im **randlosen Vollbild**; abgeschaltet läuft es im Fenster (1280×720). Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
 
 ## Entwicklung
 Die Engine **Mettgine** liegt als Git-Submodule in `mettgine/` ([Mett-Gaming/mettgine](https://github.com/Mett-Gaming/mettgine)). Darum mit `--recursive` klonen bzw. nach dem Holen die Engine mitziehen:

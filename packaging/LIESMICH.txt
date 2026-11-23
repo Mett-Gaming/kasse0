@@ -84,6 +84,7 @@ zählen getrennt davon.
 Das Tutorial beim ersten Einkauf überspringst du mit dem Haken "Tutorial
 überspringen" im Hauptmenü.
 
+Das Spiel startet im randlosen Vollbild; in den Optionen lässt es sich abschalten.
 Jumpscares lassen sich in den Optionen nicht abschalten. Probier es ruhig.
 
 Einstellungen werden unter %APPDATA%\kasse0\settings.txt gespeichert.
