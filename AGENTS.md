@@ -129,7 +129,7 @@ Spieler installieren KASSE 0 über den Mett-Launcher. Das Projektarchiv liegt un
 - **Pro Veröffentlichung genau ein Zip** passend zu `KASSE0-v*.zip` (kein zusätzliches `KASSE0-v…-debug.zip`). Andere Dateien (`.sha256`, `.txt`) stören nicht.
 - **Aufbau bleibt `KASSE0/KASSE0.exe`.** Ändern sich exe-Name, Ort, Zip-Schema oder Archiv-Name, muss vorher `games.json` im Katalog angepasst werden.
 - **Dateien nie nach dem Veröffentlichen hochladen oder ersetzen** (der Launcher prüft Größe und sha256). Fehlerhafte Veröffentlichungen mit neuer Patch-Version korrigieren, alte nicht löschen (sie bleiben im Launcher wählbar).
-- **Das Spiel schreibt nichts neben die exe.** Bei jeder Aktualisierung wird der Installordner ersetzt; Spielstände und Einstellungen gehören nach `%APPDATA%\kasse0`. Muss doch etwas im Installordner bleiben: Pfad unter `preserve` in `games.json` eintragen.
+- **Das Spiel schreibt nichts neben die exe.** Bei jeder Aktualisierung wird der Installordner ersetzt; Spielstände und Einstellungen gehören nach `%APPDATA%\.mettlauncher\kasse0`. Muss doch etwas im Installordner bleiben: Pfad unter `preserve` in `games.json` eintragen.
 - **`KASSE0.exe` läuft selbst, bis das Spiel endet** (kein Starter, der einen zweiten Prozess startet), braucht keine Adminrechte, hat **keine eigene Aktualisierung** und bleibt auch ohne Launcher direkt aus dem Zip startbar. Arbeitsverzeichnis ist der Installordner.
 
 ## 9. Wenn etwas schiefgeht

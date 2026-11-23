@@ -1,4 +1,4 @@
-//! Optionen, gespeichert als key=value in %APPDATA%\kasse0\settings.txt.
+//! Optionen, gespeichert als key=value in %APPDATA%\.mettlauncher\kasse0\settings.txt.
 
 use std::path::PathBuf;
 
@@ -26,10 +26,7 @@ impl Default for Settings {
 }
 
 fn path() -> Option<PathBuf> {
-    let base = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .or_else(|| std::env::current_dir().ok())?;
-    Some(base.join("kasse0").join("settings.txt"))
+    crate::crash::data_dir("kasse0").map(|d| d.join("settings.txt"))
 }
 
 impl Settings {

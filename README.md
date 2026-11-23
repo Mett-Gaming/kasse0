@@ -118,7 +118,7 @@ Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umd
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 
 ## Optionen
-Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
+Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\.mettlauncher\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
 
 ## Entwicklung
 Die Engine **Mettgine** liegt als Git-Submodule in `mettgine/` ([Mett-Gaming/mettgine](https://github.com/Mett-Gaming/mettgine)). Darum mit `--recursive` klonen bzw. nach dem Holen die Engine mitziehen:
@@ -194,4 +194,4 @@ git push origin v0.2.0
 Danach liegt `KASSE0-v0.2.0.zip` unter *Releases* im Repository.
 
 ### Absturzberichte
-Stürzt das Spiel ab (auch im Grafiktreiber), schreibt es einen Bericht nach `%APPDATA%\kasse0\crashes\` (Version, Fehler, Aufrufliste, Grafikkarte, Spielzustand, letzte Protokollzeilen) und öffnet ein Absturzfenster mit „Bericht kopieren“, „Ordner öffnen“, „Neu starten“. Das laufende Protokoll steht in `%APPDATA%\kasse0\logs\latest.log`, auch im Release-Build ohne Konsole. Mit `kasse0.pdb` neben der exe enthält die Aufrufliste Funktionsnamen und Zeilen. Die Original-Packs (`assets_src/`) sind nicht im Repository; gebaut wird aus den konvertierten Dateien in `assets/`.
+Stürzt das Spiel ab (auch im Grafiktreiber), schreibt es einen Bericht nach `%APPDATA%\.mettlauncher\kasse0\crashes\` (Version, Fehler, Aufrufliste, Grafikkarte, Spielzustand, letzte Protokollzeilen) und öffnet ein Absturzfenster mit „Bericht kopieren“, „Ordner öffnen“, „Neu starten“. Das laufende Protokoll steht in `%APPDATA%\.mettlauncher\kasse0\logs\latest.log`, auch im Release-Build ohne Konsole. Mit `kasse0.pdb` neben der exe enthält die Aufrufliste Funktionsnamen und Zeilen. Die Original-Packs (`assets_src/`) sind nicht im Repository; gebaut wird aus den konvertierten Dateien in `assets/`.
