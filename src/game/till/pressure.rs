@@ -113,13 +113,10 @@ impl Game {
         }
         let s = self.till_stress();
         let paying = self.till_paying();
-        // im Kassenfenster zaehlt die Maus: stillhalten, nicht ziehen (belt_window.rs)
+        // im Kassenfenster achtet sie weder auf die Maus noch auf den Blick
         let window = self.belt_window_open();
-        let moving = if window {
-            self.window_mouse_busy()
-        } else {
-            vec3(self.player.vel.x, 0.0, self.player.vel.z).length() > MOVE_SPEED
-        };
+        let moving =
+            !window && vec3(self.player.vel.x, 0.0, self.player.vel.z).length() > MOVE_SPEED;
         let gazing = !window && self.gazing_at_cashier();
         let knock_here = self.someone_at_barrier();
         let doubt_now = self.till.as_ref().map_or(0.0, |t| t.doubt);

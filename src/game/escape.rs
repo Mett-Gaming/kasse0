@@ -144,7 +144,8 @@ impl Game {
         e.moving = (e.pos - old).length_squared() > 1e-8;
         e.yaw = lerp_angle(e.yaw, npc::yaw_towards(e.pos, player), (dt * 10.0).min(1.0));
         let d = vec3(e.pos.x - player.x, 0.0, e.pos.z - player.z).length();
-        if d < CATCH_DIST && !self.god && !self.paid_and_outside() {
+        // im Tutorial greift niemand zu
+        if d < CATCH_DIST && !self.god && !self.tutorial_run && !self.paid_and_outside() {
             let (at, v) = (self.employees[i].pos, self.employees[i].variant);
             self.caught_by(at, v);
         }
@@ -224,6 +225,25 @@ mod tests {
         assert!(far_steps > 0, "von weitem gar nichts");
         assert_eq!(none_steps, 0, "Schritte durch den ganzen Markt");
         assert!(near_beats > far_beats, "Herz schlaegt nicht schneller");
+    }
+
+    #[test]
+    fn tutorial_chase_cannot_be_lost() {
+        let mut g = paid_game(44);
+        g.tutorial_run = true;
+        g.tutorial = Some(crate::game::tutorial::Tutorial::default());
+        g.employees.clear();
+        g.customers.truncate(1);
+        g.player.pos = g.world.spawn;
+        let p = g.player.pos;
+        g.customers[0].pos = vec3(p.x + 0.6, 0.0, p.z);
+        g.grace = 0.0;
+        let mut inp = Input::default();
+        for _ in 0..600 {
+            g.update(1.0 / 60.0, &mut inp);
+        }
+        assert_eq!(g.outcome, Outcome::Running, "im Tutorial erwischt = vorbei");
+        assert_eq!(g.deaths, 0);
     }
 
     #[test]

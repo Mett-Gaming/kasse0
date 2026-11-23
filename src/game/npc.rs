@@ -131,6 +131,10 @@ fn grid_line_free(nav: &NavGrid, a: Vec3, b: Vec3) -> bool {
 
 /// Bester Nachbar im Feld (kleinster Wert), None = Ziel erreicht oder Sackgasse.
 fn downhill(nav: &NavGrid, field: &[u16], (cx, cz): (usize, usize)) -> Option<(usize, usize)> {
+    // Feld vom alten Markt (vor einem Umbau, anderes Raster): nicht benutzbar
+    if field.len() != nav.w * nav.h {
+        return None;
+    }
     let here = field[cz * nav.w + cx];
     let mut best = (here, None);
     for (dx, dz) in NEIGHBORS {
@@ -176,6 +180,11 @@ fn start_cell(nav: &NavGrid, field: &[u16], pos: Vec3) -> Option<(usize, usize)>
 /// Zelle, die noch in gerader Linie frei erreichbar ist (oder das Ziel selbst).
 pub fn steer_point(world: &World, field: &[u16], pos: Vec3, goal: Vec3) -> Vec3 {
     let nav = &world.nav;
+    // kein (oder ein veraltetes) Feld nach einem Umbau des Markts: direkt aufs Ziel zu,
+    // bis das Feld neu berechnet ist
+    if field.len() != nav.w * nav.h {
+        return goal;
+    }
     let Some(start) = start_cell(nav, field, pos) else {
         return goal;
     };

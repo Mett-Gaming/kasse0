@@ -49,7 +49,31 @@ impl Game {
             self.say("Lauf. Und dreh dich NICHT um.", 4.0);
             self.play(Sfx::Sting, 0.4);
         }
-        if self.corridor_facing() < TURN_DEAD && !self.god {
+        let facing = self.corridor_facing();
+        let turned = facing < TURN_DEAD;
+        if self.tutorial_run {
+            // Tutorial: warnen statt Game Over, einmal je Umdrehen
+            let warn = match &mut self.tutorial {
+                Some(t) if turned && !t.turn_warned => {
+                    t.turn_warned = true;
+                    true
+                }
+                Some(t) => {
+                    if facing > 0.0 {
+                        t.turn_warned = false;
+                    }
+                    false
+                }
+                None => false,
+            };
+            if warn {
+                self.tutorial_forgive(
+                    "Du hast dich umgedreht! Im echten Spiel ist das Game Over. Weiter!",
+                );
+            }
+            return;
+        }
+        if turned && !self.god {
             self.turn_scare();
         }
     }
@@ -222,6 +246,22 @@ mod tests {
             "Hindernisse kaum zufaellig: {}",
             layouts.len()
         );
+    }
+
+    #[test]
+    fn tutorial_turning_around_only_warns() {
+        let mut g = in_corridor(84);
+        g.tutorial_run = true;
+        g.tutorial = Some(crate::game::tutorial::Tutorial::default());
+        g.player.yaw = 0.0; // Blick zurueck
+        g.update(1.0 / 60.0, &mut Input::default());
+        assert_eq!(g.outcome, Outcome::Running, "im Tutorial Game Over");
+        assert!(!g.turned_back);
+        assert!(g.tutorial.as_ref().unwrap().turn_warned);
+        // wieder nach vorn: die Warnung kann erneut kommen
+        g.player.yaw = std::f32::consts::PI;
+        g.update(1.0 / 60.0, &mut Input::default());
+        assert!(!g.tutorial.as_ref().unwrap().turn_warned);
     }
 
     #[test]

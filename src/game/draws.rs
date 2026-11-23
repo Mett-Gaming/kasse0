@@ -21,6 +21,8 @@ impl Game {
         // Kassen: Kassierer:in, Band, Terminal, Rollo, Kamera
         self.collect_checkout_draws(out);
         self.collect_barrier_draws(out);
+        // Tutorial-Modus: Pfeile am Boden, rote Rahmen um benoetigte Waren
+        self.collect_guide_draws(out);
         // Zigarette vor der Kamera und weggeschnippte Kippen
         self.collect_cigarette_draws(out);
         // Fliegen um verdorbene Ware in der Naehe

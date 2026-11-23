@@ -9,7 +9,10 @@ pub struct Settings {
     pub vhs: f32,
     pub fov: f32,
     pub fullscreen: bool,
-    pub tutorial: bool,
+    /// Beim ersten Einkauf schon gefragt, ob man das Tutorial spielen will?
+    pub tutorial_asked: bool,
+    /// Tutorial einmal geschafft? Dann gibt es "Tutorial spielen" in den Optionen.
+    pub tutorial_done: bool,
 }
 
 impl Default for Settings {
@@ -20,7 +23,8 @@ impl Default for Settings {
             vhs: 1.0,
             fov: 70.0,
             fullscreen: false,
-            tutorial: true,
+            tutorial_asked: false,
+            tutorial_done: false,
         }
     }
 }
@@ -47,7 +51,9 @@ impl Settings {
                 "vhs" => s.vhs = f.unwrap_or(s.vhs).clamp(0.0, 1.5),
                 "fov" => s.fov = f.unwrap_or(s.fov).clamp(55.0, 100.0),
                 "fullscreen" => s.fullscreen = v == "true",
-                "tutorial" => s.tutorial = v != "false",
+                "tutorial_asked" => s.tutorial_asked = v == "true",
+                "tutorial_done" => s.tutorial_done = v == "true",
+                // frueher gab es "tutorial" (an/aus): wird ignoriert
                 _ => {}
             }
         }
@@ -56,8 +62,15 @@ impl Settings {
 
     pub fn to_text(&self) -> String {
         format!(
-            "sensitivity={}\nvolume={}\nvhs={}\nfov={}\nfullscreen={}\ntutorial={}\n",
-            self.sensitivity, self.volume, self.vhs, self.fov, self.fullscreen, self.tutorial
+            "sensitivity={}\nvolume={}\nvhs={}\nfov={}\nfullscreen={}\ntutorial_asked={}\n\
+             tutorial_done={}\n",
+            self.sensitivity,
+            self.volume,
+            self.vhs,
+            self.fov,
+            self.fullscreen,
+            self.tutorial_asked,
+            self.tutorial_done
         )
     }
 
@@ -94,11 +107,18 @@ mod tests {
             vhs: 0.5,
             fov: 80.0,
             fullscreen: true,
-            tutorial: false,
+            tutorial_asked: true,
+            tutorial_done: true,
         };
         assert_eq!(Settings::parse(&s.to_text()), s);
+        // neue Spieler: noch nicht gefragt, Tutorial noch nicht geschafft
+        assert!(!Settings::default().tutorial_asked);
+        assert!(!Settings::default().tutorial_done);
         let bad = Settings::parse("volume=7\nfov=abc\nunbekannt=1");
         assert_eq!(bad.volume, 1.0);
         assert_eq!(bad.fov, 70.0);
+        // aeltere Datei mit der frueheren Tutorial-Option wird ohne Fehler gelesen
+        let old = Settings::parse("fullscreen=true\ntutorial=false\n");
+        assert!(old.fullscreen && !old.tutorial_asked);
     }
 }

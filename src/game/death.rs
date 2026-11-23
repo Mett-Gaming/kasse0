@@ -16,6 +16,16 @@ const RESET_RADIUS: f32 = 8.0;
 impl Game {
     /// Ein Verfolger hat einen erreicht: verletzt (Todesanimation) oder Run vorbei.
     pub(super) fn caught_by(&mut self, catcher: Vec3, variant: usize) {
+        // Tutorial: nur erklaeren, nicht sterben
+        if self.tutorial_run {
+            let msg = if self.chase.is_some() {
+                "Erwischt! Im echten Spiel wäre die Flucht jetzt vorbei. Weiterlaufen!"
+            } else {
+                "Erwischt! Im echten Spiel kostet das ein Leben. Halte Abstand."
+            };
+            self.tutorial_forgive(msg);
+            return;
+        }
         self.catcher_variant = Some(variant);
         // Bei der Flucht zum Ausgang gibt es kein Aufwachen mehr
         if self.deaths >= SURVIVABLE_HITS || self.chase.is_some() {

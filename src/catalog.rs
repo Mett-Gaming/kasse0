@@ -29,6 +29,8 @@ struct RawProduct {
     sub: String,
     name: String,
     cents: u32,
+    /// Gewicht in kg (entscheidet, was zuerst aufs Band muss)
+    kg: f32,
     #[serde(default)]
     list: Option<String>,
     #[serde(default)]
@@ -56,6 +58,9 @@ pub struct Sub {
 pub struct Product {
     pub name: String,
     pub cents: u32,
+    /// Gewicht in kg
+    pub kg: f32,
+    #[allow(dead_code)]
     pub sub: usize,
     /// globaler Modell-Index (fuer Renderer und MeshDraw)
     pub mesh: usize,
@@ -145,6 +150,7 @@ pub fn catalog() -> &'static Catalog {
             products.push(Product {
                 name: p.name,
                 cents: p.cents,
+                kg: p.kg,
                 sub,
                 mesh,
                 tint: p.tint.map(Vec3::from).unwrap_or(Vec3::ONE),

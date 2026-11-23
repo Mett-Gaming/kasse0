@@ -26,7 +26,7 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 
 ### Das Kassen-Minispiel
 In den **Kassenbereich kommen keine NPCs** hinein. Sobald die erste Ware auf dem Band liegt, sind **Kunden und Mitarbeiter harmlos**, solange du an der Kasse bleibst. Dafür beobachtet dich jetzt die **Kassiererin**. Unten links zeigt ein Balken ihr Misstrauen, daneben stehen deine **drei Kassen-Leben**.
-- **Ware richtig aufs Band:** Getränke (schwer) zuerst. Falsch beschriftete Ware sortiert sie als "ARTIKEL UNBEKANNT" aus, und das fällt auf.
+- **Ware richtig aufs Band:** Schweres zuerst: alles ab 1 kg (z. B. Wasser, Melone, Milch) vor alles Leichte. Im Kassenfenster steht bei jeder Ware das Gewicht, schwere Ware ist rot. Falsch beschriftete Ware sortiert sie als "ARTIKEL UNBEKANNT" aus, und das fällt auf.
 - **Fragen beantworten (1, 2, 3):** Während sie scannt, fragt sie zweimal etwas ("Sammeln Sie Punkte?"). Antworte unauffällig. Schweigen fällt auch auf.
 - **Karte durchziehen:** E am Kartenterminal öffnet den Kartenleser. Mit E nimmst du die SCAMCART aus dem Portemonnaie, dann ziehst du sie mit der Maus **gleichmäßig nach rechts** durch den Leser. Das Display meldet „ZU SCHNELL“ (kostet ein Leben) oder „ZU LANGSAM“ (macht sie misstrauisch; auch, wenn du unterwegs anhältst). Dann noch mal. Bei „ANGENOMMEN“ geht es weiter zur PIN.
 - **PIN eintippen (0–9):** Das Terminal zeigt die PIN kurz an. Merk sie dir und tipp sie ein, bevor die Zeit abläuft.
@@ -37,7 +37,7 @@ In den **Kassenbereich kommen keine NPCs** hinein. Sobald die erste Ware auf dem
 - Je länger du an der Kasse stehst und je mehr Leben schon weg sind, desto schlimmer wird alles (auch beim Barzahlen: weniger Zeit, mehr Kleingeld-Chaos).
 - **Nicht weggehen:** Entfernst du dich von der Kasse, steigt ihr Misstrauen, und die Verfolger können dich wieder erwischen.
 
-**Direkte Fehler** (Getränke nicht zuerst, falsche Ware, schlechte Antwort, Karte zu schnell, falsche PIN, zu viel Geld) kosten **sofort ein Kassen-Leben**. Weiche Fehler (neutrale Antwort, Schweigen, zu langsam, Weggehen) füllen nur ihren Misstrauens-Balken. Ist der voll, hebt sie den Kopf: ebenfalls ein Leben weg, und der Balken beginnt wieder bei null. Nach dem dritten Mal hat sie dich durchschaut, und der Run ist vorbei. Die Kassen-Leben sind getrennt von den drei Leben im Markt.
+**Direkte Fehler** (Schweres nicht zuerst, falsche Ware, schlechte Antwort, Karte zu schnell, falsche PIN, zu viel Geld) kosten **sofort ein Kassen-Leben**. Weiche Fehler (neutrale Antwort, Schweigen, zu langsam, Weggehen) füllen nur ihren Misstrauens-Balken. Ist der voll, hebt sie den Kopf: ebenfalls ein Leben weg, und der Balken beginnt wieder bei null. Nach dem dritten Mal hat sie dich durchschaut, und der Run ist vorbei. Die Kassen-Leben sind getrennt von den drei Leben im Markt.
 
 Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (grün → gelb → rot, blinkt bei 100 %), sobald sie über null liegt.
 
@@ -63,7 +63,7 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 | F1 | Cheat-Menü zum Testen, nach Kategorien: Spieler, Markt & Einkauf, Kasse & Flucht, Leute, Schrecken. Enter oder Rechts öffnet eine Kategorie, Esc oder Links geht zurück |
 | F12 | Screenshot (Ordner *Bilder*) |
 
-Beim ersten Einkauf zeigt ein Tutorial-Panel alle Tasten und hakt sie ab. Überspringen kannst du es mit dem Haken **„Tutorial überspringen“** im Hauptmenü (gleiche Einstellung wie in den Optionen) oder mitten im Spiel per Cheat. Zum Ausräumen aufs Band muss der Wagen an der Kasse stehen. Unterwegs kannst du ihn aber parken und Waren zu Fuß holen.
+Beim **allerersten Einkauf** fragt das Spiel, ob du das **Tutorial** spielen willst (Ja/Nein, wird nur einmal gefragt). Bei „Nein“ gibt es einen kurzen Spruch, dann geht der normale Einkauf los. Das Tutorial ist ein ganzer Einkauf mit Anleitung. Erst hakt er alle Tasten ab, danach erklärt ein Kasten jede Phase (Wasser, Einkaufen, Kasse, Bezahlen, Flucht). **Pfeile am Boden** zeigen den Weg (am Anfang zum Wasser in der Getränkeabteilung), und die Waren, die dir noch fehlen, sind **rot umrandet**. Im Tutorial kannst du nicht verlieren: Kunden und Mitarbeiter verfolgen dich gar nicht (auch nicht bei der Flucht), und Fehler an der Kasse werden nur erklärt. Beim Einkaufen wechselt der Kasten zwischen drei Seiten: Einkaufen, Kunden (kommen näher, wenn du nicht hinsiehst) und Mitarbeiter (sprechen dich an, Antwort mit 1/2/3). Im Kassenfenster und beim Bezahlen (Karte, PIN, Bargeld) erklärt eine kleine Leiste oben auf dem Fenster die Bedienung. Schaffst du es und gehst danach ins Hauptmenü, heißt es: „Du bist jetzt schlau genug, um einkaufen zu können. Wow.“ Im normalen Einkauf gibt es kein Tutorial-Fenster. Zum Ausräumen aufs Band muss der Wagen an der Kasse stehen. Unterwegs kannst du ihn aber parken und Waren zu Fuß holen.
 
 ### Der Wagen
 - **Er quietscht.** Im gekippten Markt hören Mitarbeiter in der Nähe das Rad und kommen nachsehen. Wer schleichen will, lässt ihn stehen.
@@ -115,7 +115,7 @@ Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umd
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 
 ## Optionen
-Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild, Tutorial an/aus. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
+Mausempfindlichkeit, Lautstärke, VHS-Effekt-Stärke, Sichtfeld, Vollbild. Hast du das Tutorial einmal geschafft, gibt es hier auch **„Tutorial spielen“**. Sie werden in `%APPDATA%\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
 
 ## Entwicklung
 Die Engine **Mettgine** liegt als Git-Submodule in `mettgine/` ([Mett-Gaming/mettgine](https://github.com/Mett-Gaming/mettgine)). Darum mit `--recursive` klonen bzw. nach dem Holen die Engine mitziehen:
@@ -143,7 +143,7 @@ Mit dem Auto-Screenshot-Durchlauf rendert das Spiel automatisch alle Screens (Ti
 $env:KASSE0_AUTOSHOT = "$PWD\shots"; cargo run --release -- 1994
 ```
 
-Das Cheat-Menü (**F1**, zwei Spalten) kippt den Markt, füllt den Zettel, erhöht den Warenwert, teleportiert, ruft Mitarbeiter, springt direkt zur Karten- oder Barzahlung, füllt die Leben wieder auf (Markt und Kasse), überspringt das Tutorial usw. Die rechte Spalte („Schreck: …“) teleportiert an eine passende Stelle und löst genau einen Jumpscare aus (Hinter dir, Stromausfall, Kassiererin, Geisterwagen, Fata Morgana, Deckenkabel, Kopfüber, Monitor, Tod ohne Lebensverlust, Troll-Option). Für Validation-Layer im Debug-Build das LunarG Vulkan SDK installieren.
+Das Cheat-Menü (**F1**, zwei Spalten) kippt den Markt, füllt den Zettel, erhöht den Warenwert, teleportiert, ruft Mitarbeiter, springt direkt zur Karten- oder Barzahlung, füllt die Leben wieder auf (Markt und Kasse), startet einen Einkauf im Tutorial-Modus oder beendet dort die Anleitung usw. Die rechte Spalte („Schreck: …“) teleportiert an eine passende Stelle und löst genau einen Jumpscare aus (Hinter dir, Stromausfall, Kassiererin, Geisterwagen, Fata Morgana, Deckenkabel, Kopfüber, Monitor, Tod ohne Lebensverlust, Troll-Option). Für Validation-Layer im Debug-Build das LunarG Vulkan SDK installieren.
 
 ### Modelle neu konvertieren
 Waren (Katalog `tools/catalog.json`, Quell-Packs in `assets_src/packs`):

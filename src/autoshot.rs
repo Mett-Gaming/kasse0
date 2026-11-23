@@ -12,7 +12,7 @@ impl App {
             0 => return Some(1.5),
             1 => self.shot_request = Some(shot("01_title")),
             2 => {
-                self.start_game(seed);
+                self.start_game(seed, false);
                 return Some(2.5);
             }
             3 => self.shot_request = Some(shot("02_normal")),
@@ -64,7 +64,7 @@ impl App {
             }
             13 => self.shot_request = Some(shot("07_pause")),
             14 => {
-                self.go(Screen::Options { from_pause: true });
+                self.go(self.options_screen(true));
                 return Some(0.5);
             }
             15 => self.shot_request = Some(shot("08_options")),
@@ -83,7 +83,7 @@ impl App {
             19 => self.shot_request = Some(shot("10_caught_end")),
             20 => {
                 // Gewinnen
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tip();
                 self.game.debug_finish_shopping();
                 return Some(3.0);
@@ -91,13 +91,13 @@ impl App {
             21 => self.shot_request = Some(shot("11_won")),
             22 => {
                 self.to_title();
-                self.go(Screen::Options { from_pause: false });
+                self.go(self.options_screen(false));
                 return Some(0.6);
             }
             23 => self.shot_request = Some(shot("12_options_title")),
             24 => {
                 // Vor eine Ware stellen und sie anschauen (Interaktions-Prompt)
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tip();
                 self.game.customers.clear();
                 self.game.employees.clear();
@@ -147,7 +147,7 @@ impl App {
             29 => self.shot_request = Some(shot("16_cart")),
             32 => {
                 // Getraenke-Aktionstisch im normalen Markt
-                self.start_game(seed);
+                self.start_game(seed, false);
                 let w = &self.game.world;
                 self.game.player.pos = vec3(w.size.x - 2.0, 0.0, 6.2);
                 self.game.player.yaw = std::f32::consts::FRAC_PI_2;
@@ -164,7 +164,7 @@ impl App {
             35 => self.shot_request = Some(shot("18_cheats")),
             36 => {
                 // frisches Werbeposter an der Westwand
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 let z = self.game.world.aisle_z0 + 1.5;
                 self.game.player.pos = vec3(1.7, 0.0, z);
@@ -235,7 +235,7 @@ impl App {
                 self.game.holograms.clear();
                 self.game.params.walls = 0;
                 self.game.cheat(11);
-                self.game.cheat(game::CHEATS.len() - 1);
+                self.game.cheat(game::TUTORIAL_CHEAT - 1); // NPC-Zustaende
                 let e = self
                     .game
                     .employees
@@ -264,7 +264,7 @@ impl App {
             31 => self.shot_request = Some(shot("14_customer_close")),
             46 | 50 => {
                 // Kassenzone von den Gaengen aus (normal bzw. gekippt: "0 Kasse")
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.message = None;
                 if step == 50 {
@@ -287,7 +287,7 @@ impl App {
             51 => self.shot_request = Some(shot("26_checkout_zero")),
             48 => {
                 // Kuehlwand mit Kopfschildern und Haengeschilder ueber den Gaengen
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.message = None;
                 let z = self.game.world.aisle_z0 - 0.4;
@@ -302,7 +302,7 @@ impl App {
             49 => self.shot_request = Some(shot("25_cooler_signs")),
             52 | 54 => {
                 // Mitten im Kassieren: Ware auf dem Band (normal bzw. gekippt)
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.tip();
                 self.game.customers.clear();
@@ -328,7 +328,7 @@ impl App {
             55 => self.shot_request = Some(shot("28_belt_scanned")),
             56 | 58 => {
                 // Blick zurueck zum Eingang mit Fensterfront
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 if step == 58 {
                     self.game.tip();
@@ -349,7 +349,7 @@ impl App {
             59 => self.shot_request = Some(shot("30_windows_tipped")),
             60 | 62 | 64 => {
                 // Aufstellung im Eingangsbereich: Kundschaft (zwei Bilder) bzw. Personal
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.message = None;
                 self.game.shoppers.clear();
@@ -393,7 +393,7 @@ impl App {
             }
             66 => {
                 // Nahaufnahme: zwei Kunden und ein Mitarbeiter nebeneinander
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.message = None;
                 self.game.shoppers.clear();
@@ -421,7 +421,7 @@ impl App {
             67 => self.shot_request = Some(shot("34_people_close")),
             68 => {
                 // Bildfolge: ein Mitarbeiter laeuft quer durchs Bild (Animation pruefen)
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.message = None;
                 self.game.shoppers.clear();
@@ -447,7 +447,7 @@ impl App {
             }
             76 | 78 | 80 => {
                 // Kollaps: Loecher, verdorbene Ware, Riesenwaren, Steigung im Gang
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.tip();
                 for _ in 0..6 {
@@ -480,7 +480,7 @@ impl App {
             81 => self.shot_request = Some(shot("38_collapse_ceiling")),
             82 => {
                 // Kassengang, Blick auf den Ueberwachungsmonitor (gekippt)
-                self.start_game(seed);
+                self.start_game(seed, false);
                 self.game.tutorial = None;
                 self.game.tip();
                 self.game.customers.clear();

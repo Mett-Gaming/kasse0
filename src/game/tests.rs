@@ -268,11 +268,11 @@ pub(super) fn belt_drop(g: &mut Game) {
     g.update(1.0 / 60.0, &mut Input::default());
 }
 
-/// Den ganzen Wagen richtig aufs Band legen: Getraenke zuerst (Wagen steht an der Kasse).
+/// Den ganzen Wagen richtig aufs Band legen: Schweres zuerst (Wagen steht an der Kasse).
 pub(super) fn put_all_on_belt(g: &mut Game) {
     look_at_belt(g);
     while !g.cart.is_empty() {
-        let drink = g.cart.iter().position(|c| c.is_drink());
+        let drink = g.cart.iter().position(|c| c.is_heavy());
         g.cart_sel = Some(drink.unwrap_or(g.cart.len() - 1));
         belt_drop(g);
     }
@@ -366,7 +366,7 @@ fn full_run_checkout_and_exit_wins() {
         g.belt.is_empty() && g.till.is_none(),
         "Ausraeumen ohne Wagen"
     );
-    // Wagen zur Kasse, Stueck fuer Stueck aufs Band (Getraenke zuerst)
+    // Wagen zur Kasse, Stueck fuer Stueck aufs Band (Schweres zuerst)
     let n = g.cart.len();
     g.trolley.pos = lane.scan_point + vec3(0.0, 0.0, -1.0);
     put_all_on_belt(&mut g);
@@ -1622,5 +1622,38 @@ fn staff_stays_human_even_in_the_collapse() {
         assert_eq!(d.fx.twitch, 0.0, "Personal zuckt");
         assert_eq!(d.fx.distort, 0.0, "Personal zerreisst");
         assert!(d.fx.look_limit <= 1.2, "Personal dreht den Kopf zu weit");
+    }
+}
+
+#[test]
+fn npcs_survive_an_old_path_field_after_the_market_is_rebuilt() {
+    // Absturz v0.20.7: nach einem Umbau des Markts (anderes Raster) lief ein NPC noch mit
+    // dem Feld vom alten Markt -> Index ausserhalb. Jetzt geht er direkt aufs Ziel zu.
+    let mut g = Game::new(888_900);
+    g.tip();
+    let n = g.world.nav.w * g.world.nav.h;
+    let goal = g.player.pos;
+    for old_len in [n.saturating_sub(37), n + 37, 0] {
+        let old = vec![5u16; old_len];
+        let from = goal + vec3(3.0, 0.0, 2.0);
+        let p = npc::step_along(&g.world, &old, from, goal, 1.5, 0.1);
+        assert!(p.is_finite());
+        let _ = npc::steer_point(&g.world, &old, from, goal);
+    }
+}
+
+#[test]
+fn freezer_scare_works_on_short_freezer_pieces() {
+    // Absturz v0.20.7 (Seed 952600): Kuehltruhen-Stueck von 0,75 m -> clamp(0.22, -0.22)
+    use crate::game::scare_kinds::freezer_spot;
+    let mid = vec3(10.0, 0.0, 5.0);
+    for len in [0.0, 0.75, 1.2, 4.0] {
+        for p in [vec3(12.0, 0.0, 9.0), vec3(8.0, 0.0, 1.0), mid] {
+            let s = freezer_spot(mid, 0.0, len, p);
+            assert!(s.is_finite());
+            // bleibt auf dem Stueck, mit Abstand zu den Enden, sofern es lang genug ist
+            assert!((s.z - mid.z).abs() <= (len * 0.5 - 0.6).max(0.0) + 1e-4);
+            assert!((s.x - mid.x).abs() < 1e-4);
+        }
     }
 }

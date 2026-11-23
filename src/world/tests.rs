@@ -426,3 +426,26 @@ fn departments_move_physically_at_high_escalation() {
     // im normalen Markt bleibt sie im ersten Gang
     assert!(freezer_x(&gen(3, false)) < 7.0);
 }
+
+#[test]
+fn register_stands_fully_on_the_counter() {
+    // Die Kasse schwebt nicht: Unterseite auf der Thekenplatte, Grundflaeche ganz auf der Theke
+    // (Modell um 90 Grad gedreht: Modell-z liegt entlang x, Modell-x entlang z)
+    let h = crate::assets::half_extent(crate::assets::MeshId::Register) * REGISTER_SCALE;
+    for tipped in [false, true] {
+        let w = gen(7, tipped);
+        for lane in &w.lanes {
+            let (cx, z0) = (lane.belt_start.x, lane.belt_start.z - 0.15);
+            let r = lane.register;
+            assert!((r.y - COUNTER_TOP).abs() < 1e-4, "Kasse auf {} m", r.y);
+            assert!(
+                (r.x - cx).abs() + h.z <= COUNTER_HALF.0 + 1e-3,
+                "Kasse ragt seitlich ueber die Theke"
+            );
+            assert!(
+                r.z - h.x >= z0 && r.z + h.x <= z0 + COUNTER_HALF.1 * 2.0 + 1e-3,
+                "Kasse ragt vorn/hinten ueber die Theke"
+            );
+        }
+    }
+}

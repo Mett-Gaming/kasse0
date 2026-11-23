@@ -82,10 +82,10 @@ impl Game {
             .is_some_and(|l| (self.trolley.pos - l.scan_point).length() <= CART_AT_REGISTER)
     }
 
-    /// Fuer Screenshots: den ganzen Wagen richtig sortiert (Getraenke zuerst) aufs Band.
+    /// Fuer Screenshots: den ganzen Wagen richtig sortiert (Schweres zuerst) aufs Band.
     pub fn debug_unload_cart(&mut self) {
         let mut items: Vec<ItemData> = self.cart.drain(..).collect();
-        items.sort_by_key(|i| !i.is_drink());
+        items.sort_by_key(|i| !i.is_heavy());
         for item in items {
             self.put_on_belt(item);
         }
@@ -221,7 +221,11 @@ impl Game {
         for lane in &self.world.lanes {
             out.push(MeshDraw {
                 mesh: MeshId::Register as usize,
-                model: Mat4::from_rotation_translation(to_cashier, lane.register),
+                model: Mat4::from_scale_rotation_translation(
+                    Vec3::splat(crate::world::REGISTER_SCALE),
+                    to_cashier,
+                    lane.register,
+                ),
                 tint: white,
             });
             // Buerostuhl; an der offenen Kasse sitzt die Kassiererin darauf (draws.rs)

@@ -5,7 +5,7 @@ mod smoke;
 mod till;
 
 use crate::game::dialog::CART_OPENER;
-use crate::game::tutorial::{Tutorial, STEPS as TUTORIAL_STEPS};
+use crate::game::tutorial::{Phase, Tutorial, PHASES as TUTORIAL_PHASES, STEPS as TUTORIAL_STEPS};
 use crate::game::{Focus, Game, Outcome, PickupKind};
 use crate::settings::Settings;
 use crate::ui::{self, euro, Ui, DIM, GREEN, RED, WHITE, YELLOW};
@@ -15,6 +15,8 @@ pub enum Screen {
     Title,
     Options {
         from_pause: bool,
+        /// Zeile "Tutorial spielen" (erst, wenn man das Tutorial einmal geschafft hat)
+        tutorial: bool,
     },
     Playing,
     Paused,
@@ -23,28 +25,27 @@ pub enum Screen {
     Cheats {
         group: Option<usize>,
     },
+    /// Beim allerersten Einkauf: Tutorial spielen? (Ja/Nein)
+    AskTutorial,
+    /// Nach "Nein": "OK Champ ..." (OK startet den normalen Einkauf)
+    Champ,
+    /// Tutorial geschafft, auf dem Weg ins Hauptmenue: "Du bist jetzt schlau genug ..."
+    TutorialDone,
 }
 
-pub const TITLE_ITEMS: &[&str] = &[
-    "Neuer Einkauf",
-    "Tutorial überspringen",
-    "Optionen",
-    "Beenden",
-];
+pub const TITLE_ITEMS: &[&str] = &["Neuer Einkauf", "Optionen", "Beenden"];
+pub const ASK_ITEMS: &[&str] = &["Ja", "Nein"];
+pub const CHAMP_ITEMS: &[&str] = &["OK"];
 
-/// Hauptmenue-Zeilen; der zweite Punkt ist ein Haken (Tutorial ueberspringen).
-pub fn title_rows(tutorial: bool) -> Vec<String> {
-    TITLE_ITEMS
-        .iter()
-        .enumerate()
-        .map(|(i, s)| {
-            if i == 1 {
-                format!("[{}] {s}", if tutorial { " " } else { "x" })
-            } else {
-                s.to_string()
-            }
-        })
-        .collect()
+/// Hauptmenue-Zeilen: Einkauf, Optionen, Beenden. (Das Tutorial wird beim ersten Einkauf
+/// angeboten, siehe AskTutorial.)
+pub fn title_rows() -> Vec<String> {
+    TITLE_ITEMS.iter().map(|s| s.to_string()).collect()
+}
+
+/// Bildschirme ueber dem Kameraschwenk des Hauptmenues (kein laufendes Spiel).
+pub fn on_title(screen: Screen) -> bool {
+    matches!(screen, Screen::Title | Screen::AskTutorial | Screen::Champ)
 }
 pub const PAUSE_ITEMS: &[&str] = &[
     "Weiter",
@@ -54,10 +55,15 @@ pub const PAUSE_ITEMS: &[&str] = &[
     "Beenden",
 ];
 pub const END_ITEMS: &[&str] = &["Nochmal (gleicher Seed)", "Neuer Einkauf", "Hauptmenü"];
-pub const OPTION_COUNT: usize = 8;
+/// Optionen ohne die Tutorial-Zeile; davon lassen sich die ersten OPTION_VALUES mit
+/// links/rechts verstellen (danach: ggf. "Tutorial spielen", "Zurück")
+pub const OPTION_COUNT: usize = 7;
+pub const OPTION_VALUES: usize = 6;
+/// Zeile "Tutorial spielen" in den Optionen (nur nach einem geschafften Tutorial)
+pub const OPTION_TUTORIAL: usize = OPTION_VALUES;
 
 pub fn option_rows(s: &Settings) -> Vec<String> {
-    vec![
+    let mut rows = vec![
         format!("Mausempfindlichkeit   < {:.1}x >", s.sensitivity),
         format!("Lautstärke            < {:>3.0}% >", s.volume * 100.0),
         format!("VHS-Effekt            < {:>3.0}% >", s.vhs * 100.0),
@@ -66,14 +72,14 @@ pub fn option_rows(s: &Settings) -> Vec<String> {
             "Vollbild              < {:<4} >",
             if s.fullscreen { "An" } else { "Aus" }
         ),
-        format!(
-            "Tutorial              < {:<4} >",
-            if s.tutorial { "An" } else { "Aus" }
-        ),
         // laesst sich nicht abschalten (siehe main.rs: menu_scare)
         "Jumpscares            < An   >".to_string(),
-        "Zurück".to_string(),
-    ]
+    ];
+    if s.tutorial_done {
+        rows.push("Tutorial spielen".to_string());
+    }
+    rows.push("Zurück".to_string());
+    rows
 }
 
 /// Erste Menuezeile (y) und Zeilenabstand fuer Zeichnen und Maus-Treffer.
@@ -85,6 +91,8 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
         Screen::End => (205.0, 16.0),
         Screen::Cheats { group: None } => (62.0, 22.0),
         Screen::Cheats { group: Some(_) } => (56.0, 15.0),
+        Screen::AskTutorial => (150.0, 18.0),
+        Screen::Champ | Screen::TutorialDone => (158.0, 18.0),
         Screen::Playing => (0.0, 0.0),
     }
 }
@@ -92,13 +100,15 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
 pub fn menu_len(screen: Screen) -> usize {
     match screen {
         Screen::Title => TITLE_ITEMS.len(),
-        Screen::Options { .. } => OPTION_COUNT,
+        Screen::Options { tutorial, .. } => OPTION_COUNT + tutorial as usize,
         Screen::Paused => PAUSE_ITEMS.len(),
         Screen::End => END_ITEMS.len(),
         Screen::Cheats { group: None } => crate::game::cheat_groups().len() + 1,
         Screen::Cheats { group: Some(g) } => {
             crate::game::cheat_groups().get(g).map_or(0, |c| c.2.len()) + 1
         }
+        Screen::AskTutorial => ASK_ITEMS.len(),
+        Screen::Champ | Screen::TutorialDone => CHAMP_ITEMS.len(),
         Screen::Playing => 0,
     }
 }
@@ -171,12 +181,12 @@ fn timestamp(secs: f32) -> String {
     format!("SP {}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60)
 }
 
-pub fn draw_title(u: &mut Ui, sel: usize, time: f32, seed_hint: u64, tutorial: bool) {
+pub fn draw_title(u: &mut Ui, sel: usize, time: f32, seed_hint: u64) {
     u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.35]);
     osd(u, time, "PLAY");
     u.text_center(52.0, "KASSE 0", WHITE, 4.0);
     u.text_center(92.0, "ein ganz normaler Einkauf", DIM, 1.0);
-    draw_menu(u, Screen::Title, &title_rows(tutorial), sel, time);
+    draw_menu(u, Screen::Title, &title_rows(), sel, time);
     u.text_s(12.0, 252.0, &format!("Band #{seed_hint}"), DIM, 1.0);
     u.text_s(
         ui::W - 12.0 - Ui::text_width(&timestamp(time), 1.0),
@@ -185,6 +195,44 @@ pub fn draw_title(u: &mut Ui, sel: usize, time: f32, seed_hint: u64, tutorial: b
         WHITE,
         1.0,
     );
+}
+
+/// Erster Einkauf: Tutorial ja/nein, bzw. danach die Antwort auf "Nein".
+pub fn draw_ask_tutorial(u: &mut Ui, screen: Screen, sel: usize, time: f32) {
+    u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.55]);
+    osd(u, time, "PAUSE");
+    let (x, y, w, h) = (60.0, 70.0, 360.0, 120.0);
+    u.rect(x, y, w, h, [0.03, 0.03, 0.04, 0.95]);
+    u.rect(x, y, w, 1.0, [0.95, 0.85, 0.3, 0.7]);
+    if screen == Screen::TutorialDone {
+        u.text_center(y + 12.0, "TUTORIAL GESCHAFFT", DIM, 1.0);
+        u.text_center(y + 28.0, "Du bist jetzt schlau genug,", WHITE, 1.0);
+        u.text_center(y + 40.0, "um einkaufen zu können.", WHITE, 1.0);
+        u.text_center(y + 56.0, "WOW.", YELLOW, 2.0);
+        let items: Vec<String> = CHAMP_ITEMS.iter().map(|s| s.to_string()).collect();
+        draw_menu(u, screen, &items, sel, time);
+    } else if screen == Screen::Champ {
+        u.text_center(y + 18.0, "OK Champ,", YELLOW, 2.0);
+        u.text_center(
+            y + 48.0,
+            "hab nicht gedacht, dass du so schlau bist.",
+            WHITE,
+            1.0,
+        );
+        let items: Vec<String> = CHAMP_ITEMS.iter().map(|s| s.to_string()).collect();
+        draw_menu(u, screen, &items, sel, time);
+    } else {
+        u.text_center(y + 14.0, "DEIN ERSTER EINKAUF", YELLOW, 1.0);
+        u.text_center(y + 34.0, "Willst du das Tutorial spielen?", WHITE, 1.0);
+        u.text_center(
+            y + 48.0,
+            "Mit Pfeilen am Boden. Verlieren geht nicht.",
+            DIM,
+            1.0,
+        );
+        let items: Vec<String> = ASK_ITEMS.iter().map(|s| s.to_string()).collect();
+        draw_menu(u, screen, &items, sel, time);
+    }
 }
 
 pub fn draw_options(u: &mut Ui, sel: usize, time: f32, s: &Settings, from_pause: bool) {
@@ -198,7 +246,10 @@ pub fn draw_options(u: &mut Ui, sel: usize, time: f32, s: &Settings, from_pause:
     u.text_center(40.0, "OPTIONEN", WHITE, 2.0);
     draw_menu(
         u,
-        Screen::Options { from_pause },
+        Screen::Options {
+            from_pause,
+            tutorial: s.tutorial_done,
+        },
         &option_rows(s),
         sel,
         time,
@@ -424,8 +475,13 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         }
     }
 
-    if let Some(t) = &g.tutorial {
-        draw_tutorial(u, t);
+    // Tutorial-Modus: erst die Tasten-Liste, dann ein Kasten je Phase
+    if let (Some(t), Some(phase)) = (&g.tutorial, g.tutorial_phase()) {
+        if phase == Phase::Controls {
+            draw_tutorial(u, t);
+        } else if !g.belt_window_open() && !g.till_paying() && g.dialog.is_none() {
+            draw_tutorial_phase(u, phase, g.run_time);
+        }
     }
 
     // Einkaufszettel (TAB) bzw. kurzer Hinweis
@@ -488,6 +544,11 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN, Geldboerse
     till::draw(u, g, time);
 
+    // Tutorial: Erklaerleiste oben links ueber Kassenfenster, Karte/PIN und Bargeld
+    if let Some(hints) = crate::game::tutorial::ui_hints(g) {
+        draw_tutorial_bar(u, hints, time);
+    }
+
     // Flucht nach dem Bezahlen; im Korridor: nicht umdrehen
     let warn = g.turn_warning();
     if warn > 0.0 {
@@ -504,6 +565,56 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         u.text_center(64.0, "ALARM - LAUF ZUM AUSGANG!", RED, 2.0);
     }
 }
+
+/// Tutorial ab Phase 2: kurzer Kasten oben links der Mitte (unter der Durchsage, neben dem
+/// Kassendisplay rechts oben).
+fn draw_tutorial_phase(u: &mut Ui, phase: Phase, time: f32) {
+    let (page, lines) = phase.page(time);
+    let pages = phase.pages().len();
+    let (x, y, w) = (46.0, 66.0, 300.0);
+    let h = 20.0 + lines.len() as f32 * 10.0;
+    u.rect(x, y, w, h, [0.02, 0.02, 0.03, 0.78]);
+    u.rect(x, y, w, 1.0, [0.95, 0.85, 0.3, 0.7]);
+    let title = format!(
+        "TUTORIAL {}/{}: {}",
+        phase.number(),
+        TUTORIAL_PHASES,
+        phase.title()
+    );
+    u.text(x + 6.0, y + 5.0, &title, YELLOW, 1.0);
+    // mehrere Seiten (z. B. Einkaufen, Kunden, Mitarbeiter): Seitenzahl rechts oben
+    if pages > 1 {
+        let n = format!("{}/{}", page + 1, pages);
+        u.text(x + w - 6.0 - Ui::text_width(&n, 1.0), y + 5.0, &n, DIM, 1.0);
+    }
+    for (k, l) in lines.iter().enumerate() {
+        u.text(x + 6.0, y + 17.0 + k as f32 * 10.0, l, WHITE, 1.0);
+    }
+}
+
+/// Schmale Erklaerleiste ganz oben links (ueber den Kassen-Fenstern, die erst bei y = 14
+/// beginnen): ein Hinweis nach dem anderen, Seitenzahl rechts.
+fn draw_tutorial_bar(u: &mut Ui, hints: &[&str], time: f32) {
+    use crate::game::tutorial::HINT_TIME;
+    if hints.is_empty() {
+        return;
+    }
+    let k = (time / HINT_TIME) as usize % hints.len();
+    let n = format!("{}/{}", k + 1, hints.len());
+    let w = 72.0 + Ui::text_width(hints[k], 1.0) + 8.0 + Ui::text_width(&n, 1.0) + 6.0;
+    // mittig, klein auf der Oberkante des Fensters (ganz oben am Bildrand schneidet der
+    // VHS-Effekt ab); gelber Rahmen, damit es sich vom Fenster abhebt
+    let (x, y, h) = ((ui::W - w) * 0.5, TUTORIAL_BAR_Y, 14.0);
+    u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.95, 0.85, 0.3, 0.9]);
+    u.rect(x, y, w, h, [0.02, 0.02, 0.03, 0.97]);
+    u.text(x + 4.0, y + 3.0, "TUTORIAL", YELLOW, 1.0);
+    u.text(x + 72.0, y + 3.0, hints[k], WHITE, 1.0);
+    u.text(x + w - 6.0 - Ui::text_width(&n, 1.0), y + 3.0, &n, DIM, 1.0);
+}
+
+/// Hoehe der Tutorial-Leiste ueber den Kassen-Fenstern (Kassenfenster ab y = 14,
+/// Kartenleser ab 20, Geldboerse ab 28)
+pub const TUTORIAL_BAR_Y: f32 = 16.0;
 
 /// Alle Tasten auf einen Blick; erledigte abgehakt, aktuelle hervorgehoben.
 fn draw_tutorial(u: &mut Ui, t: &Tutorial) {
@@ -627,6 +738,7 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
                 ink,
                 1.0,
             );
+            // (das Lob nach dem Tutorial kommt erst auf dem Weg ins Hauptmenue)
             u.text_center(y + 34.0, "Danke für Ihren Einkauf.", WHITE, 1.0);
         }
         _ => {
@@ -705,9 +817,18 @@ mod tests {
     fn hud_draws_for_all_screens() {
         let mut g = Game::new(1);
         let mut u = Ui::default();
-        draw_title(&mut u, 0, 1.0, 1, true);
-        assert_eq!(title_rows(false)[1], "[x] Tutorial überspringen");
-        assert_eq!(title_rows(true)[1], "[ ] Tutorial überspringen");
+        draw_title(&mut u, 0, 1.0, 1);
+        // kein Tutorial-Knopf mehr: das Tutorial wird beim ersten Einkauf angeboten
+        assert!(!title_rows().iter().any(|r| r.contains("Tutorial")));
+        draw_ask_tutorial(&mut u, Screen::AskTutorial, 0, 1.0);
+        draw_ask_tutorial(&mut u, Screen::Champ, 0, 1.0);
+        // Ja/Nein und OK liegen im Kasten und sind per Maus treffbar
+        draw_ask_tutorial(&mut u, Screen::TutorialDone, 0, 1.0);
+        for s in [Screen::AskTutorial, Screen::Champ, Screen::TutorialDone] {
+            let (y0, _) = menu_layout(s);
+            assert!(y0 > 70.0 && y0 + menu_len(s) as f32 * 18.0 < 190.0);
+            assert_eq!(menu_hit(s, 240.0, y0 + 2.0), Some(0));
+        }
         draw_options(&mut u, 2, 1.0, &Settings::default(), true);
         draw_pause(&mut u, 1, 1.0, &g);
         draw_hud(&mut u, &g, true, 1.0);
@@ -731,10 +852,25 @@ mod tests {
     fn jumpscares_cannot_be_switched_off() {
         let rows = option_rows(&Settings::default());
         assert_eq!(rows.len(), OPTION_COUNT);
-        assert!(rows[6].starts_with("Jumpscares") && rows[6].contains("An"));
-        // alle Zeilen passen auf den Bildschirm
-        let (y0, step) = menu_layout(Screen::Options { from_pause: false });
-        assert!(y0 + step * (OPTION_COUNT as f32) < ui::H);
+        assert!(rows[5].starts_with("Jumpscares") && rows[5].contains("An"));
+        // "Tutorial spielen" erst nach einem geschafften Tutorial, vor "Zurück"
+        assert!(!rows.iter().any(|r| r.contains("Tutorial")));
+        let done = Settings {
+            tutorial_done: true,
+            ..Settings::default()
+        };
+        let rows = option_rows(&done);
+        assert_eq!(rows.len(), OPTION_COUNT + 1);
+        assert_eq!(rows[OPTION_TUTORIAL], "Tutorial spielen");
+        assert_eq!(rows.last().unwrap(), "Zurück");
+        let with = Screen::Options {
+            from_pause: false,
+            tutorial: true,
+        };
+        assert_eq!(menu_len(with), rows.len());
+        // alle Zeilen passen auf den Bildschirm (ueber dem Hinweis bei y = 214)
+        let (y0, step) = menu_layout(with);
+        assert!(y0 + step * (rows.len() as f32 - 1.0) + 12.0 <= 214.0);
         let mut u = Ui::default();
         for e in [0.0, 0.5, 1.5, 3.0] {
             draw_menu_scare(&mut u, e, 1.0);

@@ -21,6 +21,12 @@ use std::f32::consts::{FRAC_PI_2, PI};
 const AISLE_PITCH: f32 = 3.4;
 /// Quengelware-Regal (Mitte) relativ zur Bandmitte: 1,3 m Gang zwischen Band und Regal
 const QUENGEL_DX: f32 = -1.85;
+/// Oberkante der Kassentheke (Box auf 0,45 m mit halber Hoehe 0,45 m)
+pub const COUNTER_TOP: f32 = 0.9;
+/// Halbe Breite (x) und Laenge (z) der Kassentheke, Theke beginnt bei z0
+pub const COUNTER_HALF: (f32, f32) = (0.35, 1.5);
+/// Kassenmodell verkleinert, damit es ganz auf die Theke passt
+pub const REGISTER_SCALE: f32 = 0.75;
 /// So viel wird der Kollisionskoerper neben einem Durchgang gekuerzt (Meter)
 const PASSAGE_TRIM: f32 = 0.035;
 const GONDOLA_HALF_W: f32 = 0.6;
@@ -905,8 +911,8 @@ pub fn generate(params: &WorldParams) -> World {
         let z0 = checkout_z;
         let open = !tipped || i as usize == params.open_lane % lanes_n as usize;
         g.b.add_solid(
-            vec3(cx, 0.45, z0 + 1.5),
-            vec3(0.35, 0.45, 1.5),
+            vec3(cx, COUNTER_TOP * 0.5, z0 + COUNTER_HALF.1),
+            vec3(COUNTER_HALF.0, COUNTER_TOP * 0.5, COUNTER_HALF.1),
             vec3(0.3, 0.32, 0.35),
         );
         g.b.add(
@@ -1112,7 +1118,8 @@ pub fn generate(params: &WorldParams) -> World {
         );
         lanes.push(Lane {
             scan_point: vec3(cx - 0.7, 0.0, z0 + 2.4),
-            register: vec3(cx + 0.17, 0.91, z0 + 2.83),
+            // Kasse ganz auf der Theke (Platte auf 0,9 m), neben dem Scanner-Turm
+            register: vec3(cx + 0.18, COUNTER_TOP, z0 + 2.81),
             open,
             belt_start: vec3(cx, 0.912, z0 + 0.15),
             belt_end: vec3(cx, 0.912, z0 + 2.32),

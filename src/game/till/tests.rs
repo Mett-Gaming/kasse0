@@ -177,14 +177,14 @@ fn first_item_on_belt_starts_the_till_game() {
 }
 
 #[test]
-fn drinks_not_first_costs_a_life_at_once() {
+fn heavy_not_first_costs_a_life_at_once() {
     let mut g = at_till(32);
-    // erst etwas anderes, dann das Wasser
-    let other = g.cart.iter().position(|c| !c.is_drink()).unwrap();
+    // erst etwas Leichtes, dann das Wasser (1,6 kg)
+    let other = g.cart.iter().position(|c| !c.is_heavy()).unwrap();
     g.cart_sel = Some(other);
     belt_drop(&mut g);
     assert_eq!(doubt(&g), 0.0);
-    let water = g.cart.iter().position(|c| c.is_drink()).unwrap();
+    let water = g.cart.iter().position(|c| c.is_heavy()).unwrap();
     g.cart_sel = Some(water);
     belt_drop(&mut g);
     assert_eq!(lives(&g), TILL_LIVES - 1, "Reihenfolge kostet kein Leben");
@@ -578,4 +578,83 @@ fn someone_knocks_at_the_barrier() {
             .count();
     }
     assert!(knocks > 0, "kein Klopfen am Absperrband");
+}
+
+/// Ware aus dem Katalog nach Namen (fuer Tests mit bestimmtem Gewicht).
+fn product(name: &str) -> ItemData {
+    let cat = crate::catalog::catalog();
+    let i = cat.products.iter().position(|p| p.name == name).unwrap();
+    let p = &cat.products[i];
+    ItemData {
+        name: p.name.clone(),
+        cents: p.cents as i64,
+        kind: PickupKind::Product {
+            product: i,
+            fake: false,
+        },
+        mesh: p.mesh,
+        tint: p.tint,
+    }
+}
+
+#[test]
+fn weight_decides_what_goes_first_not_being_a_drink() {
+    // Die Limo-Dose ist ein Getraenk, aber leicht; die Wassermelone ist schwer
+    let can = product("Limo Dose");
+    let melon = product("Wassermelone");
+    assert!(!can.is_heavy() && melon.is_heavy());
+    assert!(product("Mineralwasser 1,5L").is_heavy());
+    assert!(!product("Schokoriegel").is_heavy());
+
+    // Dose zuerst, dann Melone: ein Leben weg
+    let mut g = at_till(41);
+    g.cart = vec![can.clone(), melon.clone()];
+    g.cart_sel = Some(0);
+    belt_drop(&mut g);
+    g.cart_sel = Some(0);
+    belt_drop(&mut g);
+    assert_eq!(lives(&g), TILL_LIVES - 1, "Melone nach Dose kostet nichts");
+
+    // Melone zuerst, dann Dose: alles gut
+    let mut g = at_till(42);
+    g.cart = vec![melon, can];
+    g.cart_sel = Some(0);
+    belt_drop(&mut g);
+    g.cart_sel = Some(0);
+    belt_drop(&mut g);
+    assert_eq!(lives(&g), TILL_LIVES);
+}
+
+#[test]
+fn every_product_has_a_weight_and_the_window_shows_it() {
+    for p in &crate::catalog::catalog().products {
+        assert!(p.kg > 0.0 && p.kg < 10.0, "{}: {} kg", p.name, p.kg);
+    }
+    use crate::game::belt_window::weight_text;
+    assert_eq!(weight_text(1.6), "1,6 kg");
+    assert_eq!(weight_text(1.0), "1 kg");
+    assert_eq!(weight_text(0.35), "350 g");
+}
+
+#[test]
+fn tutorial_till_mistakes_only_explain() {
+    // Tutorial-Modus: falsche Reihenfolge kostet kein Kassen-Leben, Misstrauen bleibt bei 0
+    let mut g = at_till(43);
+    g.tutorial_run = true;
+    g.tutorial = Some(crate::game::tutorial::Tutorial::default());
+    let other = g.cart.iter().position(|c| !c.is_heavy()).unwrap();
+    g.cart_sel = Some(other);
+    belt_drop(&mut g);
+    let heavy = g.cart.iter().position(|c| c.is_heavy()).unwrap();
+    g.cart_sel = Some(heavy);
+    belt_drop(&mut g);
+    assert_eq!(lives(&g), TILL_LIVES, "im Tutorial ein Leben weg");
+    assert_eq!(doubt(&g), 0.0);
+    assert_eq!(g.outcome, Outcome::Running);
+    assert!(
+        g.message
+            .as_ref()
+            .is_some_and(|(m, _)| m.contains("Im echten Spiel")),
+        "keine Erklaerung"
+    );
 }

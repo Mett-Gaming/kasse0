@@ -66,6 +66,8 @@ struct App {
     clock: f32,
     fade: f32,
     fixed_seed: Option<u64>,
+    /// Laeuft gerade der Tutorial-Modus? (Neustart bleibt im gleichen Modus)
+    tutorial_mode: bool,
     /// Test-Modus: laeuft alle Screens durch und speichert Screenshots
     autoshot: Option<(std::path::PathBuf, f32, usize)>,
     shot_request: Option<std::path::PathBuf>,
@@ -116,6 +118,7 @@ impl App {
             clock: 0.0,
             fade: 1.0,
             fixed_seed,
+            tutorial_mode: false,
             autoshot: std::env::var_os("KASSE0_AUTOSHOT")
                 .map(|d| (std::path::PathBuf::from(d), 0.0, 0)),
             shot_request: None,
@@ -184,11 +187,14 @@ impl App {
         }
     }
 
-    fn start_game(&mut self, seed: u64) {
-        self.game = Game::new(seed);
-        if self.settings.tutorial {
-            self.game.tutorial = Some(game::tutorial::Tutorial::default());
-        }
+    /// Neuer Einkauf; `tutorial` = Tutorial-Modus (Anleitung, Wegweiser, entschaerft).
+    fn start_game(&mut self, seed: u64, tutorial: bool) {
+        self.tutorial_mode = tutorial;
+        self.game = if tutorial {
+            Game::new_tutorial(seed)
+        } else {
+            Game::new(seed)
+        };
         self.apply_settings();
         self.input = game::Input::default();
         self.accumulator = 0.0;
@@ -196,7 +202,26 @@ impl App {
         self.screen = Screen::Playing;
         self.set_grab(true);
         if let Some(r) = &self.running {
-            r.window.set_title(&format!("KASSE 0  |  Band #{seed}"));
+            let title = if tutorial {
+                "KASSE 0  |  Tutorial".to_string()
+            } else {
+                format!("KASSE 0  |  Band #{seed}")
+            };
+            r.window.set_title(&title);
+        }
+    }
+
+    /// Wurde gerade ein Tutorial-Einkauf gewonnen? (Endbildschirm -> Lob vor dem Hauptmenue)
+    fn tutorial_won(&self) -> bool {
+        self.game.tutorial_run && self.game.outcome == Outcome::Won
+    }
+
+    /// Optionen-Bildschirm; die Zeile "Tutorial spielen" gibt es erst nach einem geschafften
+    /// Tutorial.
+    fn options_screen(&self, from_pause: bool) -> Screen {
+        Screen::Options {
+            from_pause,
+            tutorial: self.settings.tutorial_done,
         }
     }
 
@@ -217,30 +242,57 @@ impl App {
         match self.screen {
             Screen::Title => match self.sel {
                 0 => {
-                    let seed = self.fixed_seed.take().unwrap_or_else(random_seed);
-                    self.start_game(seed);
+                    // allererster Einkauf: erst fragen, ob man das Tutorial spielen will
+                    if self.settings.tutorial_asked {
+                        let seed = self.fixed_seed.take().unwrap_or_else(random_seed);
+                        self.start_game(seed, false);
+                    } else {
+                        self.go(Screen::AskTutorial);
+                    }
                 }
-                // Haken: Tutorial ueberspringen (gleiche Einstellung wie in den Optionen)
-                1 => {
-                    self.settings.tutorial = !self.settings.tutorial;
-                    self.settings.save();
-                }
-                2 => self.go(Screen::Options { from_pause: false }),
+                1 => self.go(self.options_screen(false)),
                 _ => event_loop.exit(),
             },
+            Screen::AskTutorial => {
+                // gefragt wird nur einmal, egal wie die Antwort ist
+                self.settings.tutorial_asked = true;
+                self.settings.save();
+                if self.sel == 0 {
+                    let seed = self.fixed_seed.take().unwrap_or_else(random_seed);
+                    self.start_game(seed, true);
+                } else {
+                    self.go(Screen::Champ);
+                }
+            }
+            Screen::Champ => {
+                let seed = self.fixed_seed.take().unwrap_or_else(random_seed);
+                self.start_game(seed, false);
+            }
             Screen::Paused => match self.sel {
                 0 => self.go(Screen::Playing),
-                1 => self.go(Screen::Options { from_pause: true }),
-                2 => self.start_game(self.game.seed),
+                1 => self.go(self.options_screen(true)),
+                2 => self.start_game(self.game.seed, self.tutorial_mode),
                 3 => self.to_title(),
                 _ => event_loop.exit(),
             },
             Screen::End => match self.sel {
-                0 => self.start_game(self.game.seed),
-                1 => self.start_game(random_seed()),
+                0 => self.start_game(self.game.seed, self.tutorial_mode),
+                1 => self.start_game(random_seed(), false),
+                // nach einem geschafften Tutorial: erst das Lob, dann ins Hauptmenue
+                _ if self.tutorial_won() => self.go(Screen::TutorialDone),
                 _ => self.to_title(),
             },
-            Screen::Options { from_pause } => {
+            Screen::TutorialDone => self.to_title(),
+            Screen::Options {
+                from_pause,
+                tutorial,
+            } => {
+                // "Tutorial spielen" (nur nach einem geschafften Tutorial): neuer Tutorial-Einkauf
+                if tutorial && self.sel == hud::OPTION_TUTORIAL {
+                    self.settings.save();
+                    self.start_game(random_seed(), true);
+                    return;
+                }
                 let s = &mut self.settings;
                 let d = dir as f32;
                 match self.sel {
@@ -249,8 +301,7 @@ impl App {
                     2 => s.vhs = (s.vhs + 0.25 * d).clamp(0.0, 1.5),
                     3 => s.fov = (s.fov + 5.0 * d).clamp(55.0, 100.0),
                     4 => s.fullscreen = !s.fullscreen,
-                    5 => s.tutorial = !s.tutorial,
-                    6 => {
+                    5 => {
                         // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
                         self.start_menu_scare();
                         return;
@@ -263,8 +314,8 @@ impl App {
                             Screen::Title
                         };
                         self.go(back);
-                        // zurueck auf "Optionen" (Pause: 2. Zeile, Hauptmenue: 3. Zeile)
-                        self.sel = if from_pause { 1 } else { 2 };
+                        // zurueck auf "Optionen" (in Pause und Hauptmenue die 2. Zeile)
+                        self.sel = 1;
                         return;
                     }
                 }
@@ -296,6 +347,10 @@ impl App {
                         if self.game.take_troll_request() {
                             self.start_menu_scare();
                         }
+                        // Cheat "Tutorial starten": neuer Einkauf im Tutorial-Modus
+                        if self.game.take_tutorial_request() {
+                            self.start_game(random_seed(), true);
+                        }
                     }
                     None => {
                         self.go(Screen::Cheats { group: None });
@@ -323,20 +378,28 @@ impl App {
         match self.screen {
             Screen::Playing => self.go(Screen::Paused),
             Screen::Paused => self.go(Screen::Playing),
-            Screen::Options { from_pause } => {
+            Screen::Options { from_pause, .. } => {
                 self.settings.save();
                 self.go(if from_pause {
                     Screen::Paused
                 } else {
                     Screen::Title
                 });
-                self.sel = if from_pause { 1 } else { 2 };
+                self.sel = 1;
             }
             Screen::Cheats { group: Some(g) } => {
                 self.go(Screen::Cheats { group: None });
                 self.sel = g;
             }
             Screen::Cheats { group: None } => self.go(Screen::Playing),
+            // Frage abbrechen: zurueck ins Hauptmenue (beim naechsten Einkauf wieder gefragt)
+            Screen::AskTutorial => self.go(Screen::Title),
+            // "OK Champ" wegklicken: wie OK
+            Screen::Champ => {
+                let seed = self.fixed_seed.take().unwrap_or_else(random_seed);
+                self.start_game(seed, false);
+            }
+            Screen::TutorialDone => self.to_title(),
             Screen::End | Screen::Title => {}
         }
     }
@@ -451,10 +514,18 @@ impl App {
                     1.2
                 };
                 if self.game.outcome != Outcome::Running && self.game.outcome_timer > wait {
+                    // Tutorial geschafft: ab jetzt "Tutorial spielen" in den Optionen
+                    if self.game.outcome == Outcome::Won
+                        && self.game.tutorial_run
+                        && !self.settings.tutorial_done
+                    {
+                        self.settings.tutorial_done = true;
+                        self.settings.save();
+                    }
                     self.go(Screen::End);
                 }
             }
-            Screen::Title => {
+            Screen::Title | Screen::AskTutorial | Screen::Champ => {
                 // Langsamer Kameraschwenk durch den (noch normalen) Markt
                 let mut idle = game::Input::default();
                 self.game.update(dt, &mut idle);
@@ -486,13 +557,17 @@ impl App {
                 }
             }
             a.update(&Mood {
-                playing: self.screen != Screen::Title,
+                playing: !hud::on_title(self.screen),
                 tipped: self.game.tipped,
                 tier: self.game.tier.level(),
                 time: self.clock,
                 paused: matches!(
                     self.screen,
-                    Screen::Paused | Screen::Options { from_pause: true }
+                    Screen::Paused
+                        | Screen::Options {
+                            from_pause: true,
+                            ..
+                        }
                 ),
                 hush: self.game.hush(),
             });
@@ -503,16 +578,13 @@ impl App {
         // UI aufbauen
         self.ui.clear();
         match self.screen {
-            Screen::Title => hud::draw_title(
-                &mut self.ui,
-                self.sel,
-                self.clock,
-                self.game.seed,
-                self.settings.tutorial,
-            ),
+            Screen::Title => hud::draw_title(&mut self.ui, self.sel, self.clock, self.game.seed),
+            Screen::AskTutorial | Screen::Champ | Screen::TutorialDone => {
+                hud::draw_ask_tutorial(&mut self.ui, self.screen, self.sel, self.clock)
+            }
             Screen::Playing => hud::draw_hud(&mut self.ui, &self.game, self.show_list, self.clock),
             Screen::Paused => hud::draw_pause(&mut self.ui, self.sel, self.clock, &self.game),
-            Screen::Options { from_pause } => hud::draw_options(
+            Screen::Options { from_pause, .. } => hud::draw_options(
                 &mut self.ui,
                 self.sel,
                 self.clock,
@@ -762,12 +834,14 @@ impl App {
                 self.sfx(Sfx::Blip);
             }
             KeyCode::ArrowLeft | KeyCode::KeyA
-                if matches!(self.screen, Screen::Options { .. }) && self.sel < 7 =>
+                if matches!(self.screen, Screen::Options { .. })
+                    && self.sel < hud::OPTION_VALUES =>
             {
                 self.activate(event_loop, -1)
             }
             KeyCode::ArrowRight | KeyCode::KeyD
-                if matches!(self.screen, Screen::Options { .. }) && self.sel < 7 =>
+                if matches!(self.screen, Screen::Options { .. })
+                    && self.sel < hud::OPTION_VALUES =>
             {
                 self.activate(event_loop, 1)
             }
@@ -853,7 +927,7 @@ impl ApplicationHandler for App {
             .fixed_seed
             .filter(|_| std::env::var_os("KASSE0_DIRECT").is_some())
         {
-            self.start_game(seed);
+            self.start_game(seed, false);
         }
     }
 

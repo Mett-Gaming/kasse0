@@ -3,9 +3,10 @@
 //! Die gezogene Ware haengt am Mauszeiger.
 
 use crate::game::belt_window::{
-    cart_tile, DragSrc, Rect, BELT_PANEL, CART_PANEL, HAND_TILE, TILE_ROWS, TILL_PANEL, WINDOW,
+    cart_tile, weight_text, DragSrc, Rect, BELT_PANEL, CART_PANEL, HAND_TILE, TILE_H, TILE_ROWS,
+    TILE_W, TILL_PANEL, WINDOW,
 };
-use crate::game::Game;
+use crate::game::{Game, ItemData};
 use crate::ui::{euro, Ui, DIM, GREEN, RED, WHITE, YELLOW};
 
 const PANEL: [f32; 4] = [0.07, 0.07, 0.08, 0.95];
@@ -17,24 +18,47 @@ fn panel(u: &mut Ui, r: Rect, title: &str, color: [f32; 4]) {
     u.text(r.0 + 4.0, r.1 + 3.0, title, color, 1.0);
 }
 
-/// Eine Ware als Kachel: Farbfeld in der Farbe der Ware, Name, Preis.
-fn tile(u: &mut Ui, r: Rect, name: &str, tint: [f32; 3], lifted: bool) {
+/// Eine Ware als Kachel: Farbstreifen in der Farbe der Ware, oben der Name, darunter das
+/// Gewicht und ein Gewichtsbalken. Schwere Ware (muss zuerst aufs Band) ist rot.
+fn tile(u: &mut Ui, r: Rect, item: &ItemData, lifted: bool) {
+    let heavy = item.is_heavy();
     let bg = if lifted {
         [0.95, 0.9, 0.55, 1.0]
+    } else if heavy {
+        [0.95, 0.8, 0.78, 1.0]
     } else {
         [0.88, 0.87, 0.82, 1.0]
     };
+    let t = item.tint;
     u.rect(r.0, r.1, r.2, r.3, bg);
-    u.rect(
-        r.0 + 2.0,
-        r.1 + 2.0,
-        8.0,
-        r.3 - 4.0,
-        [tint[0], tint[1], tint[2], 1.0],
-    );
+    u.rect(r.0 + 2.0, r.1 + 2.0, 3.0, r.3 - 4.0, [t.x, t.y, t.z, 1.0]);
     let ink = [0.08, 0.08, 0.1, 1.0];
-    let short: String = name.chars().take(((r.2 - 14.0) / 8.0) as usize).collect();
-    u.text(r.0 + 12.0, r.1 + (r.3 - 8.0) * 0.5, &short, ink, 1.0);
+    let red = [0.7, 0.05, 0.05, 1.0];
+    let kg = item.weight_kg();
+    let w = weight_text(kg);
+    let wc = if heavy { red } else { [0.3, 0.3, 0.32, 1.0] };
+    let (tx, right) = (r.0 + 7.0, r.0 + r.2 - 3.0);
+    if r.3 >= TILE_H {
+        // zweizeilig: Name, darunter Gewicht und Balken (voll bei 3 kg)
+        let short: String = item
+            .name
+            .chars()
+            .take(((right - tx) / 8.0) as usize)
+            .collect();
+        u.text(tx, r.1 + 1.0, &short, ink, 1.0);
+        u.text(tx, r.1 + 10.0, &w, wc, 1.0);
+        let (bx, bw) = (r.0 + 60.0, right - r.0 - 60.0);
+        u.rect(bx, r.1 + 12.0, bw, 4.0, [0.0, 0.0, 0.0, 0.25]);
+        u.rect(bx, r.1 + 12.0, bw * (kg / 3.0).clamp(0.04, 1.0), 4.0, wc);
+    } else {
+        // einzeilig (Hand): Name links, Gewicht rechts
+        let ww = Ui::text_width(&w, 1.0);
+        let n = ((right - ww - 6.0 - tx) / 8.0) as usize;
+        let short: String = item.name.chars().take(n).collect();
+        let ty = r.1 + (r.3 - 8.0) * 0.5;
+        u.text(tx, ty, &short, ink, 1.0);
+        u.text(right - ww, ty, &w, wc, 1.0);
+    }
 }
 
 pub fn draw(u: &mut Ui, g: &Game, time: f32) {
@@ -62,22 +86,19 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
             u.rect(r.0, r.1, r.2, r.3, [0.2, 0.2, 0.22, 1.0]);
             continue;
         }
-        tile(u, r, &item.name, item.tint.to_array(), false);
+        tile(u, r, item, false);
     }
     let shown = TILE_ROWS * 2;
     if g.cart.len() > shown {
-        u.text(
-            CART_PANEL.0 + 4.0,
-            HAND_TILE.1 - 10.0,
-            &format!("+{} weitere", g.cart.len() - shown),
-            DIM,
-            1.0,
-        );
+        let more = format!("+{} weitere", g.cart.len() - shown);
+        let cp = CART_PANEL;
+        let x = cp.0 + cp.2 - 4.0 - Ui::text_width(&more, 1.0);
+        u.text(x, cp.1 + 3.0, &more, DIM, 1.0);
     }
     match &g.held {
         Some(item) if dragging != Some(DragSrc::Hand) => {
             u.text(HAND_TILE.0, HAND_TILE.1 - 9.0, "IN DER HAND", DIM, 1.0);
-            tile(u, HAND_TILE, &item.name, item.tint.to_array(), false);
+            tile(u, HAND_TILE, item, false);
         }
         _ => {}
     }
@@ -119,7 +140,7 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
     let hint = if dragging.is_some() {
         "HIER LOSLASSEN"
     } else {
-        "Ware hierher ziehen"
+        "hierher ziehen"
     };
     u.text(
         bp.0 + (bp.2 - Ui::text_width(hint, 1.0)) * 0.5,
@@ -128,7 +149,7 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
         if dragging.is_some() { GREEN } else { DIM },
         1.0,
     );
-    u.text(bp.0 + 4.0, bp.1 + 16.0, "Getränke zuerst!", DIM, 1.0);
+    u.text(bp.0 + 4.0, bp.1 + 16.0, "Ab 1 kg zuerst!", DIM, 1.0);
 
     // Kassiererin und Bon
     let tp = TILL_PANEL;
@@ -142,9 +163,6 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
         ("scannt", GREEN)
     };
     panel(u, tp, who, c);
-    if staring {
-        u.text(tp.0 + 4.0, tp.1 + 14.0, "MAUS STILL!", RED, 1.0);
-    }
     if let Some(t) = &g.till {
         let lines: Vec<(&str, i64)> = t.receipt.iter().filter_map(|l| l.shown()).collect();
         let lines = &lines[lines.len().saturating_sub(7)..];
@@ -193,9 +211,8 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
         let (mx, my) = w.mouse;
         tile(
             u,
-            (mx - 35.0, my - 7.0, 71.0, 15.0),
-            &item.name,
-            item.tint.to_array(),
+            (mx - TILE_W * 0.5, my - TILE_H * 0.5, TILE_W, TILE_H),
+            item,
             true,
         );
     }

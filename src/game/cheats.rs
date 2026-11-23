@@ -46,7 +46,11 @@ pub const CHEATS: &[&str] = &[
     "Director: Ruhe",
     "Verfolger 6 m hinter dir",
     "NPC-Zustände an/aus",
+    "Tutorial starten",
 ];
+
+/// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 1;
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
@@ -58,7 +62,7 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         (
             "Spieler",
             "Unverwundbar, Leben, Tutorial, Auffälligkeit",
-            vec![0, 14, 15, 4, 5],
+            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5],
         ),
         (
             "Markt & Einkauf",
@@ -83,7 +87,7 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         (
             "NPCs & Stufen",
             "Stufe, Spannungskurve, Verfolger, Zustände anzeigen",
-            (FIRST_NPC_CHEAT..CHEATS.len()).collect(),
+            (FIRST_NPC_CHEAT..TUTORIAL_CHEAT).collect(),
         ),
     ]
 }
@@ -198,7 +202,9 @@ impl Game {
                 "Leben aufgefüllt.".into()
             }
             15 => {
+                // beendet Anleitung, Wegweiser und Entschaerfung
                 self.tutorial = None;
+                self.tutorial_run = false;
                 "Tutorial übersprungen.".into()
             }
             16 => {
@@ -213,6 +219,10 @@ impl Game {
                 } else {
                     "Kartenzahlung.".into()
                 }
+            }
+            TUTORIAL_CHEAT => {
+                self.tutorial_request = true;
+                "Tutorial startet.".into()
             }
             i if i >= FIRST_NPC_CHEAT => self.npc_cheat(i - FIRST_NPC_CHEAT),
             i if i >= FIRST_SCARE_CHEAT => self.scare_cheat(i - FIRST_SCARE_CHEAT),
@@ -289,14 +299,24 @@ mod tests {
         assert_eq!(t.lives, till::TILL_LIVES);
         assert_eq!(t.doubt, 0.0);
 
-        let mut g = Game::new(57);
-        g.tutorial = Some(tutorial::Tutorial::default());
+        let mut g = Game::new_tutorial(57);
         let i = CHEATS
             .iter()
             .position(|c| c.starts_with("Tutorial"))
             .unwrap();
         g.cheat(i);
         assert!(g.tutorial.is_none());
+        assert!(
+            !g.tutorial_run,
+            "Entschaerfung bleibt nach dem Ueberspringen"
+        );
+        // "Tutorial starten": fordert einen neuen Tutorial-Einkauf an (einmal abholbar)
+        assert_eq!(CHEATS[TUTORIAL_CHEAT], "Tutorial starten");
+        assert!(cheat_groups()[0].2.contains(&TUTORIAL_CHEAT));
+        assert!(!g.take_tutorial_request());
+        g.cheat(TUTORIAL_CHEAT);
+        assert!(g.take_tutorial_request());
+        assert!(!g.take_tutorial_request());
         // Unverwundbar: Kunde direkt neben dem Spieler erwischt ihn nicht
         g.spawn_customer_at(g.player.pos + vec3(0.3, 0.0, 0.0));
         g.update(1.0 / 60.0, &mut Input::default());

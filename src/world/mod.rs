@@ -8,6 +8,9 @@ pub mod layout;
 
 pub use gen::generate;
 pub use gen::POSTER_TEXTS;
+pub use gen::REGISTER_SCALE;
+#[cfg(test)]
+pub use gen::{COUNTER_HALF, COUNTER_TOP};
 
 use crate::catalog::catalog;
 use crate::render::MeshDraw;
@@ -639,6 +642,15 @@ impl World {
                     && seen[z as usize * nav.w + x as usize]
             })
         })
+    }
+
+    /// Punkt im Gang vor der Tuer des Getraenkeraums (Tuer bei min.x + 1,7 in der Suedwand).
+    pub fn drinks_outside(&self) -> Vec3 {
+        vec3(
+            self.drinks_zone.min.x + 1.7,
+            0.0,
+            self.drinks_zone.max.z + 1.6,
+        )
     }
 
     /// Ist eine Ware vom Eingang aus zu Fuss erreichbar?

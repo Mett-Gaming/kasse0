@@ -18,7 +18,7 @@ mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
-pub use cheats::{cheat_groups, CHEATS};
+pub use cheats::{cheat_groups, CHEATS, TUTORIAL_CHEAT};
 pub mod dialog;
 pub mod escalation;
 mod hands;
@@ -243,6 +243,8 @@ pub struct Game {
     pub held: Option<ItemData>,
     pub loose: Vec<Loose>,
     pub tutorial: Option<tutorial::Tutorial>,
+    /// Tutorial-Modus: man kann nicht verlieren, Fehler werden nur erklaert
+    pub tutorial_run: bool,
     pub suspicion: f32,
     /// Cheat: Kunden koennen einen nicht erwischen
     pub god: bool,
@@ -280,6 +282,8 @@ pub struct Game {
     subliminal_wait: f32,
     /// Cheat: das Menue soll den Troll-Jumpscare zeigen (main.rs holt das ab)
     troll_request: bool,
+    /// Cheat: neuen Einkauf im Tutorial-Modus starten (main.rs holt das ab)
+    tutorial_request: bool,
     pub holograms: Vec<mirage::Hologram>,
     mirage_timer: f32,
     tipped_time: f32,
@@ -459,6 +463,7 @@ impl Game {
             held: None,
             loose: Vec::new(),
             tutorial: None,
+            tutorial_run: false,
             suspicion: 0.0,
             god: false,
             grace: 0.0,
@@ -485,6 +490,7 @@ impl Game {
             subliminal: -1.0,
             subliminal_wait: 0.0,
             troll_request: false,
+            tutorial_request: false,
             holograms: Vec::new(),
             mirage_timer: 12.0,
             tipped_time: 0.0,
@@ -629,7 +635,10 @@ impl Game {
         }
         self.tipped = true;
         self.shoppers.clear();
-        self.tutorial = None; // ab hier ist man auf sich allein gestellt
+        // die Tasten-Liste ist vorbei; im Tutorial-Modus geht die Anleitung weiter
+        if !self.tutorial_run {
+            self.tutorial = None;
+        }
         self.params.tipped = true;
         self.apply_tier_params();
         self.rebuild_world();
@@ -972,17 +981,8 @@ impl Game {
         input.ui_pressed = false;
         input.ui_released = false;
 
-        // Tutorial
-        if let Some(t) = &mut self.tutorial {
-            t.listed |= input.list_open;
-            if t.advance(dt, self.held.is_some(), self.cart.len()) {
-                self.tutorial = None;
-                self.say(
-                    "Gut. Jetzt raus aus der Getränkeabteilung und den Rest einkaufen.",
-                    5.0,
-                );
-            }
-        }
+        // Tutorial-Modus: Tasten abhaken, Wegweiser (tutorial.rs)
+        self.update_tutorial(dt, input);
 
         self.update_loose(dt);
         self.update_mirages(dt);

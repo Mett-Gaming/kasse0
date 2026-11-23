@@ -342,6 +342,7 @@ impl Game {
         let running = self.player.vel.length() > WALK_SPEED * 1.3;
         let noticed = self.suspicion >= 1.0;
         let chase = self.chasing();
+        let tutorial = self.tutorial_run;
         // Im Gespraech mit einem Mitarbeiter steht die Welt still: kein Kunde rueckt naeher
         let talking = self.dialog.is_some();
         let flankers = self.flankers();
@@ -376,7 +377,8 @@ impl Game {
             // ihn zuletzt gesehen oder gehoert haben.
             let omniscient = noticed || chase;
             let knows = omniscient || c.brain.memory.is_some();
-            let hunting = c.stalker && (!seen || omniscient) && knows;
+            // im Tutorial verfolgt einen niemand (auch nicht bei der Flucht)
+            let hunting = !tutorial && c.stalker && (!seen || omniscient) && knows;
             if c.brain.hunting && !hunting {
                 // Jagd vorbei: nicht zum alten Ziel zurueck, sondern hier weiterbummeln
                 c.field.clear();
@@ -514,9 +516,12 @@ impl Game {
             let c = &mut self.customers[i];
             let dist = vec3(c.pos.x - player.x, 0.0, c.pos.z - player.z).length();
             // Waehrend eines Gespraechs (und kurz danach) ist man sicher
-            // ... und an der Kasse, solange das Kassen-Minispiel laeuft
-            let safe =
-                self.god || self.dialog.is_some() || self.grace > 0.0 || self.till_protects();
+            // ... und an der Kasse, solange das Kassen-Minispiel laeuft, und im Tutorial immer
+            let safe = self.god
+                || self.tutorial_run
+                || self.dialog.is_some()
+                || self.grace > 0.0
+                || self.till_protects();
             if dist < CATCH_DIST && !self.paid_and_outside() && !safe {
                 let (at, variant) = (self.customers[i].pos, self.customers[i].variant);
                 self.caught_by(at, variant);
@@ -791,7 +796,8 @@ impl Game {
                     continue;
                 }
             }
-            if self.chasing() {
+            // im Tutorial jagt das Personal auch bei der Flucht nicht (Streife wie sonst)
+            if self.chasing() && !self.tutorial_run {
                 self.chase_employee(i, dt);
                 if self.outcome != Outcome::Running {
                     return;
@@ -815,9 +821,14 @@ impl Game {
             let dist = (e.pos - player).length();
             // An der Kasse lassen die Mitarbeiter einen in Ruhe
             // bemerkt ihn (Sichtkegel, senses.rs) oder folgt ihm nach einer schlechten Antwort
-            let interested = (e.follow > 0.0 || sees) && e.ignore <= 0.0 && !self.till_protects();
+            // im Tutorial laesst einen das Personal ganz in Ruhe: kein Hinterherlaufen, kein
+            // Nachsehen bei Geraeuschen
+            let calm = self.tutorial_run;
+            let interested =
+                !calm && (e.follow > 0.0 || sees) && e.ignore <= 0.0 && !self.till_protects();
             // hat etwas gehoert: geht nachsehen, wo es war (nicht direkt zum Spieler)
             let investigating = !interested
+                && !calm
                 && e.ignore <= 0.0
                 && !self.till_protects()
                 && e.brain.investigate.is_some();

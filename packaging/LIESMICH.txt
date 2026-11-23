@@ -31,7 +31,8 @@ DAS KASSEN-MINISPIEL
   In den Kassenbereich kommen Kunden und Mitarbeiter nicht hinein, und solange du
   an der Kasse bleibst, sind sie harmlos. Dafür beobachtet dich die Kassiererin.
   Fall ihr nicht auf:
-    - Getränke zuerst aufs Band, keine falsch beschriftete Ware.
+    - Schweres zuerst aufs Band (alles ab 1 kg, steht im Kassenfenster rot
+      dran), keine falsch beschriftete Ware.
     - Ihre Fragen unauffällig beantworten (1, 2, 3), nicht schweigen.
     - Am Kartenterminal (E) die Karte aus dem Portemonnaie nehmen (E) und
       mit der Maus gleichmäßig nach rechts durch den Leser ziehen.
@@ -40,13 +41,13 @@ DAS KASSEN-MINISPIEL
     - Manchmal geht die Karte nicht: Dann zahlst du bar aus der Geldbörse,
       schnell und passend (A/D oder Mausrad wählen, E hinlegen, F zurück).
     - Schaut sie auf (der Scanner stoppt, es knarzt): still stehen und ihr
-      nicht ins Gesicht schauen - im Kassenfenster: Maus stillhalten.
+      nicht ins Gesicht schauen (im Kassenfenster ist das egal).
     - Kassendisplay rechts oben prüfen: Scannt sie etwas doppelt oder zu
       teuer, mit R reklamieren - übersehen kostet beim Bezahlen ein Leben.
     - Trödle nicht: sie wird von allein ungeduldig, und je länger du stehst,
       desto schlimmer wird alles.
     - Nicht von der Kasse weggehen.
-  Du hast drei Kassen-Leben. Ein direkter Fehler (Getränke nicht zuerst, falsche
+  Du hast drei Kassen-Leben. Ein direkter Fehler (Schweres nicht zuerst, falsche
   Ware, schlechte Antwort, Karte zu schnell, falsche PIN, zu viel Geld) kostet
   sofort eines. Kleinere Patzer füllen ihr Misstrauen (Balken unten links); ist
   es voll, ist auch ein Leben weg. Nach dem dritten ist der Einkauf vorbei.
@@ -80,8 +81,12 @@ Du hast drei Leben im Markt: zweimal erwischt wachst du am Eingang auf (der Wage
 bleibt, wo es passiert ist), beim dritten Mal ist Schluss. Die drei Kassen-Leben
 zählen getrennt davon.
 
-Das Tutorial beim ersten Einkauf überspringst du mit dem Haken "Tutorial
-überspringen" im Hauptmenü.
+Beim allerersten Einkauf fragt das Spiel, ob du das Tutorial spielen willst
+(nur einmal). Das Tutorial ist ein ganzer Einkauf mit Anleitung, Pfeilen
+am Boden und rot umrandeten Waren. Dort verfolgt dich niemand, und Fehler werden
+nur erklärt. Es erklärt auch Kunden und Mitarbeiter. Der normale Einkauf ("Neuer Einkauf") hat kein Tutorial-Fenster.
+Hast du das Tutorial einmal geschafft, kannst du es in den Optionen mit
+"Tutorial spielen" jederzeit wieder starten.
 
 Jumpscares lassen sich in den Optionen nicht abschalten. Probier es ruhig.
 

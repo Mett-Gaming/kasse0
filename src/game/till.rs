@@ -1,6 +1,6 @@
 //! Kassen-Minispiel: Sobald die erste Ware auf dem Band liegt, sind Kunden und Mitarbeiter
 //! harmlos, solange man an der Kasse bleibt. Dafuer beobachtet einen die Kassiererin.
-//! Man muss die Ware richtig aufs Band legen (Getraenke zuerst, nichts Falsches), ihre Fragen
+//! Man muss die Ware richtig aufs Band legen (alles ab 1 kg zuerst, nichts Falsches), ihre Fragen
 //! beantworten, die Karte ruhig durchziehen und die PIN eintippen. Jeder Fehler fuellt ihr
 //! Misstrauen. Ist es voll, kostet das eines von drei Kassen-Leben; beim dritten ist der Run vorbei.
 
@@ -8,6 +8,8 @@ use super::*;
 
 /// Kassen-Leben (getrennt von den Leben im Markt)
 pub const TILL_LIVES: u32 = 3;
+/// Ab diesem Gewicht (kg) ist eine Ware schwer und muss vor allem Leichten aufs Band.
+pub const HEAVY_KG: f32 = 1.0;
 /// So weit darf man sich waehrend des Kassierens von der Kasse entfernen
 pub const TILL_RADIUS: f32 = 3.5;
 /// Antwortzeit fuer eine Frage der Kassiererin
@@ -195,7 +197,7 @@ pub struct Till {
     /// Nach so vielen gescannten Waren stellt sie die naechste Frage
     ask_at: Vec<usize>,
     used: Vec<usize>,
-    /// Liegt schon etwas anderes als Getraenke auf dem Band?
+    /// Liegt schon etwas Leichtes (unter HEAVY_KG) auf dem Band?
     other_on_belt: bool,
     /// Ist man gerade an der Kasse (fuer den Hinweis beim Weggehen)?
     was_near: bool,
@@ -273,15 +275,17 @@ impl Till {
 }
 
 impl ItemData {
-    /// Getraenke sind schwer und gehoeren zuerst aufs Band.
-    pub fn is_drink(&self) -> bool {
+    /// Gewicht in kg (aus dem Katalog; eine geworfene Tomate wiegt 100 g).
+    pub fn weight_kg(&self) -> f32 {
         match self.kind {
-            PickupKind::Product { product, .. } => {
-                let cat = catalog();
-                cat.subs[cat.products[product].sub].id == "getraenke"
-            }
-            PickupKind::Tomato { .. } => true,
+            PickupKind::Product { product, .. } => catalog().products[product].kg,
+            PickupKind::Tomato { .. } => 0.1,
         }
+    }
+
+    /// Schwere Waren (ab HEAVY_KG) gehoeren zuerst aufs Band.
+    pub fn is_heavy(&self) -> bool {
+        self.weight_kg() >= HEAVY_KG
     }
 }
 
@@ -361,11 +365,11 @@ impl Game {
                 5.0,
             ));
         }
-        let drink = data.is_drink();
+        let heavy = data.is_heavy();
         let t = self.till.as_mut().unwrap();
-        if drink && t.other_on_belt {
+        if heavy && t.other_on_belt {
             self.till_mistake("Kassiererin: \"Schwere Sachen zuerst.\"");
-        } else if !drink {
+        } else if !heavy {
             t.other_on_belt = true;
         }
     }
@@ -645,7 +649,7 @@ impl Game {
         self.till_lose_life("Ihr Misstrauen ist zu groß.");
     }
 
-    /// Direkter Fehler (Getraenke nicht zuerst, falsche Ware, schlechte Antwort, Karte zu
+    /// Direkter Fehler (Schweres nicht zuerst, falsche Ware, schlechte Antwort, Karte zu
     /// schnell, falsche PIN, zu viel Geld): kostet sofort ein Kassen-Leben.
     pub(super) fn till_mistake(&mut self, msg: &str) {
         self.play(Sfx::Error, 0.6);
@@ -654,8 +658,17 @@ impl Game {
 
     /// Ein Kassen-Leben weg; beim letzten ist der Run vorbei.
     fn till_lose_life(&mut self, reason: &str) {
+        let tutorial = self.tutorial_run;
         let Some(t) = &mut self.till else { return };
         if t.lives == 0 {
+            return;
+        }
+        // Tutorial: kein Leben weg, Misstrauen zurueck auf null, nur erklaeren
+        if tutorial {
+            t.doubt = 0.0;
+            self.tutorial_forgive(&format!(
+                "{reason} Im echten Spiel kostet das ein Kassen-Leben."
+            ));
             return;
         }
         t.lives -= 1;

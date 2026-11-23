@@ -221,6 +221,14 @@ pub struct ExtraScares {
     pub announce: Option<f32>,
 }
 
+/// Stelle an einem Kuehltruhen-Stueck (Mitte, Richtung, Laenge) neben dem Spieler `p`,
+/// mit 0,6 m Abstand zu den Enden. Kurze Stuecke (unter 1,2 m): ihre Mitte.
+pub(super) fn freezer_spot(mid: Vec3, yaw: f32, len: f32, p: Vec3) -> Vec3 {
+    let along = vec3(yaw.sin(), 0.0, yaw.cos());
+    let m = (len * 0.5 - 0.6).max(0.0);
+    mid + along * (p - mid).dot(along).clamp(-m, m)
+}
+
 impl Game {
     /// Schreck einer bestimmten Art: Klang und Bildwirkung aus ihrem Stil.
     pub(super) fn fire_scare_kind(&mut self, kind: ScareKind, strength: f32) {
@@ -487,6 +495,7 @@ impl Game {
     }
 
     /// Kuehltruhe: Wer hineinschaut, sieht jemanden darin liegen, der sich aufrichtet.
+    /// Kuehltruhen-Schreck: Hand aus der Truhe neben dem Spieler (beim Hineinschauen).
     fn update_freezer(&mut self, dt: f32) {
         if let Some((p, y, t, v)) = self.extra.freezer {
             let t = t + dt;
@@ -504,10 +513,7 @@ impl Game {
         }
         let p = self.player.pos;
         let hit = self.world.freezers.iter().find_map(|&(mid, yaw, len)| {
-            let along = vec3(yaw.sin(), 0.0, yaw.cos());
-            let d = p - mid;
-            let a = d.dot(along).clamp(-len * 0.5 + 0.6, len * 0.5 - 0.6);
-            let point = mid + along * a;
+            let point = freezer_spot(mid, yaw, len, p);
             let across = vec3(p.x - point.x, 0.0, p.z - point.z).length();
             (across < 1.8).then_some((point, yaw))
         });

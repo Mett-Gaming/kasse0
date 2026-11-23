@@ -1,8 +1,8 @@
 //! Kassenfenster: E am Kassenband oeffnet ein eigenes Fenster (Markt dahinter abgedunkelt).
 //! Links liegt der Inhalt des Wagens (und was man in der Hand hat), in der Mitte das Band,
 //! rechts der Kassenbon. Waren zieht man mit gedrueckter Maustaste vom Wagen aufs Band; dabei
-//! gelten dieselben Regeln wie sonst (Getraenke zuerst ...). E oder Esc schliesst das Fenster.
-//! Schaut die Kassiererin auf, muss die Maus still bleiben (till/pressure.rs).
+//! gelten dieselben Regeln wie sonst (Schweres ab 1 kg zuerst ...). E oder Esc schliesst das Fenster.
+//! Schaut die Kassiererin auf, ruht nur der Scanner; die Maus beobachtet sie nicht.
 //!
 //! Das Layout (im 480x270-Raster des HUD) steht hier, damit Treffer-Tests und Zeichnen
 //! (hud/belt_window.rs) dieselben Rechtecke benutzen.
@@ -12,20 +12,18 @@ use super::*;
 /// Rechteck im HUD-Raster: x, y, Breite, Hoehe
 pub type Rect = (f32, f32, f32, f32);
 
-pub const WINDOW: Rect = (16.0, 14.0, 448.0, 142.0);
-/// Wagen links, Band in der Mitte, Kasse/Bon rechts
-pub const CART_PANEL: Rect = (24.0, 32.0, 150.0, 118.0);
-pub const BELT_PANEL: Rect = (182.0, 32.0, 150.0, 118.0);
-pub const TILL_PANEL: Rect = (340.0, 32.0, 116.0, 118.0);
+pub const WINDOW: Rect = (8.0, 14.0, 464.0, 142.0);
+/// Wagen links (breit, damit neben dem Namen das Gewicht steht), Band in der Mitte, Bon rechts
+pub const CART_PANEL: Rect = (14.0, 32.0, 202.0, 118.0);
+pub const BELT_PANEL: Rect = (222.0, 32.0, 124.0, 118.0);
+pub const TILL_PANEL: Rect = (352.0, 32.0, 114.0, 118.0);
 /// Kacheln im Wagen: zwei Spalten
-const TILE_W: f32 = 71.0;
-const TILE_H: f32 = 15.0;
-const TILE_GAP: f32 = 3.0;
-pub const TILE_ROWS: usize = 5;
+pub const TILE_W: f32 = 96.0;
+pub const TILE_H: f32 = 18.0;
+const TILE_GAP: f32 = 2.0;
+pub const TILE_ROWS: usize = 4;
 /// "In der Hand" unten im Wagen-Feld
-pub const HAND_TILE: Rect = (28.0, 132.0, 142.0, 14.0);
-/// So viel Mausbewegung pro Bild (HUD-Pixel) zaehlt beim Aufschauen als "bewegt"
-pub const MOUSE_STILL: f32 = 1.0;
+pub const HAND_TILE: Rect = (18.0, 134.0, 194.0, 14.0);
 
 /// Was man gerade zieht.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -37,9 +35,8 @@ pub enum DragSrc {
 #[derive(Clone, Debug, Default)]
 pub struct BeltWindow {
     pub drag: Option<DragSrc>,
-    /// Mauszeiger (HUD-Raster) und wie weit er sich im letzten Bild bewegt hat
+    /// Mauszeiger (HUD-Raster)
     pub mouse: (f32, f32),
-    pub moved: f32,
 }
 
 /// Kachel `i` des Wagens (oder None, wenn sie nicht mehr ins Feld passt).
@@ -60,6 +57,16 @@ pub fn cart_tile(i: usize) -> Option<Rect> {
 
 pub fn inside(r: Rect, p: (f32, f32)) -> bool {
     p.0 >= r.0 && p.0 <= r.0 + r.2 && p.1 >= r.1 && p.1 <= r.1 + r.3
+}
+
+/// Gewicht zum Anzeigen: ab 1 kg in kg mit einer Stelle ("1,6 kg", "1 kg"), darunter in Gramm.
+pub fn weight_text(kg: f32) -> String {
+    if kg >= 1.0 {
+        let s = format!("{:.1}", kg).replace('.', ",");
+        format!("{} kg", s.trim_end_matches(",0"))
+    } else {
+        format!("{} g", (kg * 1000.0).round() as i32)
+    }
 }
 
 impl Game {
@@ -105,7 +112,6 @@ impl Game {
             return;
         };
         let m = input.ui_mouse;
-        w.moved = ((m.0 - w.mouse.0).powi(2) + (m.1 - w.mouse.1).powi(2)).sqrt();
         w.mouse = m;
         if input.ui_pressed && w.drag.is_none() {
             w.drag = if inside(HAND_TILE, m) && self.held.is_some() {
@@ -152,13 +158,6 @@ impl Game {
         if self.cart.is_empty() && self.held.is_none() {
             self.close_belt_window();
         }
-    }
-
-    /// Hat man waehrend des Aufschauens die Maus bewegt oder gezogen? (pressure.rs)
-    pub fn window_mouse_busy(&self) -> bool {
-        self.belt_window
-            .as_ref()
-            .is_some_and(|w| w.moved > MOUSE_STILL || w.drag.is_some())
     }
 }
 
@@ -229,7 +228,7 @@ mod tests {
         let mut g = at_belt(102);
         press_e(&mut g);
         let n = g.cart.len();
-        let drink = g.cart.iter().position(|c| c.is_drink()).unwrap();
+        let drink = g.cart.iter().position(|c| c.is_heavy()).unwrap();
         let from = center(cart_tile(drink).unwrap());
         mouse(&mut g, from, true, true, false);
         assert_eq!(
@@ -240,7 +239,7 @@ mod tests {
         mouse(&mut g, center(BELT_PANEL), false, false, true);
         assert_eq!(g.cart.len(), n - 1);
         assert_eq!(g.belt.len(), 1, "Ware liegt nicht auf dem Band");
-        assert!(g.belt[0].data.is_drink());
+        assert!(g.belt[0].data.is_heavy());
         // daneben loslassen: nichts passiert
         let from = center(cart_tile(0).unwrap());
         mouse(&mut g, from, true, true, false);
@@ -254,23 +253,21 @@ mod tests {
         let mut g = at_belt(103);
         press_e(&mut g);
         // erst etwas anderes, dann ein Getraenk: ein Leben weg
-        let other = g.cart.iter().position(|c| !c.is_drink()).unwrap();
+        let other = g.cart.iter().position(|c| !c.is_heavy()).unwrap();
         g.window_drop(DragSrc::Cart(other));
-        let drink = g.cart.iter().position(|c| c.is_drink()).unwrap();
+        let drink = g.cart.iter().position(|c| c.is_heavy()).unwrap();
         g.window_drop(DragSrc::Cart(drink));
         assert_eq!(g.till.as_ref().unwrap().lives, till::TILL_LIVES - 1);
     }
 
     #[test]
-    fn moving_the_mouse_while_she_stares_is_noticed() {
+    fn she_does_not_watch_the_mouse_in_the_window() {
         let mut g = at_belt(104);
         press_e(&mut g);
         // eine Ware auflegen, damit das Minispiel laeuft; Druck an, sie starrt
-        let drink = g.cart.iter().position(|c| c.is_drink()).unwrap();
-        g.window_drop(DragSrc::Cart(drink));
+        let heavy = g.cart.iter().position(|c| c.is_heavy()).unwrap();
+        g.window_drop(DragSrc::Cart(heavy));
         g.calm_till = false;
-        // Zeiger steht schon an seiner Stelle (sonst zaehlt der erste Sprung als Bewegung)
-        g.belt_window.as_mut().unwrap().mouse = (100.0, 100.0);
         let t = g.till.as_mut().unwrap();
         t.look = Some(till::pressure::LookUp {
             warn: 0.0,
@@ -279,18 +276,20 @@ mod tests {
         });
         mouse(&mut g, (100.0, 100.0), false, false, false);
         let before = g.till.as_ref().unwrap().doubt;
-        // stillhalten: nichts
-        for _ in 0..20 {
-            mouse(&mut g, (100.0, 100.0), false, false, false);
+        // Maus wild bewegen und ziehen, waehrend sie starrt: faellt nicht auf
+        for k in 0..20 {
+            let p = (100.0 + k as f32 * 9.0, 60.0 + (k % 3) as f32 * 30.0);
+            mouse(&mut g, p, k % 2 == 0, k % 4 == 0, false);
         }
-        let still = g.till.as_ref().unwrap().doubt - before;
-        assert!(still < 0.05, "Stillhalten faellt auf: {still}");
-        // Maus bewegen: faellt auf
-        mouse(&mut g, (140.0, 120.0), false, false, false);
-        let moved = g.till.as_ref().unwrap().doubt - before;
+        let t = g.till.as_ref().unwrap();
         assert!(
-            moved >= till::pressure::SUS_STARE,
-            "Mausbewegung faellt nicht auf"
+            !t.look.as_ref().is_some_and(|l| l.caught),
+            "Maus faellt auf"
+        );
+        assert!(
+            t.doubt - before < 0.05,
+            "Mausbewegung macht misstrauisch: {}",
+            t.doubt - before
         );
     }
 }
