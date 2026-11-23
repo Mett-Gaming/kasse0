@@ -149,12 +149,20 @@ impl Phase {
                 "durchziehen, PIN tippen. Bar:",
                 "genau passend zahlen.",
             ]],
-            Phase::Escape => &[&[
-                "Alarm! Renn zum Ausgang (Pfeile).",
-                "Im echten Spiel rennen alle auf dich",
-                "zu. Im Korridor NICHT umdrehen.",
-                "(Im Tutorial verfolgt dich keiner.)",
-            ]],
+            Phase::Escape => &[
+                &[
+                    "Alarm! Renn zum Ausgang (Pfeile).",
+                    "Im echten Spiel rennen alle auf dich",
+                    "zu. Im Korridor NICHT umdrehen.",
+                    "(Im Tutorial verfolgt dich keiner.)",
+                ],
+                &[
+                    "KORRIDOR: Leertaste springt, C oder",
+                    "Strg duckt, E drückt Türen auf.",
+                    "Bleib nicht stehen: Im echten Spiel",
+                    "holt dich sonst etwas ein.",
+                ],
+            ],
         }
     }
 
@@ -175,6 +183,7 @@ pub const PAGE_TIME: f32 = 8.0;
 /// Erklaerleiste oben links ueber den Kassen-Fenstern (nur im Tutorial): Hinweise wechseln
 /// alle HINT_TIME Sekunden, je hoechstens HINT_MAX Zeichen.
 pub const HINT_TIME: f32 = 5.0;
+#[cfg_attr(not(test), allow(dead_code))]
 pub const HINT_MAX: usize = 45;
 pub const BELT_HINTS: &[&str] = &[
     "Ware mit gedrückter Maus aufs Band ziehen.",
@@ -207,8 +216,18 @@ pub fn ui_hints(g: &Game) -> Option<&'static [&'static str]> {
             _ => CARD_HINTS,
         });
     }
+    if g.chasing() && g.in_corridor() {
+        return Some(CORRIDOR_HINTS);
+    }
     g.belt_window_open().then_some(BELT_HINTS)
 }
+
+pub const CORRIDOR_HINTS: &[&str] = &[
+    "Leertaste: über niedrige Sachen springen.",
+    "C oder Strg halten: unter Rohren ducken.",
+    "E drückt Türen auf. Manche klemmen.",
+    "Nicht umdrehen und nicht stehen bleiben.",
+];
 
 /// In welcher Phase ist man gerade? (None = kein Tutorial)
 pub fn phase(g: &Game) -> Option<Phase> {
@@ -430,7 +449,7 @@ mod tests {
 
     #[test]
     fn payment_and_belt_windows_explain_themselves_only_in_the_tutorial() {
-        for list in [BELT_HINTS, CARD_HINTS, CASH_HINTS] {
+        for list in [BELT_HINTS, CARD_HINTS, CASH_HINTS, CORRIDOR_HINTS] {
             for h in list {
                 assert!(h.chars().count() <= HINT_MAX, "zu lang: {h}");
             }

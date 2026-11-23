@@ -7,8 +7,11 @@ mod gen;
 pub mod layout;
 
 pub use gen::generate;
-pub use gen::POSTER_TEXTS;
 pub use gen::REGISTER_SCALE;
+pub use gen::{
+    corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
+    CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
+};
 #[cfg(test)]
 pub use gen::{COUNTER_HALF, COUNTER_TOP};
 
@@ -148,6 +151,9 @@ pub struct WorldParams {
     pub decay: u8,
     /// Zufall fuer die Hindernisse im Fluchtkorridor (wird bei jedem Bezahlen neu gewuerfelt)
     pub corridor_seed: u64,
+    /// Laenge des Fluchtkorridors (Meter, aus der Run-Zeit beim Bezahlen, siehe
+    /// `corridor_len_for`)
+    pub corridor_len: f32,
 }
 
 impl WorldParams {
@@ -169,6 +175,7 @@ impl WorldParams {
             giants: 0,
             decay: 0,
             corridor_seed: 0,
+            corridor_len: 40.0,
         }
     }
 }

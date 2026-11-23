@@ -43,6 +43,11 @@ const TILL_ANNOUNCEMENTS: &[&str] = &[
     "Bitte verhalten Sie sich normal.",
     "Wir sehen Sie, Kunde 0.",
     "Bitte zahlen Sie zügig. Bitte bleiben Sie.",
+    "Kasse 0 freut sich auf Ihre Ankunft. Seit Jahren.",
+    "Bitte legen Sie alles aufs Band. Auch das, was Sie mitgebracht haben.",
+    "Die Kassiererin hat heute Geburtstag. Seit 1987.",
+    "Bitte lächeln Sie. Die Kamera sieht es nicht.",
+    "Kartenzahlung ist möglich. Bargeld ist möglich. Gehen ist nicht möglich.",
 ];
 
 /// Klopfen: so nah am Absperrband muss jemand stehen

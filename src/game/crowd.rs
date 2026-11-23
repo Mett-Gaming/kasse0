@@ -409,12 +409,8 @@ impl Game {
                 * if self.paid { 1.4 } else { 1.0 };
             // Rennen faellt auf: dann holen sie deutlich schneller auf
             let s = if chase {
-                // im engen Fluchtkorridor etwas langsamer
-                if self.world.corridor.is_some_and(|k| k.contains(c.pos)) {
-                    super::corridor::CORRIDOR_CHASE_SPEED
-                } else {
-                    super::escape::CHASE_SPEED
-                }
+                // in den Fluchtkorridor kommen sie nicht mit (dort ist man allein)
+                super::escape::CHASE_SPEED
             } else if seen {
                 speed * 0.4
             } else if running {

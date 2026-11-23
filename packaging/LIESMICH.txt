@@ -57,9 +57,13 @@ DIE FLUCHT
   Kaum hast du bezahlt, kommt die Durchsage: "Kunde 0 hat ein Gesicht.
   Schnappt ihn!" Der Alarm geht los, und alle rennen auf dich zu. Lauf zur
   Tür! Wer dich jetzt erwischt, beendet den Einkauf sofort.
-  Hinter der Tür kommt ein langer Gang voller Hindernisse. DREH DICH NICHT UM -
-  wer zurückschaut, ist sofort tot. Was hinter dir passiert, zeigt nur der
-  Spiegel am Ende. Der Ausgang liegt kurz davor links.
+  Hinter der Tür kommt ein langer, verwinkelter Gang (je länger dein Run, desto
+  länger der Gang). Die Tür knallt hinter dir zu, und etwas rückt nach: Bleib
+  nicht stehen, sonst holt es dich ein. Ausdauer ist dort unendlich.
+  Ducken (C/Strg), springen (Leertaste), Türen aufdrücken (E, manche klemmen),
+  umkippenden Regalen und rollenden Wagen ausweichen. DREH DICH NICHT UM -
+  wer zurückschaut, ist sofort tot. Am Ende zeigt dir ein Spiegel, wer direkt
+  hinter dir steht. Die Ausgangstür davor klemmt.
 
 STEUERUNG
   WASD               Gehen            Shift   Rennen (fällt auf!)
@@ -68,6 +72,9 @@ STEUERUNG
   Maus ziehen        im Kassenfenster: Ware aus dem Wagen aufs Band
   Q                  Wagen stehen lassen / schieben
   Shift halten       Rennen (kostet Ausdauer)
+  Leertaste          Springen (im Fluchtkorridor). Mit dem Wagen nur ein
+                     Hopser - dabei fällt mal keine, mal eine, mal mehr Ware heraus!
+  C oder Strg        Ducken (gehalten, im Fluchtkorridor)
   F                  Ware aus dem Wagen nehmen (die anvisierte leuchtet auf)
   Mausrad            am Wagen / Band: andere Ware anwählen
   1 / 2 / 3          Antwort im Gespräch und an der Kasse

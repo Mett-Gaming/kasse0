@@ -276,7 +276,7 @@ pub fn draw_pause(u: &mut Ui, sel: usize, time: f32, g: &Game) {
     let items: Vec<String> = PAUSE_ITEMS.iter().map(|s| s.to_string()).collect();
     draw_menu(u, Screen::Paused, &items, sel, time);
     draw_list(u, g, 16.0, 154.0, false);
-    draw_controls(u, 186.0, 154.0);
+    draw_controls(u);
 }
 
 fn draw_list(u: &mut Ui, g: &Game, x: f32, y: f32, panel: bool) {
@@ -330,10 +330,8 @@ fn draw_list(u: &mut Ui, g: &Game, x: f32, y: f32, panel: bool) {
 }
 
 pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
+    // nach dem Ende (Tod oder Gewinn) kein HUD mehr, nur das Bild
     if g.outcome != Outcome::Running {
-        if g.outcome == Outcome::Caught && (g.time * 10.0).fract() < 0.5 {
-            u.text_center(120.0, "TRACKING", RED, 2.0);
-        }
         return;
     }
     osd(u, time, "PLAY");
@@ -384,6 +382,9 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         u.text_center(y + 11.0, action, YELLOW, 1.0);
     } else {
         match g.focus {
+            Some(Focus::Door(_)) => {
+                u.text_center(y, "[E] Tür aufdrücken", YELLOW, 1.0);
+            }
             Some(Focus::Shelf(i)) => {
                 let p = crate::game::ItemData::from_shelf(&g.world.items[i]);
                 u.text_center(
@@ -558,7 +559,11 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
             u.text_center(110.0, "NICHT UMDREHEN", RED, 3.0);
         }
     } else if g.chasing() && g.in_corridor() {
-        if (time * 1.5).fract() < 0.7 {
+        // die Front holt auf: SCHNELLER (blinkt schneller, je naeher)
+        let near = g.front_warning();
+        if near > 0.0 && (time * (2.0 + 6.0 * near)).fract() < 0.6 {
+            u.text_center(64.0, "SCHNELLER", RED, 2.0);
+        } else if near <= 0.0 && (time * 1.5).fract() < 0.7 {
             u.text_center(64.0, "NICHT UMDREHEN. LAUF.", RED, 1.0);
         }
     } else if g.chasing() && (time * 2.5).fract() < 0.6 {
@@ -642,11 +647,50 @@ fn draw_tutorial(u: &mut Ui, t: &Tutorial) {
 }
 
 /// Tastenbelegung (Pause-Menue)
-fn draw_controls(u: &mut Ui, x: f32, y: f32) {
-    u.text_s(x, y, "STEUERUNG", YELLOW, 1.0);
-    for (i, (key, what)) in TUTORIAL_STEPS.iter().enumerate() {
-        let line = format!("{key:<11} {what}");
-        u.text_s(x, y + 12.0 + i as f32 * 11.0, &line, WHITE, 1.0);
+/// Steuerung im Pausenmenue: zwei Spalten mit Ueberschrift, Tasten als kleine Tastenkappen.
+pub const CONTROLS_MOVE: &[(&str, &str)] = &[
+    ("WASD", "Gehen"),
+    ("Maus", "Umsehen"),
+    ("Shift", "Rennen"),
+    ("Leer", "Springen"),
+    ("C/Strg", "Ducken"),
+    ("Esc", "Pause"),
+];
+pub const CONTROLS_SHOP: &[(&str, &str)] = &[
+    ("E", "Benutzen"),
+    ("Q", "Wagen"),
+    ("F", "Ware raus"),
+    ("Tab", "Zettel"),
+    ("Rad", "Auswählen"),
+    ("1 2 3", "Antworten"),
+    ("R", "Reklamieren"),
+    ("0-9", "PIN"),
+];
+/// Kasten der Steuerung (x, y, Breite, Hoehe) und Spalten (x, Breite der Tastenkappen)
+const CONTROLS_BOX: (f32, f32, f32, f32) = (184.0, 144.0, 290.0, 122.0);
+const CONTROLS_COLS: [(f32, f32); 2] = [(190.0, 54.0), (330.0, 44.0)];
+const CONTROLS_ROW: f32 = 11.5;
+
+fn draw_controls(u: &mut Ui) {
+    let (bx, by, bw, bh) = CONTROLS_BOX;
+    u.rect(bx, by, bw, bh, [0.03, 0.03, 0.04, 0.85]);
+    u.rect(bx, by, bw, 1.0, [0.95, 0.85, 0.3, 0.7]);
+    u.text(bx + 6.0, by + 4.0, "STEUERUNG", YELLOW, 1.0);
+    let sections = [
+        ("BEWEGEN", CONTROLS_MOVE),
+        ("EINKAUF & KASSE", CONTROLS_SHOP),
+    ];
+    for ((title, list), (cx, cap)) in sections.iter().zip(CONTROLS_COLS) {
+        u.text(cx, by + 17.0, title, DIM, 1.0);
+        for (k, (key, what)) in list.iter().enumerate() {
+            let y = by + 30.0 + k as f32 * CONTROLS_ROW;
+            // Tastenkappe: heller Rahmen, Taste mittig
+            u.rect(cx, y - 2.0, cap, 11.0, [0.75, 0.75, 0.7, 1.0]);
+            u.rect(cx + 1.0, y - 1.0, cap - 2.0, 9.0, [0.16, 0.16, 0.18, 1.0]);
+            let kx = cx + (cap - Ui::text_width(key, 1.0)) * 0.5;
+            u.text(kx, y, key, WHITE, 1.0);
+            u.text(cx + cap + 5.0, y, what, WHITE, 1.0);
+        }
     }
 }
 
@@ -699,6 +743,33 @@ pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game, group: Option<us
     u.text_center(252.0, &state, DIM, 1.0);
 }
 
+/// Gruselige Schriftzuege beim Tod (statt "DU BIST AUFGEFALLEN"), einer je Tod.
+pub const DEATH_TITLES: &[&str] = &[
+    "DU BLEIBST JETZT HIER",
+    "WILLKOMMEN IM SORTIMENT",
+    "SIE HABEN DICH",
+    "DEIN GESICHT GEHÖRT UNS",
+    "DER MARKT SCHLIESST NIE",
+    "ZURÜCK INS REGAL",
+    "MINDESTHALTBAR BIS: JETZT",
+    "WIR SEHEN DICH",
+    "KUNDE 0 IST AUSVERKAUFT",
+    "DU WARST NIE HIER",
+    "NIEMAND VERLÄSST KAUF NULL",
+    "SIE HABEN DICH GEFUNDEN",
+];
+
+/// Welcher Schriftzug fuer diesen Tod: haengt an Seed und Zeitpunkt, bleibt also stehen,
+/// solange der Endbildschirm zu sehen ist.
+pub fn death_title(g: &Game) -> &'static str {
+    let h = g
+        .seed
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        .wrapping_add((g.run_time * 10.0) as u64)
+        .wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    DEATH_TITLES[((h >> 33) % DEATH_TITLES.len() as u64) as usize]
+}
+
 pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
     u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.8]);
     match g.outcome {
@@ -743,11 +814,26 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
         }
         _ => {
             osd(u, time, "STOP");
-            u.text_center(70.0, "DU BIST AUFGEFALLEN", RED, 2.0);
+            // gruseliger Schriftzug (zufaellig je Tod), zittert und flackert ab und zu
+            let title = death_title(g);
+            let glitch = ((time * 7.3).sin() * (time * 3.1).cos()) > 0.82;
+            let jx = if glitch {
+                (time * 91.0).sin() * 3.0
+            } else {
+                0.0
+            };
+            let x = (ui::W - Ui::text_width(title, 2.0)) * 0.5 + jx;
+            if glitch {
+                // kurzer Bildriss: weisser Schatten versetzt dahinter
+                u.text(x + 2.0, 69.0, title, [1.0, 1.0, 1.0, 0.5], 2.0);
+            }
+            u.text(x, 70.0, title, RED, 2.0);
             let why = if g.till_caught {
                 "Die Kassiererin hat dich durchschaut."
             } else if g.turned_back {
                 "Du hast dich umgedreht."
+            } else if g.front_caught {
+                "Sie haben dich eingeholt. Du warst zu langsam."
             } else if g.chase.is_some() {
                 "Sie haben Kunde 0 geschnappt - kurz vor dem Ausgang."
             } else {
@@ -837,6 +923,21 @@ mod tests {
         g.outcome = Outcome::Caught;
         draw_end(&mut u, &g, 0, 1.0);
         assert!(u.verts.len() > 100);
+        // gruselige Schriftzuege: passen in die Breite, wechseln von Tod zu Tod, bleiben
+        // aber stehen, solange der Endbildschirm zu sehen ist
+        for t in DEATH_TITLES {
+            assert!(Ui::text_width(t, 2.0) < ui::W - 12.0, "zu breit: {t}");
+        }
+        assert!(!DEATH_TITLES.contains(&"DU BIST AUFGEFALLEN"));
+        let first = death_title(&g);
+        g.time += 5.0;
+        assert_eq!(death_title(&g), first, "Schriftzug springt");
+        let mut seen = std::collections::HashSet::new();
+        for k in 0..60 {
+            g.run_time = 30.0 + k as f32 * 7.3;
+            seen.insert(death_title(&g));
+        }
+        assert!(seen.len() >= 6, "kaum Abwechslung: {}", seen.len());
         assert_eq!(u.verts.len() % 6, 0);
     }
 
@@ -995,4 +1096,45 @@ pub fn draw_npc_debug(u: &mut Ui, labels: &[(f32, f32, String)], g: &Game) {
         YELLOW,
         1.0,
     );
+}
+
+#[cfg(test)]
+mod controls_tests {
+    use super::*;
+
+    #[test]
+    fn controls_overview_is_tidy_and_fits() {
+        let (bx, by, bw, bh) = CONTROLS_BOX;
+        assert!(
+            bx + bw <= ui::W && by + bh <= ui::H,
+            "Kasten ragt aus dem Bild"
+        );
+        // unter dem Pausenmenue (letzter Eintrag samt Markierung)
+        let (y0, step) = menu_layout(Screen::Paused);
+        assert!(y0 + step * (PAUSE_ITEMS.len() as f32 - 1.0) + 12.0 <= by);
+        let lists = [CONTROLS_MOVE, CONTROLS_SHOP];
+        for (k, (list, (cx, cap))) in lists.iter().zip(CONTROLS_COLS).enumerate() {
+            let right = if k == 0 {
+                CONTROLS_COLS[1].0 - 4.0
+            } else {
+                bx + bw - 3.0
+            };
+            for (key, what) in list.iter() {
+                assert!(
+                    Ui::text_width(key, 1.0) <= cap - 2.0,
+                    "Taste zu breit: {key}"
+                );
+                let end = cx + cap + 5.0 + Ui::text_width(what, 1.0);
+                assert!(end <= right, "{what} ragt hinaus");
+            }
+            let last = by + 30.0 + (list.len() as f32 - 1.0) * CONTROLS_ROW + 9.0;
+            assert!(last <= by + bh, "Spalte {k} zu lang");
+        }
+        // die neuen Tasten stehen drin
+        assert!(CONTROLS_MOVE.iter().any(|c| c.1 == "Springen"));
+        assert!(CONTROLS_MOVE.iter().any(|c| c.1 == "Ducken"));
+        let mut u = Ui::default();
+        draw_controls(&mut u);
+        assert!(!u.verts.is_empty());
+    }
 }

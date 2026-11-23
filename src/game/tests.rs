@@ -403,11 +403,21 @@ fn full_run_checkout_and_exit_wins() {
     );
     assert!(g.in_corridor(), "nicht im Korridor angekommen");
     assert_eq!(g.outcome, Outcome::Running);
-    // ... bis kurz vor den Ausgang am Ende, dann links hinaus
-    let exit = g.world.exit_zone;
-    let c = g.world.corridor.unwrap();
-    g.player.pos = vec3(c.x1 - 0.5, 0.0, (exit.min.z + exit.max.z) * 0.5);
-    g.player.yaw = std::f32::consts::FRAC_PI_2; // nach +x
+    assert!(g.corridor_entered(), "Tuer hinter einem nicht zu");
+    // ... bis vor die Ausgangstuer am Ende (klemmt: 3x E), dann links hinaus
+    let c = g.world.corridor.clone().unwrap();
+    let st = *c
+        .stations
+        .iter()
+        .find(|s| s.kind == crate::world::StationKind::ExitDoor)
+        .unwrap();
+    g.player.pos = st.at + st.side * (crate::world::CORRIDOR_HALF_W - 0.6);
+    g.player.yaw = std::f32::consts::FRAC_PI_2; // nach +x, zur Tuer
+    g.update(1.0 / 60.0, &mut Input::default());
+    for _ in 0..3 {
+        press_e(&mut g);
+        step(&mut g, 0.1, Input::default());
+    }
     step(
         &mut g,
         3.0,
@@ -1675,4 +1685,131 @@ fn card_terminal_sits_on_its_pole_inside_its_target_box() {
         .filter(|v| v.normal[2] > 0.5 && v.normal[1] > 0.4)
         .count();
     assert!(screen > 3, "Display zeigt nicht zum Kunden");
+}
+
+#[test]
+fn jumping_with_the_cart_is_low_the_cart_hops_and_goods_fall_out() {
+    // Sprung ohne Wagen: so hoch kommt man
+    let mut g = Game::new(61);
+    g.tip();
+    g.customers.clear();
+    g.employees.clear();
+    g.fill_list_cheap();
+    g.trolley.pushing = false;
+    let peak = |g: &mut Game| {
+        let mut top = 0.0f32;
+        let mut lift = 0.0f32;
+        let mut inp = Input {
+            jump: true,
+            ..Default::default()
+        };
+        g.update(1.0 / 60.0, &mut inp);
+        for _ in 0..90 {
+            g.update(1.0 / 60.0, &mut Input::default());
+            top = top.max(g.player.jump_y);
+            lift = lift.max(g.cart_lift());
+        }
+        (top, lift)
+    };
+    let n = g.cart.len();
+    assert!(n >= 2);
+    let (free, lift) = peak(&mut g);
+    assert!(free > 0.5, "Sprung ohne Wagen nur {free} m");
+    assert_eq!(lift, 0.0, "abgestellter Wagen hopst mit");
+    assert_eq!(g.cart.len(), n, "ohne Wagen faellt Ware heraus");
+    // mit geschobenem Wagen: niedriger, der Wagen hopst mit, beim Aufsetzen fliegt Ware heraus
+    g.trolley.pushing = true;
+    let loose = g.loose.len();
+    let (with_cart, lift) = peak(&mut g);
+    assert!(
+        with_cart < free * 0.6,
+        "mit Wagen genauso hoch: {with_cart} m"
+    );
+    assert!(lift > 0.2, "Wagen hopst nicht mit");
+    let fell = n - g.cart.len();
+    assert_eq!(
+        g.loose.len(),
+        loose + fell,
+        "herausgefallene Ware liegt nicht am Boden"
+    );
+    assert!(!g.player.cart_jump);
+    // wie viele herausfallen, ist Zufall: mal keine, mal eine, mal mehrere
+    let mut seen = [false; 3];
+    for k in 0..200 {
+        let mut g2 = Game::new(70 + k);
+        g2.tip();
+        g2.fill_list_cheap();
+        let n = g2.cart.len();
+        g2.spill_cart();
+        let fell = n - g2.cart.len();
+        seen[fell.min(2)] = true;
+        assert!(fell <= n);
+    }
+    assert!(
+        seen.iter().all(|&s| s),
+        "nicht alle Faelle kommen vor: {seen:?}"
+    );
+    // ein leerer Wagen bleibt leer, eine einzelne Ware faellt hoechstens allein heraus
+    let mut rng = Pcg64::seed_from_u64(1);
+    assert_eq!(hands::spill_count(0, 0.9, &mut rng), 0);
+    assert_eq!(hands::spill_count(1, 0.95, &mut rng), 1);
+    assert_eq!(hands::spill_count(5, 0.1, &mut rng), 0);
+}
+
+#[test]
+fn goods_lie_in_the_cart_basket_instead_of_floating() {
+    let mut g = Game::new(62);
+    g.tip();
+    g.fill_list_cheap();
+    // noch ein paar Waren mehr, damit sich etwas stapelt
+    for k in 0..10 {
+        let i = (k * 37) % g.world.items.len();
+        let it = &g.world.items[i];
+        g.cart.push(ItemData::from_shelf(it));
+    }
+    let mut lying = 0;
+    for i in 0..g.cart.len() {
+        let h = g.cart[i].half();
+        let m = g.cart_item_local(i);
+        // Ecken der Ware (Ursprung unten in der Mitte) im Wagenmodell
+        let mut lo = Vec3::splat(f32::MAX);
+        let mut hi = Vec3::splat(f32::MIN);
+        for sx in [-1.0f32, 1.0] {
+            for sy in [0.0f32, 2.0] {
+                for sz in [-1.0f32, 1.0] {
+                    let p = m.transform_point3(vec3(sx * h.x, sy * h.y, sz * h.z));
+                    lo = lo.min(p);
+                    hi = hi.max(p);
+                }
+            }
+        }
+        // nie unter dem Korbboden, die unterste Lage liegt auf (schwebt nicht)
+        assert!(
+            lo.y > hands::CART_FLOOR - 0.05,
+            "Ware {i} steckt im Boden: {}",
+            lo.y
+        );
+        if i < hands::CART_CELLS {
+            assert!(
+                lo.y < hands::CART_FLOOR + 0.03,
+                "Ware {i} schwebt {} m ueber dem Boden",
+                lo.y - hands::CART_FLOOR
+            );
+        }
+        // im Korb (laengs -0,5..0,24, quer +-0,27)
+        let c = (lo + hi) * 0.5;
+        assert!(
+            c.x.abs() < 0.27 && c.z > -0.52 && c.z < 0.26,
+            "Ware {i} neben dem Korb: {c}"
+        );
+        if h.y > h.x.max(h.z) * 1.15 {
+            lying += 1;
+            // umgekippt: so hoch wie sie vorher tief war (plus etwas Schraeglage)
+            assert!(
+                hi.y - lo.y < 2.0 * h.z * 1.1 + 0.04 && hi.y - lo.y < 2.0 * h.y,
+                "hohe Ware {i} steht noch"
+            );
+        }
+    }
+    assert!(lying > 0, "keine hohe Ware im Test");
 }

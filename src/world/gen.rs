@@ -4,7 +4,10 @@ mod corridor;
 mod decay;
 mod fixtures;
 
-pub use corridor::{Corridor, POSTER_TEXTS};
+pub use corridor::{
+    corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
+    CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
+};
 
 use super::layout::{self, Layout};
 use super::material::*;
@@ -220,8 +223,8 @@ pub fn generate(params: &WorldParams) -> World {
         let (c, exit) = corridor::build(
             &mut g.b,
             params.corridor_seed,
-            door_x0,
-            door_x1,
+            params.corridor_len,
+            door_cx,
             depth + WALL_T * 2.0,
         );
         corridor = Some(c);
@@ -1425,9 +1428,8 @@ pub fn generate(params: &WorldParams) -> World {
         ceiling_holes,
         ..
     } = g;
-    // Das Navigationsraster reicht bis ans Ende des Korridors (Verfolger rennen hinterher)
-    let nav_depth = corridor.map_or(depth, |c| c.z1 + 0.5);
-    let nav = build_nav(&b.solids, &b.obbs, width, nav_depth);
+    // Das Navigationsraster endet an der Ladentuer: in den Korridor kommt kein NPC mit
+    let nav = build_nav(&b.solids, &b.obbs, width, depth);
     let mut world = World {
         instances: b.instances,
         lights: b.lights,

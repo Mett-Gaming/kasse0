@@ -22,7 +22,7 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
 7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und drück **E am Band**: Es öffnet sich das **Kassenfenster** mit deinem Wagen links, dem Band in der Mitte und dem Bon rechts. Zieh die Waren **mit gedrückter Maustaste** aufs Band. E oder Esc schließt das Fenster. Dann beginnt das **Kassen-Minispiel** (siehe unten). Bezahlt ist, wenn die Karte durchgezogen und die PIN eingetippt ist (oder du bar und passend gezahlt hast).
 8. **Flucht:** Kaum hast du bezahlt, kommt die Durchsage *"Kunde 0 hat ein Gesicht. Schnappt ihn!"*. Der Alarm geht los, und alle Kunden und Mitarbeiter rennen auf dich zu. Du hörst ihre Schritte immer näher kommen und dein Herz immer schneller schlagen. Lauf zur Tür! Wer dich jetzt erwischt, beendet den Einkauf sofort.
-9. **Der Korridor:** Hinter der Tür wartet ein langer, enger Gang mit rot flackernden Röhren. Weich den Kistenstapeln, umgekippten Regalen und Paletten aus. Sie liegen bei jedem Lauf woanders. An den Wänden hängen Poster: *NICHT UMDREHEN*. Das ist ernst gemeint: **Wer sich umdreht, ist sofort tot**, und was dann direkt vor dir steht, willst du nicht sehen (schon beim Seitenblick färbt sich das Bild rot). Was hinter dir los ist, siehst du nur im großen Spiegel am Ende des Gangs. Der Ausgang liegt kurz davor links.
+9. **Der Korridor:** Hinter der Tür wartet ein langer, niedriger Gang mit rot flackernden Röhren, der **bei jedem Lauf neu gewürfelt** wird: mal links, mal rechts um die Ecke, nie zurück. **Je länger dein Run gedauert hat, desto länger ist er** (40 m bis 140 m). Hinter dir knallt die Tür zu. Im Gang bist du allein, aber es klingt nicht so: Schritte, Atmen, Herzschlag. Etwas rückt nach, und **wer stehen bleibt oder zu langsam ist, wird eingeholt** („SCHNELLER“). Ausdauer ist hier unendlich. Unterwegs: Kistenreihen mit Lücke, Rohre und Rollgitter zum **Ducken** (C oder Strg), Barrieren zum **Springen** (Leertaste), **Schwingtüren** zum Aufdrücken (E, manche klemmen), **Regale, die umkippen**, **Einkaufswagen, die dir entgegenrollen** (ein Treffer lässt dich stolpern), Engstellen, eine **Decke, die sich senkt**, und **Wände, die zusammenrücken** (dazwischen kannst du weiter sprinten). Gestalten stehen im Gang und verschwinden, Lautsprecher sagen Dinge, die du nicht hören willst. Und an den Wänden hängen Poster: *NICHT UMDREHEN*. Das ist ernst gemeint: **Wer sich umdreht, ist sofort tot** (schon beim Seitenblick färbt sich das Bild rot). Am Ende hängt ein großer Spiegel, und in ihm siehst du, dass jemand direkt hinter dir steht. Die Ausgangstür davor klemmt. Drück sie auf, bevor er dich hat.
 
 ### Das Kassen-Minispiel
 In den **Kassenbereich kommen keine NPCs** hinein. Sobald die erste Ware auf dem Band liegt, sind **Kunden und Mitarbeiter harmlos**, solange du an der Kasse bleibst. Dafür beobachtet dich jetzt die **Kassiererin**. Unten links zeigt ein Balken ihr Misstrauen, daneben stehen deine **drei Kassen-Leben**.
@@ -48,8 +48,10 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 |---|---|
 | WASD / Pfeile | Gehen |
 | Shift | Rennen (fällt auf, kostet Ausdauer; die Leiste erscheint, wenn sie nicht voll ist) |
+| Leertaste | Springen (im Fluchtkorridor über niedrige Hindernisse). Mit dem Wagen nur ein kleiner Hopser, der Wagen hopst mit, und beim Aufsetzen fällt zufällig Ware heraus: mal keine, mal eine, mal mehrere |
+| C oder Strg (halten) | Ducken (im Fluchtkorridor unter Rohren und Gittern durch) |
 | Maus | Umsehen |
-| E / Leertaste / Linksklick | Ware aus dem Regal greifen; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: die gewählte Ware aus dem Wagen aufs Band; am Kartenterminal: Kartenleser öffnen, dann Karte aus dem Portemonnaie nehmen (F bricht ab) |
+| E / Linksklick | Ware aus dem Regal greifen; im Fluchtkorridor: Tür aufdrücken; mit Ware in der Hand: auf den Wagen zielen = hineinlegen, aufs Band zielen = aufs Band legen, sonst fallen lassen; auf das Band ohne Ware: die gewählte Ware aus dem Wagen aufs Band; am Kartenterminal: Kartenleser öffnen, dann Karte aus dem Portemonnaie nehmen (F bricht ab) |
 | Q (oder E auf den Wagen) | Wagen stehen lassen / wieder schieben |
 | F (am Wagen) | Ware wieder herausnehmen: die anvisierte (sie leuchtet auf), sonst die zuletzt eingelegte |
 | Mausrad (am Wagen oder Band) | Andere Ware im Wagen anwählen |
@@ -59,7 +61,7 @@ Deine Auffälligkeit zeigt im gekippten Markt ein kleiner Balken unten links (gr
 | 0–9 | PIN am Kartenterminal |
 | R | An der Kasse reklamieren (falsch gescannt) |
 | A / D oder Mausrad, E, F (beim Barzahlen) | Schein oder Münze wählen, hinlegen, zurücknehmen |
-| Esc / P | Pause (mit Tastenübersicht) |
+| Esc / P | Pause (mit übersichtlicher Steuerung: Bewegen und Einkauf & Kasse, Tasten als Tastenkappen) |
 | F1 | Cheat-Menü zum Testen, nach Kategorien: Spieler, Markt & Einkauf, Kasse & Flucht, Leute, Schrecken. Enter oder Rechts öffnet eine Kategorie, Esc oder Links geht zurück |
 | F12 | Screenshot (Ordner *Bilder*) |
 
@@ -146,7 +148,7 @@ Mit dem Auto-Screenshot-Durchlauf rendert das Spiel automatisch alle Screens (Ti
 $env:KASSE0_AUTOSHOT = "$PWD\shots"; cargo run --release -- 1994
 ```
 
-Das Cheat-Menü (**F1**, zwei Spalten) kippt den Markt, füllt den Zettel, erhöht den Warenwert, teleportiert, ruft Mitarbeiter, springt direkt zur Karten- oder Barzahlung, füllt die Leben wieder auf (Markt und Kasse), startet einen Einkauf im Tutorial-Modus oder beendet dort die Anleitung usw. Die rechte Spalte („Schreck: …“) teleportiert an eine passende Stelle und löst genau einen Jumpscare aus (Hinter dir, Stromausfall, Kassiererin, Geisterwagen, Fata Morgana, Deckenkabel, Kopfüber, Monitor, Tod ohne Lebensverlust, Troll-Option). Für Validation-Layer im Debug-Build das LunarG Vulkan SDK installieren.
+Das Cheat-Menü (**F1**, zwei Spalten) kippt den Markt, füllt den Zettel, erhöht den Warenwert, teleportiert, ruft Mitarbeiter, springt direkt zur Karten- oder Barzahlung, füllt die Leben wieder auf (Markt und Kasse), startet einen Einkauf im Tutorial-Modus oder beendet dort die Anleitung, lässt dich sofort sterben (zum Ansehen der Todes-Schriftzüge) usw. Die rechte Spalte („Schreck: …“) teleportiert an eine passende Stelle und löst genau einen Jumpscare aus (Hinter dir, Stromausfall, Kassiererin, Geisterwagen, Fata Morgana, Deckenkabel, Kopfüber, Monitor, Tod ohne Lebensverlust, Troll-Option). Für Validation-Layer im Debug-Build das LunarG Vulkan SDK installieren.
 
 ### Modelle neu konvertieren
 Waren (Katalog `tools/catalog.json`, Quell-Packs in `assets_src/packs`):

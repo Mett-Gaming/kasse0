@@ -73,6 +73,10 @@ pub struct Input {
     pub digit: Option<u8>,
     /// R: an der Kasse reklamieren (falsch gescannt)
     pub complain: bool,
+    /// C oder Strg gehalten: ducken
+    pub crouch: bool,
+    /// Leertaste: springen (Flanke)
+    pub jump: bool,
     /// Kassenfenster (belt_window.rs): Mauszeiger im HUD-Raster, Taste gehalten,
     /// gerade gedrueckt / losgelassen (Flanken werden in update() verbraucht)
     pub ui_mouse: (f32, f32),
@@ -94,6 +98,12 @@ pub struct Player {
     pub exhausted: bool,
     /// rennt gerade wirklich (Taste, in Bewegung, Ausdauer da)
     pub running: bool,
+    /// geduckt 0..1 (weich), Sprunghoehe und -tempo
+    pub crouch: f32,
+    pub jump_y: f32,
+    pub jump_v: f32,
+    /// Sprung mit geschobenem Wagen (beim Aufsetzen faellt Ware heraus)
+    pub cart_jump: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -214,6 +224,8 @@ pub enum Focus {
     Terminal,
     /// Mitarbeiter, der gerade den eigenen Wagen wegschiebt
     Employee(usize),
+    /// Tuer im Fluchtkorridor (Index in corridor.stations)
+    Door(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -314,7 +326,9 @@ pub struct Game {
     pub chase: Option<f32>,
     /// Im Fluchtkorridor umgedreht (Game Over), Korridor schon betreten (Hinweis)
     pub turned_back: bool,
-    corridor_entered: bool,
+    /// Fluchtkorridor: Tueren, Regale, Front ... (game/corridor/), von der Front eingeholt
+    pub corridor_run: Option<corridor::Run>,
+    pub front_caught: bool,
     /// Die nutzlose Zigarette (smoke.rs), Kippen am Boden, ausgeatmeter Rauch (Sekunden)
     pub cig: smoke::Cigarette,
     pub butts: Vec<smoke::Butt>,
@@ -411,6 +425,24 @@ pub const ANNOUNCEMENTS: &[&str] = &[
     "Ein Mitarbeiter bitte in Gang 0.",
     "Bitte schauen Sie nicht weg.",
     "Kasse 0 ist jetzt für Sie geöffnet.",
+    "In Gang 4 wurde ein Gesicht gefunden. Bitte an der Information abholen.",
+    "Der Kunde direkt hinter Ihnen möchte bitte zur Information.",
+    "Heute im Angebot: Ihre Kindheit. Solange der Vorrat reicht.",
+    "Wir haben die Kunden gezählt. Es ist einer zu viel.",
+    "Bitte atmen Sie leiser. Die anderen Kunden schlafen.",
+    "Das Licht in Gang 2 ist kein Licht. Bitte nicht hineinsehen.",
+    "Die Ausgänge wurden verlegt. Wohin, ist nicht bekannt.",
+    "Frisch eingetroffen in der Obstabteilung: Zähne.",
+    "Es ist 25 Uhr. Der Markt hat für Sie geöffnet.",
+    "Bitte melden Sie verdächtige Kunden. Sie sind ein verdächtiger Kunde.",
+    "Ihr Einkaufswagen vermisst Sie. Bitte kehren Sie zu ihm zurück.",
+    "Wir bitten um Ruhe. Etwas hört zu.",
+    "Die Kühltruhe in Gang 6 ist nicht leer. Bitte nicht öffnen.",
+    "Das ist eine Durchsage. Das ist keine Durchsage.",
+    "Kunde 0, Ihre Mutter wartet am Ausgang. Es gibt keinen Ausgang.",
+    "Bitte zählen Sie Ihre Finger. Melden Sie Abweichungen an der Kasse.",
+    "Ein Mitarbeiter bitte in Gang 0. Ein Mitarbeiter ist bereits in Gang 0.",
+    "Liebe Kunden, wir wissen, wo Sie wohnen. Danke für Ihre Treue.",
 ];
 
 impl Game {
@@ -443,6 +475,10 @@ impl Game {
             stamina: 1.0,
             exhausted: false,
             running: false,
+            crouch: 0.0,
+            jump_y: 0.0,
+            jump_v: 0.0,
+            cart_jump: false,
         };
         let trolley = Trolley {
             pos: world.spawn + vec3(0.0, 0.0, -hands::CART_OFFSET),
@@ -515,7 +551,8 @@ impl Game {
             till_caught: false,
             chase: None,
             turned_back: false,
-            corridor_entered: false,
+            corridor_run: None,
+            front_caught: false,
             cig: smoke::Cigarette::None,
             butts: Vec::new(),
             exhale: 0.0,
@@ -796,10 +833,12 @@ impl Game {
         let fall = self
             .dying_progress()
             .map_or(0.0, |k| ((k - 0.3) / 0.4).clamp(0.0, 1.0));
+        // geduckt tiefer, im Sprung hoeher
+        let h = EYE_HEIGHT * (1.0 - 0.45 * p.crouch) + p.jump_y;
         p.pos
             + vec3(
                 0.0,
-                EYE_HEIGHT * (1.0 - 0.8 * fall) + bob + self.sway_at(p.pos).y,
+                h * (1.0 - 0.8 * fall) + bob + self.sway_at(p.pos).y,
                 0.0,
             )
     }
@@ -919,6 +958,7 @@ impl Game {
             input.interact = false;
             input.cart_toggle = false;
             input.take_out = false;
+            input.jump = false;
             input.choice = None;
             input.digit = None;
             input.complain = false;
@@ -932,6 +972,7 @@ impl Game {
             input.interact = false;
             input.cart_toggle = false;
             input.take_out = false;
+            input.jump = false;
             input.choice = None;
             input.digit = None;
             input.complain = false;
@@ -978,6 +1019,7 @@ impl Game {
         input.interact = false;
         input.cart_toggle = false;
         input.take_out = false;
+        input.jump = false;
         input.wheel = 0;
         input.choice = None;
         input.digit = None;
@@ -1000,7 +1042,7 @@ impl Game {
         self.update_suspicion(dt, input);
         self.update_events(dt);
         self.update_chase(dt);
-        self.update_corridor();
+        self.update_corridor(dt);
 
         // Die Schwelle: Getraenkeabteilung betreten und wieder verlassen kippt den Markt.
         let inside = self.world.drinks_zone.contains_xz(self.player.pos);

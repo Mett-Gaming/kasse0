@@ -24,6 +24,8 @@ impl Game {
         self.collect_barrier_draws(out);
         // Tutorial-Modus: Pfeile am Boden, benoetigte Waren leuchten
         self.collect_guide_draws(out);
+        // Fluchtkorridor: Tueren, Regale, Wagen, Decke, Waende (game/corridor/)
+        self.collect_obstacle_draws(out);
         // Zigarette vor der Kamera und weggeschnippte Kippen
         self.collect_cigarette_draws(out);
         // Fliegen um verdorbene Ware in der Naehe
@@ -89,6 +91,9 @@ impl Game {
             fx: Default::default(),
         };
 
+        // Fluchtkorridor: Gestalten vor einem, am Ende die Gestalt hinter einem
+        self.collect_corridor_people(out);
+
         // Figur mit eigenem Animator: Clip, Zeit, Ueberblenden
         let animated = |variant, a: &crate::people::Animator, seed: f32, pos, yaw, tint| {
             let mut d = person(variant, a.clip, a.clip_time(), pos, yaw, tint);
@@ -143,18 +148,15 @@ impl Game {
             out.push(d);
         }
 
-        // Kassiererin an der offenen Kasse: gesichtslose Personal-Figur. Beim Scannen greift sie
-        // zum Band, im gekippten Markt dreht sie sich sonst immer zu dir. Waehrend des Schrecks
-        // "sie beugt sich vor" zeichnet scares.rs sie.
+        // Kassiererin an der offenen Kasse: gesichtslose Personal-Figur. Sie sitzt immer fest auf
+        // ihrem Stuhl zum Band hin - auch im gekippten Markt und bei der Flucht dreht sie sich
+        // nicht mit, wenn man herumlaeuft. Waehrend des Schrecks "sie beugt sich vor" zeichnet
+        // scares.rs sie.
         if let Some(lane) = self.open_lane().filter(|_| !self.cashier_standing()) {
-            // schaut sie auf (till/pressure.rs), ruckt sie zum Spieler herum und leuchtet heller
+            // schaut sie auf (till/pressure.rs), ruckt nur ihr Kopf zum Spieler herum und sie
+            // leuchtet heller
             let looking = self.cashier_looking();
-            let scanning = self.scan_timer > 0.0 && !looking;
-            let yaw = if looking || (self.tipped && !scanning) {
-                npc::yaw_towards(lane.seat, self.player.pos)
-            } else {
-                -std::f32::consts::FRAC_PI_2
-            };
+            let yaw = CASHIER_YAW;
             let glow = if self.cashier_staring() {
                 0.5 + 0.1 * (t * 17.0).sin()
             } else if self.tipped {
@@ -165,19 +167,24 @@ impl Game {
             // beim Aufschauen friert sie ein (keine Bewegung im Clip)
             let anim_t = if looking { 0.0 } else { t };
             // sie sitzt auf dem Buerostuhl: Figur so stellen, dass das Gesaess auf der
-            // Sitzflaeche liegt (dreht sich mit dem Stuhl zu dir, wenn sie dich ansieht)
+            // Sitzflaeche liegt (der Stuhl steht fest, sie auch)
             let facing = vec3(yaw.sin(), 0.0, yaw.cos());
             let pos = lane.seat
                 + facing * crate::people::SIT_BACK
                 + vec3(0.0, crate::people::SIT_UP, 0.0);
-            out.push(person(
+            let mut d = person(
                 self.cashier_variant,
                 Clip::Sit,
                 anim_t,
                 pos,
                 yaw,
                 Vec4::new(1.0, 1.0, 1.0, glow),
-            ));
+            );
+            if looking {
+                d.look_at = Some(eye);
+                d.fx.look_limit = STAFF_LOOK_LIMIT;
+            }
+            out.push(d);
         }
 
         // Schrecken: aufgestandene Kassiererin, Gestalt im Deckenloch, Gesicht beim Tod
@@ -372,6 +379,8 @@ const CUSTOMER_LOOK_DIST: f32 = 14.0;
 const STAFF_LOOK_DIST: f32 = 9.0;
 /// so weit dreht das Personal den Kopf (Radiant, menschlich)
 const STAFF_LOOK_LIMIT: f32 = 1.1;
+/// Blickrichtung der sitzenden Kassiererin: zum Band (der Stuhl steht fest)
+pub(super) const CASHIER_YAW: f32 = -std::f32::consts::FRAC_PI_2;
 
 impl Game {
     /// Wie weit eine Kundin an `pos` den Kopf nach dir drehen darf (None = gar nicht).
