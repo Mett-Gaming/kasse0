@@ -589,6 +589,7 @@ fn last_scare_at_the_exit_does_not_kill() {
         press_e(&mut g);
         step(&mut g, 0.1, Input::default());
     }
+    g.sfx.clear();
     step(
         &mut g,
         3.0,
@@ -602,6 +603,13 @@ fn last_scare_at_the_exit_does_not_kill() {
         "kein letzter Schreck"
     );
     assert_eq!(g.outcome, Outcome::Won);
+    // geschafft: der letzte Schreck ist nur zu sehen, nicht zu hoeren
+    assert!(
+        !g.sfx
+            .iter()
+            .any(|(s, _)| matches!(s, Sfx::Scare | Sfx::Shriek)),
+        "Schreck-Ton beim Entkommen"
+    );
 }
 
 /// Ein Testlaeufer: rennt die Mittellinie entlang, weicht Bloecken aus, duckt, springt und

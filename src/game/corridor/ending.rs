@@ -1,7 +1,7 @@
 //! Das Ende des Gangs: Im letzten Stueck steht eine Gestalt dicht hinter einem - sehen kann man
 //! sie nur im Spiegel (umdrehen ist toedlich). Die Ausgangstuer seitlich vor dem Spiegel klemmt
-//! immer (3x E); wer zu lange braucht, wird eingeholt. Hinter der Tuer: ein letzter Schreck,
-//! dann ist man draussen.
+//! immer (3x E); wer zu lange braucht, wird eingeholt. Hinter der Tuer: ein letzter, stummer
+//! Schreck (nur Bild, kein Ton), dann ist man draussen.
 
 use super::*;
 use crate::people::{Clip, PersonDraw};
@@ -36,8 +36,10 @@ impl Game {
         if r.ending && through && !r.last_scare {
             // der letzte Schreck: Gesicht, Schrei, Lichtblitz - aber man ist durch
             r.last_scare = true;
+            // nur fuers Auge (Blitz, Rot, Rauschen) - geschafft ist geschafft: kein Schreck-Ton
+            let quiet = self.sfx.len();
             self.fire_scare(0.9);
-            self.play(Sfx::Shriek, 1.0);
+            self.sfx.truncate(quiet);
             self.red = self.red.max(0.6);
             self.glitch = 1.0;
         }
