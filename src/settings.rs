@@ -7,6 +7,8 @@ use mettgine::settings::KeyValues;
 pub struct Settings {
     pub sensitivity: f32,
     pub volume: f32,
+    /// Musik, zusaetzlich zur Gesamtlautstaerke
+    pub music: f32,
     pub vhs: f32,
     pub fov: f32,
     pub fullscreen: bool,
@@ -25,6 +27,7 @@ impl Default for Settings {
         Self {
             sensitivity: 1.0,
             volume: 0.8,
+            music: 1.0,
             vhs: 1.0,
             fov: 70.0,
             fullscreen: true,
@@ -49,6 +52,7 @@ impl Settings {
         Self {
             sensitivity: kv.f32("sensitivity", d.sensitivity, 0.2, 3.0),
             volume: kv.f32("volume", d.volume, 0.0, 1.0),
+            music: kv.f32("music", d.music, 0.0, 1.0),
             vhs: kv.f32("vhs", d.vhs, 0.0, 1.5),
             fov: kv.f32("fov", d.fov, 55.0, 100.0),
             fullscreen: kv.str("fullscreen") != Some("false"),
@@ -66,6 +70,7 @@ impl Settings {
         let mut kv = KeyValues::default();
         kv.set("sensitivity", self.sensitivity);
         kv.set("volume", self.volume);
+        kv.set("music", self.music);
         kv.set("vhs", self.vhs);
         kv.set("fov", self.fov);
         kv.set("fullscreen", self.fullscreen);
@@ -76,17 +81,46 @@ impl Settings {
         kv
     }
 
+    /// Zahl hinter einer Zeile mit Schieberegler.
+    pub fn number(&self, row: Row) -> f32 {
+        match row {
+            Row::Sensitivity => self.sensitivity,
+            Row::Volume => self.volume,
+            Row::Music => self.music,
+            Row::Vhs => self.vhs,
+            Row::Fov => self.fov,
+            _ => 0.0,
+        }
+    }
+
+    /// Schieberegler setzen (in seinen Grenzen).
+    pub fn set_number(&mut self, row: Row, v: f32) {
+        let Some((min, max)) = row.range() else {
+            return;
+        };
+        // gerundet, sonst sammeln sich Fehler der Schritte an
+        let v = (v.clamp(min, max) * 100.0).round() / 100.0;
+        match row {
+            Row::Sensitivity => self.sensitivity = v,
+            Row::Volume => self.volume = v,
+            Row::Music => self.music = v,
+            Row::Vhs => self.vhs = v,
+            Row::Fov => self.fov = v.round(),
+            _ => {}
+        }
+    }
+
     /// Wert einer Optionszeile verstellen; `dir` = +1/-1.
     pub fn change(&mut self, row: Row, dir: i32) {
-        // gerundet, sonst sammeln sich Fehler der Schritte an
-        let step = |v: f32, by: f32, min: f32, max: f32| {
-            ((v + by * dir as f32).clamp(min, max) * 100.0).round() / 100.0
-        };
         match row {
-            Row::Sensitivity => self.sensitivity = step(self.sensitivity, 0.1, 0.2, 3.0),
-            Row::Volume => self.volume = step(self.volume, 0.1, 0.0, 1.0),
-            Row::Vhs => self.vhs = step(self.vhs, 0.25, 0.0, 1.5),
-            Row::Fov => self.fov = step(self.fov, 5.0, 55.0, 100.0),
+            Row::Sensitivity | Row::Volume | Row::Music | Row::Vhs | Row::Fov => {
+                let step = match row {
+                    Row::Vhs => 0.25,
+                    Row::Fov => 5.0,
+                    _ => 0.1,
+                };
+                self.set_number(row, self.number(row) + step * dir as f32);
+            }
             Row::Fullscreen => self.fullscreen = !self.fullscreen,
             Row::FpsLimit => {
                 let n = FPS_LIMITS.len() as i32;
@@ -95,7 +129,7 @@ impl Settings {
                 self.fps_limit = FPS_LIMITS[next as usize];
             }
             Row::LowLatency => self.low_latency = !self.low_latency,
-            Row::Open(_) | Row::Jumpscares | Row::Tutorial | Row::Back => {}
+            Row::Tabs | Row::Jumpscares | Row::Tutorial | Row::Back => {}
         }
     }
 
@@ -125,9 +159,12 @@ mod tests {
 
     #[test]
     fn every_value_row_changes_something_and_the_rate_wraps_around() {
-        use crate::hud::options::{rows, Page};
-        for page in [Page::Graphics, Page::Sound, Page::Controls] {
-            for row in rows(page, true).into_iter().filter(|r| r.is_value()) {
+        use crate::hud::options::{rows, PAGES};
+        for page in PAGES {
+            for row in rows(page, true)
+                .into_iter()
+                .filter(|r| r.is_value() && !matches!(r, Row::Tabs | Row::Jumpscares))
+            {
                 let mut s = Settings::default();
                 s.change(row, -1);
                 assert_ne!(s, Settings::default(), "{row:?} tut nichts");
@@ -145,6 +182,7 @@ mod tests {
         let s = Settings {
             sensitivity: 1.5,
             volume: 0.3,
+            music: 0.4,
             vhs: 0.5,
             fov: 80.0,
             fullscreen: true,

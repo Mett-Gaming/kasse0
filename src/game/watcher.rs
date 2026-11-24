@@ -45,6 +45,17 @@ impl Game {
         (-self.player.pos.x / 1.0).clamp(0.0, 1.0)
     }
 
+    /// Liegt etwas zwischen dem Spieler und einem Geraeusch? (dann klingt es dumpf)
+    pub fn sound_hidden(&self, at: Vec3) -> bool {
+        let eye = self.eye();
+        // Geraeusche am Boden kommen aus Huefthoehe; der letzte halbe Meter zaehlt nicht
+        // (Klopfen an einer Tuer liegt in der Tuer)
+        let at = vec3(at.x, at.y.max(1.0), at.z);
+        let d = at - eye;
+        let len = d.length();
+        len > 1.0 && !self.world.line_of_sight(eye, eye + d * ((len - 0.5) / len))
+    }
+
     /// Cheat: Markt kippen und in den ersten Raum des Seitentrakts stellen, Blick nach Westen.
     pub(super) fn debug_to_wing(&mut self) -> String {
         self.tip();

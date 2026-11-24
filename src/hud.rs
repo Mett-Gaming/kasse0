@@ -61,14 +61,14 @@ pub const END_ITEMS: &[&str] = &["Nochmal (gleicher Seed)", "Neuer Einkauf", "Ha
 pub fn menu_layout(screen: Screen) -> (f32, f32) {
     match screen {
         Screen::Title => (150.0, 18.0),
-        Screen::Options { .. } => (82.0, 17.0),
         Screen::Paused => (66.0, 16.0),
         Screen::End => (205.0, 16.0),
         Screen::Cheats { group: None } => (62.0, 22.0),
         Screen::Cheats { group: Some(_) } => (56.0, 15.0),
         Screen::AskTutorial => (150.0, 18.0),
         Screen::Champ | Screen::TutorialDone => (158.0, 18.0),
-        Screen::Playing => (0.0, 0.0),
+        // Optionen ordnet hud/options.rs selbst an
+        Screen::Playing | Screen::Options { .. } => (0.0, 0.0),
     }
 }
 
@@ -112,6 +112,9 @@ pub fn two_column_rows(screen: Screen) -> Option<usize> {
 }
 
 pub fn menu_hit(screen: Screen, x: f32, y: f32) -> Option<usize> {
+    if matches!(screen, Screen::Options { .. }) {
+        return options::hit(menu_len(screen), x, y);
+    }
     let (_, step) = menu_layout(screen);
     (0..menu_len(screen)).find(|&i| {
         let (cx, top, w) = menu_cell(screen, i);
@@ -860,7 +863,7 @@ mod tests {
             1.0,
             &Settings::default(),
             true,
-            options::Page::Main,
+            options::Page::Display,
         );
         draw_pause(&mut u, 1, 1.0, &g);
         draw_hud(&mut u, &g, true, 1.0);
@@ -897,8 +900,8 @@ mod tests {
 
     #[test]
     fn jumpscares_cannot_be_switched_off() {
-        let shown = options::label(options::Row::Jumpscares, &Settings::default());
-        assert!(shown.starts_with("Jumpscares") && shown.contains("An"));
+        let shown = options::value(options::Row::Jumpscares, &Settings::default());
+        assert_eq!(shown, "An");
         let mut u = Ui::default();
         for e in [0.0, 0.5, 1.5, 3.0] {
             draw_menu_scare(&mut u, e, 1.0);

@@ -48,7 +48,7 @@ struct App {
     wishes: Wishes,
     game: Game,
     settings: Settings,
-    audio: Option<Audio>,
+    audio: Audio,
     screen: Screen,
     sel: usize,
     ui: ui::Ui,
@@ -93,7 +93,7 @@ fn random_seed() -> u64 {
 impl App {
     fn new(fixed_seed: Option<u64>) -> Self {
         let settings = Settings::load();
-        let audio = Audio::new(settings.volume);
+        let audio = Audio::new(settings.volume, settings.music);
         let mut game = Game::new(random_seed());
         game.player.pos = game.world.spawn + glam::vec3(0.0, 0.0, -2.0);
         Self {
@@ -131,16 +131,12 @@ impl App {
         }
     }
 
-    fn sfx(&self, s: Sfx) {
-        if let Some(a) = &self.audio {
-            a.play(s);
-        }
+    fn sfx(&mut self, s: Sfx) {
+        self.audio.play(s);
     }
 
-    fn sfx_vol(&self, s: Sfx, vol: f32) {
-        if let Some(a) = &self.audio {
-            a.play_vol(s, vol);
-        }
+    fn sfx_vol(&mut self, s: Sfx, vol: f32) {
+        self.audio.play_vol(s, vol);
     }
 
     /// Troll-Jumpscare starten (Optionen, oder Cheat).
@@ -197,9 +193,8 @@ impl App {
     fn apply_settings(&mut self) {
         self.game.sensitivity = self.settings.sensitivity;
         self.game.fov_deg = self.settings.fov;
-        if let Some(a) = &mut self.audio {
-            a.set_master(self.settings.volume);
-        }
+        self.audio
+            .set_volumes(self.settings.volume, self.settings.music);
         self.wishes.fullscreen = Some(self.wanted_fullscreen());
         self.wishes.pace = true;
     }
@@ -236,7 +231,7 @@ impl App {
         Screen::Options {
             from_pause,
             tutorial: self.settings.tutorial_done,
-            page: Page::Main,
+            page: Page::Display,
         }
     }
 
@@ -261,47 +256,34 @@ impl App {
         }
     }
 
-    /// Andere Seite der Optionen zeigen.
-    fn open_options(&mut self, to: Page) {
+    /// Anderen Reiter der Optionen zeigen.
+    fn open_page(&mut self, to: Page) {
         if let Screen::Options { page, .. } = &mut self.screen {
-            let from = std::mem::replace(page, to);
-            // zurueck auf die Zeile, aus der man kam
-            self.sel = match to {
-                Page::Main => options::rows(to, true)
-                    .iter()
-                    .position(|r| *r == Row::Open(from))
-                    .unwrap_or(0),
-                _ => 0,
-            };
+            *page = to;
+            // auf den Reitern bleiben, damit man weiterblaettern kann
+            self.sel = 0;
+            self.sfx(Sfx::Blip);
         }
     }
 
-    /// Eine Ebene zurueck: Seite -> Optionen -> Pause bzw. Hauptmenue.
     fn leave_options(&mut self) {
         self.settings.save();
-        let Screen::Options {
-            from_pause, page, ..
-        } = self.screen
-        else {
-            return;
-        };
-        if page != Page::Main {
-            self.open_options(Page::Main);
-            return;
-        }
-        self.go(if from_pause {
-            Screen::Paused
-        } else {
-            Screen::Title
+        self.go(match self.screen {
+            Screen::Options {
+                from_pause: true, ..
+            } => Screen::Paused,
+            _ => Screen::Title,
         });
         // zurueck auf "Optionen" (in Pause und Hauptmenue die 2. Zeile)
         self.sel = 1;
     }
 
     fn activate_option(&mut self, dir: i32) {
-        let Some(row) = self.option_row() else { return };
+        let (Some(row), Screen::Options { page, .. }) = (self.option_row(), self.screen) else {
+            return;
+        };
         match row {
-            Row::Open(page) => return self.open_options(page),
+            Row::Tabs => return self.open_page(page.next(dir)),
             Row::Back => return self.leave_options(),
             // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
             Row::Jumpscares => return self.start_menu_scare(),
@@ -313,6 +295,29 @@ impl App {
         }
         self.apply_settings();
         self.settings.save();
+    }
+
+    /// Mausklick in den Optionen: Reiter und Schieberegler treffen, sonst wie im Menue.
+    fn click_option(&mut self, dir: i32) {
+        let x = self.cursor.0;
+        match self.option_row() {
+            Some(Row::Tabs) => {
+                if let Some(p) = options::tab_at(x) {
+                    self.sfx(Sfx::Click);
+                    self.open_page(p);
+                }
+            }
+            Some(row) => match options::slider_value(row, x) {
+                Some(v) if dir > 0 => {
+                    self.settings.set_number(row, v);
+                    self.sfx(Sfx::Click);
+                    self.apply_settings();
+                    self.settings.save();
+                }
+                _ => self.activate(dir),
+            },
+            None => {}
+        }
     }
 
     /// Menuepunkt ausloesen. `dir` = +1/-1 fuer Optionswerte.
@@ -533,28 +538,24 @@ impl App {
             _ => {}
         }
 
-        if let Some(a) = &self.audio {
-            for (s, v) in self.game.sfx.drain(..) {
-                a.play_vol(s, v);
-            }
-            self.game.scares.clear();
-            // Geraeusche mit Ort: leiser mit der Entfernung, links/rechts nach Richtung
-            let eye = self.game.eye();
-            let right = self
-                .game
-                .view_dir()
-                .cross(glam::Vec3::Y)
-                .normalize_or_zero();
-            for (s, v, at) in self.game.sfx_at.drain(..) {
-                let d = at - eye;
-                let dist = d.length();
-                let fall = (1.0 - dist / audio::HEAR_RANGE).clamp(0.0, 1.0).powf(1.5);
-                if fall > 0.0 {
-                    let pan = right.dot(d / dist.max(0.01)).clamp(-1.0, 1.0);
-                    a.play_at(s, v * fall, pan);
-                }
-            }
-            a.update(&Mood {
+        for (s, v) in self.game.sfx.drain(..) {
+            self.audio.play_vol(s, v);
+        }
+        self.game.scares.clear();
+        // Geraeusche mit Ort: hinter Regalen dumpf
+        let eye = self.game.eye();
+        for (s, v, at) in std::mem::take(&mut self.game.sfx_at) {
+            let hidden = self.game.sound_hidden(at);
+            let muffled = if hidden { audio::HIDDEN } else { 0.0 };
+            self.audio.play_at(s, v, at, muffled);
+        }
+        let listener = audio::Listener {
+            pos: eye,
+            forward: self.game.view_dir(),
+            ..Default::default()
+        };
+        self.audio.update(
+            &Mood {
                 playing: !hud::on_title(self.screen),
                 tipped: self.game.tipped,
                 tier: self.game.tier.level(),
@@ -569,10 +570,11 @@ impl App {
                 ),
                 hush: self.game.hush(),
                 muffle: self.game.wing_muffle(),
-            });
-        } else {
-            self.game.sfx.clear();
-        }
+                dull: (self.game.trip_level() * 0.7).max(self.game.dying_progress().unwrap_or(0.0)),
+            },
+            listener,
+            dt,
+        );
 
         // UI aufbauen
         self.ui.clear();
@@ -834,6 +836,14 @@ impl App {
             return;
         }
         let n = hud::menu_len(self.screen);
+        if let Screen::Options { page, .. } = self.screen {
+            // Reiter wechseln: Tab / E weiter, Q zurueck
+            match code {
+                KeyCode::Tab | KeyCode::KeyE if !repeat => return self.open_page(page.next(1)),
+                KeyCode::KeyQ if !repeat => return self.open_page(page.next(-1)),
+                _ => {}
+            }
+        }
         match code {
             KeyCode::ArrowUp | KeyCode::KeyW => {
                 self.sel = (self.sel + n - 1) % n.max(1);
@@ -987,7 +997,11 @@ impl mettgine::app::Game for App {
                     self.sel = i;
                     let dir = if *button == MouseButton::Right { -1 } else { 1 };
                     if *button == MouseButton::Left || *button == MouseButton::Right {
-                        self.activate(dir);
+                        if matches!(self.screen, Screen::Options { .. }) {
+                            self.click_option(dir);
+                        } else {
+                            self.activate(dir);
+                        }
                     }
                 }
             }
