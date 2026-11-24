@@ -3,6 +3,8 @@
 
 use std::{env, fs, path::PathBuf};
 
+include!("mettgine/game_build.rs");
+
 /// Erzeugt OUT_DIR/products_gen.rs: Katalog-JSON + alle Waren-Modelle eingebettet.
 fn gen_products(out: &std::path::Path) {
     println!("cargo:rerun-if-changed=tools/catalog.json");
@@ -77,37 +79,8 @@ fn gen_people(out: &std::path::Path) {
     fs::write(out.join("people_gen.rs"), code).unwrap();
 }
 
-/// Version fuer Absturzberichte: in der CI der Tag, sonst `git describe`, sonst Cargo.toml.
-fn gen_version() {
-    println!("cargo:rerun-if-env-changed=GITHUB_REF_NAME");
-    println!("cargo:rerun-if-changed=.git/HEAD");
-    println!("cargo:rerun-if-changed=.git/refs/tags");
-    let version = env::var("GITHUB_REF_NAME")
-        .ok()
-        .filter(|r| r.starts_with('v'))
-        .or_else(|| {
-            std::process::Command::new("git")
-                .args(["describe", "--tags", "--always"])
-                .output()
-                .ok()
-                .filter(|o| o.status.success())
-                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        })
-        .unwrap_or_else(|| env::var("CARGO_PKG_VERSION").unwrap());
-    println!("cargo:rustc-env=KASSE0_VERSION={version}");
-    // Absturzfenster: moderne Windows-Bedienelemente (Common Controls 6)
-    if env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
-        println!("cargo:rustc-link-arg-bins=/MANIFEST:EMBED");
-        println!(
-            "cargo:rustc-link-arg-bins=/MANIFESTDEPENDENCY:type='win32' \
-             name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
-             processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
-        );
-    }
-}
-
 fn main() {
-    gen_version();
+    mettgine_game("KASSE0_VERSION");
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     gen_products(&out);
     gen_people(&out);
