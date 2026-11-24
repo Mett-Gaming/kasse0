@@ -290,3 +290,6 @@ Eigenes Modell, ausdrücklich gewünschte Ausnahme von der Regel „keine selbst
 
 ## Randloses Vollbild
 Das Spiel startet im randlosen Vollbild (`Settings::fullscreen`, Standard an). Das Fenster entsteht direkt so, ohne kurz klein aufzublitzen. In den Optionen abschaltbar, die Wahl wird gespeichert. Autoshot bleibt im Fenster.
+
+## Optionen auf Seiten, Bildtakt (v0.29)
+`hud/options.rs`: Jede Zeile ist ein `Row`, jede Seite (`Page`) eine Liste davon; `Settings::change` verstellt den Wert. Bildrate (frei, 60, 120, 144, 240) und „Weniger Verzögerung“ (Reflex/Anti-Lag der Engine, Vorgabe an). Fällt die Grafikkarte aus, steht der Grund des Treibers im Absturzbericht.

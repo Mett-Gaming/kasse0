@@ -1,6 +1,7 @@
 //! HUD, Menues und End-Screens (alles im 480x270-Raster, unter dem VHS-Effekt).
 
 mod belt_window;
+pub mod options;
 mod smoke;
 mod till;
 
@@ -17,6 +18,7 @@ pub enum Screen {
         from_pause: bool,
         /// Zeile "Tutorial spielen" (erst, wenn man das Tutorial einmal geschafft hat)
         tutorial: bool,
+        page: options::Page,
     },
     Playing,
     Paused,
@@ -55,33 +57,6 @@ pub const PAUSE_ITEMS: &[&str] = &[
     "Beenden",
 ];
 pub const END_ITEMS: &[&str] = &["Nochmal (gleicher Seed)", "Neuer Einkauf", "Hauptmenü"];
-/// Optionen ohne die Tutorial-Zeile; davon lassen sich die ersten OPTION_VALUES mit
-/// links/rechts verstellen (danach: ggf. "Tutorial spielen", "Zurück")
-pub const OPTION_COUNT: usize = 7;
-pub const OPTION_VALUES: usize = 6;
-/// Zeile "Tutorial spielen" in den Optionen (nur nach einem geschafften Tutorial)
-pub const OPTION_TUTORIAL: usize = OPTION_VALUES;
-
-pub fn option_rows(s: &Settings) -> Vec<String> {
-    let mut rows = vec![
-        format!("Mausempfindlichkeit   < {:.1}x >", s.sensitivity),
-        format!("Lautstärke            < {:>3.0}% >", s.volume * 100.0),
-        format!("VHS-Effekt            < {:>3.0}% >", s.vhs * 100.0),
-        format!("Sichtfeld             < {:>3.0}° >", s.fov),
-        format!(
-            "Vollbild              < {:<4} >",
-            if s.fullscreen { "An" } else { "Aus" }
-        ),
-        // laesst sich nicht abschalten (siehe main.rs: menu_scare)
-        "Jumpscares            < An   >".to_string(),
-    ];
-    if s.tutorial_done {
-        rows.push("Tutorial spielen".to_string());
-    }
-    rows.push("Zurück".to_string());
-    rows
-}
-
 /// Erste Menuezeile (y) und Zeilenabstand fuer Zeichnen und Maus-Treffer.
 pub fn menu_layout(screen: Screen) -> (f32, f32) {
     match screen {
@@ -100,7 +75,7 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
 pub fn menu_len(screen: Screen) -> usize {
     match screen {
         Screen::Title => TITLE_ITEMS.len(),
-        Screen::Options { tutorial, .. } => OPTION_COUNT + tutorial as usize,
+        Screen::Options { tutorial, page, .. } => options::rows(page, tutorial).len(),
         Screen::Paused => PAUSE_ITEMS.len(),
         Screen::End => END_ITEMS.len(),
         Screen::Cheats { group: None } => crate::game::cheat_groups().len() + 1,
@@ -233,40 +208,6 @@ pub fn draw_ask_tutorial(u: &mut Ui, screen: Screen, sel: usize, time: f32) {
         let items: Vec<String> = ASK_ITEMS.iter().map(|s| s.to_string()).collect();
         draw_menu(u, screen, &items, sel, time);
     }
-}
-
-pub fn draw_options(u: &mut Ui, sel: usize, time: f32, s: &Settings, from_pause: bool) {
-    u.rect(
-        0.0,
-        0.0,
-        ui::W,
-        ui::H,
-        [0.0, 0.0, 0.0, if from_pause { 0.7 } else { 0.5 }],
-    );
-    u.text_center(40.0, "OPTIONEN", WHITE, 2.0);
-    draw_menu(
-        u,
-        Screen::Options {
-            from_pause,
-            tutorial: s.tutorial_done,
-        },
-        &option_rows(s),
-        sel,
-        time,
-    );
-    u.text_center(
-        214.0,
-        "Pfeiltasten / A D ändern - Enter bestätigt - Esc zurück",
-        DIM,
-        1.0,
-    );
-    u.text_center(228.0, "Klick: erhöhen - Rechtsklick: verringern", DIM, 1.0);
-    u.text_center(
-        250.0,
-        "Modelle: Quaternius, Poly Haven, Poly by Google",
-        DIM,
-        1.0,
-    );
 }
 
 pub fn draw_pause(u: &mut Ui, sel: usize, time: f32, g: &Game) {
@@ -913,7 +854,14 @@ mod tests {
             assert!(y0 > 70.0 && y0 + menu_len(s) as f32 * 18.0 < 190.0);
             assert_eq!(menu_hit(s, 240.0, y0 + 2.0), Some(0));
         }
-        draw_options(&mut u, 2, 1.0, &Settings::default(), true);
+        options::draw(
+            &mut u,
+            2,
+            1.0,
+            &Settings::default(),
+            true,
+            options::Page::Main,
+        );
         draw_pause(&mut u, 1, 1.0, &g);
         draw_hud(&mut u, &g, true, 1.0);
         g.outcome = Outcome::Won;
@@ -949,27 +897,8 @@ mod tests {
 
     #[test]
     fn jumpscares_cannot_be_switched_off() {
-        let rows = option_rows(&Settings::default());
-        assert_eq!(rows.len(), OPTION_COUNT);
-        assert!(rows[5].starts_with("Jumpscares") && rows[5].contains("An"));
-        // "Tutorial spielen" erst nach einem geschafften Tutorial, vor "Zurück"
-        assert!(!rows.iter().any(|r| r.contains("Tutorial")));
-        let done = Settings {
-            tutorial_done: true,
-            ..Settings::default()
-        };
-        let rows = option_rows(&done);
-        assert_eq!(rows.len(), OPTION_COUNT + 1);
-        assert_eq!(rows[OPTION_TUTORIAL], "Tutorial spielen");
-        assert_eq!(rows.last().unwrap(), "Zurück");
-        let with = Screen::Options {
-            from_pause: false,
-            tutorial: true,
-        };
-        assert_eq!(menu_len(with), rows.len());
-        // alle Zeilen passen auf den Bildschirm (ueber dem Hinweis bei y = 214)
-        let (y0, step) = menu_layout(with);
-        assert!(y0 + step * (rows.len() as f32 - 1.0) + 12.0 <= 214.0);
+        let shown = options::label(options::Row::Jumpscares, &Settings::default());
+        assert!(shown.starts_with("Jumpscares") && shown.contains("An"));
         let mut u = Ui::default();
         for e in [0.0, 0.5, 1.5, 3.0] {
             draw_menu_scare(&mut u, e, 1.0);

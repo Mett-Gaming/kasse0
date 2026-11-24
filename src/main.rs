@@ -21,6 +21,7 @@ mod world;
 
 use audio::{Audio, Mood, Sfx};
 use game::{Game, Outcome};
+use hud::options::{self, Page, Row};
 use hud::Screen;
 use settings::Settings;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -38,6 +39,8 @@ struct Wishes {
     grab: Option<bool>,
     fullscreen: Option<bool>,
     title: Option<String>,
+    /// Verzoegerung und Bildrate neu einstellen
+    pace: bool,
     quit: bool,
 }
 
@@ -173,6 +176,16 @@ impl App {
         if let Some(full) = w.fullscreen {
             stage.set_fullscreen(full);
         }
+        if w.pace {
+            stage
+                .renderer
+                .set_low_latency(if self.settings.low_latency {
+                    render::LowLatency::On
+                } else {
+                    render::LowLatency::Off
+                });
+            stage.renderer.set_fps_limit(self.settings.fps_limit as f32);
+        }
         if let Some(t) = w.title {
             stage.window.set_title(&t);
         }
@@ -188,6 +201,7 @@ impl App {
             a.set_master(self.settings.volume);
         }
         self.wishes.fullscreen = Some(self.wanted_fullscreen());
+        self.wishes.pace = true;
     }
 
     /// Neuer Einkauf; `tutorial` = Tutorial-Modus (Anleitung, Wegweiser, entschaerft).
@@ -222,6 +236,7 @@ impl App {
         Screen::Options {
             from_pause,
             tutorial: self.settings.tutorial_done,
+            page: Page::Main,
         }
     }
 
@@ -234,6 +249,70 @@ impl App {
             self.input = game::Input::default();
             self.show_list = false;
         }
+    }
+
+    /// Gewaehlte Zeile, wenn gerade Optionen offen sind.
+    fn option_row(&self) -> Option<Row> {
+        match self.screen {
+            Screen::Options { tutorial, page, .. } => {
+                options::rows(page, tutorial).get(self.sel).copied()
+            }
+            _ => None,
+        }
+    }
+
+    /// Andere Seite der Optionen zeigen.
+    fn open_options(&mut self, to: Page) {
+        if let Screen::Options { page, .. } = &mut self.screen {
+            let from = std::mem::replace(page, to);
+            // zurueck auf die Zeile, aus der man kam
+            self.sel = match to {
+                Page::Main => options::rows(to, true)
+                    .iter()
+                    .position(|r| *r == Row::Open(from))
+                    .unwrap_or(0),
+                _ => 0,
+            };
+        }
+    }
+
+    /// Eine Ebene zurueck: Seite -> Optionen -> Pause bzw. Hauptmenue.
+    fn leave_options(&mut self) {
+        self.settings.save();
+        let Screen::Options {
+            from_pause, page, ..
+        } = self.screen
+        else {
+            return;
+        };
+        if page != Page::Main {
+            self.open_options(Page::Main);
+            return;
+        }
+        self.go(if from_pause {
+            Screen::Paused
+        } else {
+            Screen::Title
+        });
+        // zurueck auf "Optionen" (in Pause und Hauptmenue die 2. Zeile)
+        self.sel = 1;
+    }
+
+    fn activate_option(&mut self, dir: i32) {
+        let Some(row) = self.option_row() else { return };
+        match row {
+            Row::Open(page) => return self.open_options(page),
+            Row::Back => return self.leave_options(),
+            // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
+            Row::Jumpscares => return self.start_menu_scare(),
+            Row::Tutorial => {
+                self.settings.save();
+                return self.start_game(random_seed(), true);
+            }
+            _ => self.settings.change(row, dir),
+        }
+        self.apply_settings();
+        self.settings.save();
     }
 
     /// Menuepunkt ausloesen. `dir` = +1/-1 fuer Optionswerte.
@@ -283,48 +362,7 @@ impl App {
                 _ => self.to_title(),
             },
             Screen::TutorialDone => self.to_title(),
-            Screen::Options {
-                from_pause,
-                tutorial,
-            } => {
-                // "Tutorial spielen" (nur nach einem geschafften Tutorial): neuer Tutorial-Einkauf
-                if tutorial && self.sel == hud::OPTION_TUTORIAL {
-                    self.settings.save();
-                    self.start_game(random_seed(), true);
-                    return;
-                }
-                let s = &mut self.settings;
-                let d = dir as f32;
-                match self.sel {
-                    0 => s.sensitivity = (s.sensitivity + 0.1 * d).clamp(0.2, 3.0),
-                    1 => s.volume = (s.volume + 0.1 * d).clamp(0.0, 1.0),
-                    2 => s.vhs = (s.vhs + 0.25 * d).clamp(0.0, 1.5),
-                    3 => s.fov = (s.fov + 5.0 * d).clamp(55.0, 100.0),
-                    4 => s.fullscreen = !s.fullscreen,
-                    5 => {
-                        // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
-                        self.start_menu_scare();
-                        return;
-                    }
-                    _ => {
-                        self.settings.save();
-                        let back = if from_pause {
-                            Screen::Paused
-                        } else {
-                            Screen::Title
-                        };
-                        self.go(back);
-                        // zurueck auf "Optionen" (in Pause und Hauptmenue die 2. Zeile)
-                        self.sel = 1;
-                        return;
-                    }
-                }
-                // Rundungsfehler der Schritte vermeiden
-                s.sensitivity = (s.sensitivity * 10.0).round() / 10.0;
-                s.volume = (s.volume * 10.0).round() / 10.0;
-                self.apply_settings();
-                self.settings.save();
-            }
+            Screen::Options { .. } => self.activate_option(dir),
             // Kategorien: Kategorie oeffnen oder zurueck ins Spiel
             Screen::Cheats { group: None } => {
                 if self.sel < game::cheat_groups().len() {
@@ -376,15 +414,7 @@ impl App {
         match self.screen {
             Screen::Playing => self.go(Screen::Paused),
             Screen::Paused => self.go(Screen::Playing),
-            Screen::Options { from_pause, .. } => {
-                self.settings.save();
-                self.go(if from_pause {
-                    Screen::Paused
-                } else {
-                    Screen::Title
-                });
-                self.sel = 1;
-            }
+            Screen::Options { .. } => self.leave_options(),
             Screen::Cheats { group: Some(g) } => {
                 self.go(Screen::Cheats { group: None });
                 self.sel = g;
@@ -553,12 +583,15 @@ impl App {
             }
             Screen::Playing => hud::draw_hud(&mut self.ui, &self.game, self.show_list, self.clock),
             Screen::Paused => hud::draw_pause(&mut self.ui, self.sel, self.clock, &self.game),
-            Screen::Options { from_pause, .. } => hud::draw_options(
+            Screen::Options {
+                from_pause, page, ..
+            } => options::draw(
                 &mut self.ui,
                 self.sel,
                 self.clock,
                 &self.settings,
                 from_pause,
+                page,
             ),
             Screen::End => hud::draw_end(&mut self.ui, &self.game, self.sel, self.clock),
             Screen::Cheats { group } => {
@@ -810,16 +843,10 @@ impl App {
                 self.sel = (self.sel + 1) % n.max(1);
                 self.sfx(Sfx::Blip);
             }
-            KeyCode::ArrowLeft | KeyCode::KeyA
-                if matches!(self.screen, Screen::Options { .. })
-                    && self.sel < hud::OPTION_VALUES =>
-            {
+            KeyCode::ArrowLeft | KeyCode::KeyA if self.option_row().is_some_and(Row::is_value) => {
                 self.activate(-1)
             }
-            KeyCode::ArrowRight | KeyCode::KeyD
-                if matches!(self.screen, Screen::Options { .. })
-                    && self.sel < hud::OPTION_VALUES =>
-            {
+            KeyCode::ArrowRight | KeyCode::KeyD if self.option_row().is_some_and(Row::is_value) => {
                 self.activate(1)
             }
             // Cheat-Menue: rechts oeffnet die Kategorie, links geht zurueck
@@ -874,6 +901,9 @@ impl mettgine::app::Game for App {
             second_camera: Some(MONITOR_SIZE),
             smooth: false,
             last_wins: false,
+            // Reflex/Anti-Lag moeglich, Grund bei Grafikkarten-Ausfaellen im Absturzbericht
+            low_latency: true,
+            diagnostics: true,
             world: WORLD,
             ..render::Config::new(&meshes, &skins, (&font, 128, 128))
         };
