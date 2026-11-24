@@ -347,7 +347,8 @@ impl Game {
                     Tier::Uneasy => Tier::Wrong,
                     _ => Tier::Collapse,
                 };
-                self.force_tier(next);
+                // wie im Spiel: Licht aus, Umbau im Dunkeln, Licht an (umbau.rs)
+                self.raise_tier(next);
                 format!("Stufe: {}", self.tier.name())
             }
             1 => {

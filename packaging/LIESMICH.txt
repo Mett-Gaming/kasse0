@@ -15,6 +15,9 @@ SO SPIELST DU
   2. Danach ist der Markt gekippt. Arbeite den Einkaufszettel ab (TAB halten).
   3. Je teurer dein Einkauf, je mehr vom Zettel erledigt und je länger du brauchst,
      desto schlimmer wird es. Billige Ware liegt ganz oben oder unten.
+     Geht kurz das Licht aus, baut sich der Markt im Dunkeln um.
+     Hinter der linken Wand liegen leere Räume. Und wenn dir etwas bekannt
+     vorkommt: Du warst wirklich schon hier.
      Passende Ware in deiner Nähe (4 m) pulsiert hell, auch falsch beschriftete!
   4. Rennen ist laut, Verfolger merken sich, wo sie dich zuletzt gesehen oder gehört
      haben. Wer leise verschwindet, hängt sie ab.

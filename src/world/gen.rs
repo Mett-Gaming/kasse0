@@ -3,11 +3,13 @@
 mod corridor;
 mod decay;
 mod fixtures;
+mod wing;
 
 pub use corridor::{
     corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
     CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
 };
+pub use wing::Wing;
 
 use super::layout::{self, Layout};
 use super::material::*;
@@ -36,6 +38,12 @@ const GONDOLA_HALF_W: f32 = 0.6;
 const DRINKS_W: f32 = 7.0;
 const DRINKS_D: f32 = 7.0;
 const WALL_T: f32 = 0.1;
+/// Schriftzuege der Gangnummern (Index = Nummer; "Gang 0" gibt es nur im Kollaps)
+pub const AISLE_NUMBERS: [&str; 8] = [
+    "Gang 0", "Gang 1", "Gang 2", "Gang 3", "Gang 4", "Gang 5", "Gang 6", "Gang 7",
+];
+/// Plakattext ab Stufe "falsch": alle Plakate gleich
+pub const POSTER_SAME: &str = "Sie waren schon hier";
 
 pub const PALETTE: [Vec3; 10] = [
     Vec3::new(0.85, 0.15, 0.12),
@@ -190,7 +198,22 @@ pub fn generate(params: &WorldParams) -> World {
         CEILING,
     );
     g.b.wall(0.0, -WALL_T, width, -WALL_T, 0.0, h, wall_color);
-    g.b.wall(-WALL_T, 0.0, -WALL_T, depth, 0.0, h, wall_color);
+    // Westwand: im gekippten Markt mit Tueroeffnungen in den Seitentrakt (gen/wing.rs)
+    let wing = g.build_wing(aisle_z0, aisle_z1, wall_color);
+    {
+        let mut z = 0.0;
+        for d in wing.iter().flat_map(|w| w.0.doors.iter()) {
+            let (a, b) = (d.z - 1.0, d.z + 1.0);
+            g.b.wall(-WALL_T, z, -WALL_T, a, 0.0, h, wall_color);
+            g.b.wall(-WALL_T, a, -WALL_T, b, 2.2, h, wall_color);
+            z = b;
+        }
+        g.b.wall(-WALL_T, z, -WALL_T, depth, 0.0, h, wall_color);
+    }
+    let (wing, wing_signs) = match wing {
+        Some((w, s)) => (Some(w), s),
+        None => (None, Vec::new()),
+    };
     g.b.wall(
         width + WALL_T,
         0.0,
@@ -728,6 +751,42 @@ pub fn generate(params: &WorldParams) -> World {
             vec3(0.4, 0.4, 0.4),
             PLAIN,
         );
+    }
+
+    // --- Gangnummern an beiden Enden jedes Gangs. Im gekippten Markt ab "unruhig" tragen
+    // alle dieselbe Nummer, im Kollaps steht ueberall "Gang 0" (Wiederholung, Deja-vu) ---
+    {
+        let same = (tipped && params.wing >= 2).then(|| {
+            if params.wing >= 4 {
+                0
+            } else {
+                (seed as usize % (aisle_count as usize - 1)) + 1
+            }
+        });
+        for i in 0..aisle_count as usize - 1 {
+            let number = same.unwrap_or(i + 1);
+            let text = AISLE_NUMBERS[number.min(AISLE_NUMBERS.len() - 1)];
+            for z in [aisle_z0 + 0.35, aisle_z1 - 0.35] {
+                let x = (center_x(i, z) + center_x(i + 1, z)) * 0.5;
+                g.b.add(
+                    vec3(x, 3.6, z),
+                    vec3(0.008, 0.4, 0.008),
+                    vec3(0.4, 0.4, 0.4),
+                    PLAIN,
+                );
+                g.b.label(
+                    vec3(x, 3.1, z),
+                    0.0,
+                    0.4,
+                    0.11,
+                    text,
+                    vec3(0.95, 0.95, 0.92),
+                    1.0,
+                    0.0,
+                    0.0,
+                );
+            }
+        }
     }
 
     // --- Kuehlwand an der Nordwand (durchgehend, Abschnitte je Unterabteilung) ---
@@ -1327,15 +1386,22 @@ pub fn generate(params: &WorldParams) -> World {
     // --- Werbeposter (verrotten im gekippten Markt, siehe Shader) ---
     let mut poster_seed = 0.0f32;
     let mut poster = |b: &mut Builder, c: Vec3, h: Vec3| {
-        let col = PALETTE[(poster_seed as usize * 3 + seed as usize) % PALETTE.len()];
-        b.add_ex(c, h, col, POSTER, poster_seed, 0.0, 0.0);
+        // ab Stufe "falsch" sind alle Plakate gleich: Farbe, Verfall, Text
+        let same = tipped && params.mix >= 2;
+        let pseed = if same { 0.0 } else { poster_seed };
+        let col = PALETTE[(pseed as usize * 3 + seed as usize) % PALETTE.len()];
+        b.add_ex(c, h, col, POSTER, pseed, 0.0, 0.0);
         // Schriftzug oben auf dem Plakat
         let texts: [&str; 2] = if tipped {
             ["Seit immer frisch", "Wir sehen Sie"]
         } else {
             ["Heute frisch", "AKTION"]
         };
-        let text = texts[poster_seed as usize % 2];
+        let text = if same {
+            POSTER_SAME
+        } else {
+            texts[poster_seed as usize % 2]
+        };
         let (lc, yaw, hw) = if h.x < h.z {
             (
                 vec3(c.x + 0.008, c.y + h.y * 0.72, c.z),
@@ -1397,6 +1463,7 @@ pub fn generate(params: &WorldParams) -> World {
 
     // Warnschilder "Rutschgefahr"
     let mut signs = Vec::new();
+    signs.extend(wing_signs);
     let sign_count = if tipped { 4 } else { 1 };
     for _ in 0..sign_count {
         let i = g.rng.gen_range(1..=aisle_count) as f32;
@@ -1429,7 +1496,8 @@ pub fn generate(params: &WorldParams) -> World {
         ..
     } = g;
     // Das Navigationsraster endet an der Ladentuer: in den Korridor kommt kein NPC mit
-    let nav = build_nav(&b.solids, &b.obbs, width, depth);
+    let x_min = wing.as_ref().map_or(0.0, |w| w.x_min);
+    let nav = build_nav(&b.solids, &b.obbs, x_min, width, depth);
     let mut world = World {
         instances: b.instances,
         lights: b.lights,
@@ -1468,6 +1536,7 @@ pub fn generate(params: &WorldParams) -> World {
         sparks,
         ceiling_holes,
         corral,
+        wing,
     };
     world.index_items();
     // In den Kassenbereich kommen keine NPCs (der Spieler schon)

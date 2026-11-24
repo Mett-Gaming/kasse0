@@ -194,6 +194,7 @@ impl Game {
             self.collapse_timer += dt;
             let looking_away = self.turn_acc > 1.6 || self.player.pitch.abs() > 0.7;
             if self.collapse_timer > interval
+                && !self.umbau_running()
                 && !self.checking_out()
                 && !self.till_active()
                 && (looking_away || self.collapse_timer > interval * 3.0)
@@ -203,9 +204,8 @@ impl Game {
                 if self.tier == Tier::Collapse {
                     self.params.open_lane = self.rng.gen_range(0..4);
                 }
-                self.rebuild_world();
-                self.glitch = 0.7;
-                self.say("Etwas hat sich verschoben.", 3.0);
+                // im Dunkeln umbauen (umbau.rs), der Text kommt mit dem Licht zurueck
+                self.start_umbau(Some("Etwas hat sich verschoben."));
             }
         }
     }

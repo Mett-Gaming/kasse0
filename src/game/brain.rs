@@ -537,7 +537,8 @@ mod tests {
         e.ignore = 1e6;
         g.employees.push(e);
         let mut knelt = false;
-        for _ in 0..(120 * 10) {
+        // bis 240 s: die Streife bleibt im Markt, der Zufall der Ziele laeuft dadurch anders
+        for _ in 0..(120 * 20) {
             for _ in 0..6 {
                 g.update(1.0 / 60.0, &mut Input::default());
             }

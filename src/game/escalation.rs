@@ -41,6 +41,11 @@ impl Tier {
     pub fn giants(self) -> u32 {
         [0, 0, 1, 3][self as usize]
     }
+    /// Seitentrakt hinter der Westwand: 2, 3, 4 Raeume, im Kollaps dazu der Endlos-Flur
+    /// (ab "falsch" auch ein Durchgang ins Nichts, siehe world/gen/wing.rs)
+    pub fn wing(self) -> u8 {
+        [1, 2, 3, 4][self as usize]
+    }
     /// Wie viele davon Verfolger sind (der Rest kauft nur ein)
     pub fn stalkers(self) -> usize {
         [2, 3, 5, 7][self as usize]

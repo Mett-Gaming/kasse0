@@ -75,6 +75,50 @@ Jeder Zettelartikel gibt es in einer billigen und einer teuren Variante. Die bil
 | falsch | stark gebogen (S-Kurven) | Durchgänge + 2 Wände | alle 35 s |
 | Kollaps | stark gebogen (S-Kurven) | Durchgänge + 3 Wände | alle 20 s, die Kasse wandert |
 
+**Umbau im Dunkeln** (`game/umbau.rs`): Jeder Live-Umbau, also eine neue Stufe oder das Neu-Mischen, läuft so ab:
+- 0,55 s flackert das Licht immer unruhiger (Knacken).
+- 0,4 s ist es ganz dunkel. Bei 0,65 s wird die Welt ausgetauscht (tiefes Grollen), dabei werden Spieler, NPCs und Waren mitversetzt.
+- 0,45 s flackert das Licht wieder an, erst dann erscheint der Text („Die Gänge sind länger geworden.“, „Etwas hat sich verschoben.“).
+
+Vorher sprang die Welt in einem Bild um und es wirkte wie ein Teleport. Kommt während des Ablaufs ein weiterer Umbau dazu, startet kein zweiter. Endet der Run, wird sofort fertig umgebaut. Das erste Kippen, das Bezahlen und der Korridor bauen weiter sofort um.
+
+### Unheimliches im gekippten Markt (Wiederholung, leere Räume, Gestalt)
+Angelehnt an die Stimmung liminaler Räume, ohne etwas daraus zu übernehmen. Alles aus Boxen und vorhandenen Modellen.
+
+**Seitentrakt** (`world/gen/wing.rs`, `WorldParams::wing` = `Tier::wing()`):
+- Hinter 1–2 Türöffnungen in der Westwand (2 m breit, mittig zwischen den Plakaten) liegt eine Kette **identischer** leerer Räume (6 × 7 m, Decke 2,6 m, vergilbte Wände).
+- Jeder Raum hat eine Röhre (alle flackern im Gleichtakt), eine aufgemalte Tür, die nirgends hinführt, und denselben einsamen Gegenstand: ein leeres Regalgestell oder ein Warnschild. Im letzten Raum ist er gedreht.
+- Keine Waren, keine Schilder. Die Musik ist dort fast weg, das Brummen nah (`audio::Mood::muffle`).
+
+| Stufe | Räume | Türen in den Markt | Extra |
+|---|---|---|---|
+| ruhig | 2 | 1 | – |
+| unruhig | 3 | 2 (man kommt woanders wieder heraus) | – |
+| falsch | 4 | 2 | Durchgang ins Nichts (schwarz, nicht begehbar) |
+| Kollaps | 4 | 2 | dazu ein 18 m langer Flur, Lichter werden nach hinten schwächer, am Ende eine Tür, die sich nicht öffnet |
+
+- Das Navigationsraster wächst nach links mit (Ursprung auf das Raster gerundet), Verfolger folgen einem hinein.
+- Neue Kunden, Streifen der Mitarbeiter und Fata Morganen entstehen nur im Markt.
+- Beim Umbau bleibt man im selben Raum an derselben Stelle (`World::remap_in_wing`).
+
+**Gangnummern und Plakate** (`world/gen.rs`):
+- An beiden Enden jedes Gangs hängt ein Nummernschild („Gang 1“ …).
+- Ab „unruhig“ tragen alle dieselbe Nummer, im Kollaps steht überall „Gang 0“.
+- Ab „falsch“ sind alle Plakate gleich: gleiche Farbe, gleicher Verfall, Text „Sie waren schon hier“.
+
+**Déjà-vu-Szene** (`game/dejavu.rs`, ab „unruhig“, alle 40–70 s minus 6 s je Stufe):
+- Die Szene besteht aus einem schräg stehenden leeren Wagen, einer umgekippten Dose, einem Warnschild und meist einer reglosen Kundin, die ins Regal starrt.
+- Sie wird 7–10 m vor einem im Gang aufgestellt, nur wo man gerade nicht hinsieht.
+- Hat man sie gesehen und wechselt in einen anderen Gang, steht genau dieselbe Szene wieder vor einem, die alte ist weg. Das passiert höchstens dreimal, beim dritten Mal hat sich die Kundin zu einem umgedreht.
+- Gegen den Wagen läuft man wie gegen einen echten, sonst ist alles nur Bild.
+
+**Gestalt in der Ferne** (`game/watcher.rs`, alle 30–60 s, im Kollaps 18–35 s):
+- Eine reglose, fast schwarze, leicht gestreckte Figur steht 14–25 m entfernt am Ende einer freien Sichtlinie. Im Seitentrakt steht sie am Ende des Flurs.
+- Sie verschwindet, wenn man näher als 10 m kommt, wenn man wegsieht und wieder hinschaut, oder nach 15 s. Dabei rauscht es leise.
+- Im Kollaps rückt sie nach dem Wegsehen manchmal näher (höchstens dreimal, nie unter 8 m).
+- Sie ist kein NPC und fängt nie.
+- Gestalt und Déjà-vu benutzen einen eigenen Zufall (`eerie_rng`), damit sie den Ablauf von NPCs und Schrecken nicht verschieben.
+
 Neue Wände werden nur gebaut, wenn danach Getränkeraum, Kassen, Wagenbox und alle Waren erreichbar bleiben. Röhren wechseln alle paar Sekunden zufällig ihr Flacker-Muster. Die Werbeposter (ein Maskottchen-Gesicht, prozedural im Shader) verrotten mit Stufe und Zeit: Augen werden zu Löchern, es fließen blutige Tränen, das Lächeln kippt in einen aufgerissenen Mund. Fata Morganen erscheinen alle 14–28 s in 9–20 m Entfernung und verschwinden, wenn man auf 5 m herankommt.
 
 ## Sortiment und Abteilungen
@@ -212,7 +256,7 @@ Kein eigener Menüpunkt: Beim allerersten „Neuer Einkauf“ fragt ein Fenster 
 - **Entschärft:** Erwischt werden (nur noch über den Schreck-Cheat), Kassenfehler (kein Kassen-Leben weg, Misstrauen zurück auf 0) und Umdrehen im Korridor beenden nichts. Es gibt eine Erklärung, einen roten Blitz und 4 s Schonfrist. Jumpscares bleiben. Gewinnt man, wird `tutorial_done` gespeichert (das Lob kommt nicht unter den Bon, sondern als Fenster beim Gang ins Hauptmenü): Ab dann gibt es in den Optionen (Hauptmenü und Pause) die Zeile „Tutorial spielen“ vor „Zurück“.
 
 ## Cheat-Menü (F1, `src/game/cheats.rs`, Anzeige in `src/hud.rs`)
-Zwei Ebenen. Zuerst die Kategorien mit Anzahl und einer kurzen Beschreibung der gewählten: **Spieler** (Unverwundbar, Leben auffüllen, Tutorial starten (neuer Einkauf im Tutorial-Modus, auch wenn man beim ersten Mal „Nein“ gesagt hat), Tutorial überspringen (beendet Anleitung und Entschärfung im Tutorial-Modus), Auffälligkeit 0/100 %, Sofort sterben), **Markt & Einkauf** (kippen, Zettel füllen, +10 €, zur Getränkeabteilung, umbauen, Durchsage), **Kasse & Flucht** (zur Kasse, Karten-/Barzahlung, Flucht: Korridor), **Leute** (Mitarbeiter rufen, alle entfernen, Wagen wird mitgenommen), **Schrecken** (jeder Jumpscare einzeln). Enter oder Rechts öffnet eine Kategorie, Enter löst einen Cheat aus (und es geht weiter im Spiel), Esc oder Links geht eine Ebene zurück. Jeder Cheat steht in genau einer Kategorie (Test).
+Zwei Ebenen. Zuerst die Kategorien mit Anzahl und einer kurzen Beschreibung der gewählten: **Spieler** (Unverwundbar, Leben auffüllen, Tutorial starten (neuer Einkauf im Tutorial-Modus, auch wenn man beim ersten Mal „Nein“ gesagt hat), Tutorial überspringen (beendet Anleitung und Entschärfung im Tutorial-Modus), Auffälligkeit 0/100 %, Sofort sterben), **Markt & Einkauf** (kippen, Zettel füllen, +10 €, zur Getränkeabteilung, umbauen, Durchsage, Seitentrakt: hinein, Gestalt in der Ferne, Déjà-vu-Szene), **Kasse & Flucht** (zur Kasse, Karten-/Barzahlung, Flucht: Korridor), **Leute** (Mitarbeiter rufen, alle entfernen, Wagen wird mitgenommen), **Schrecken** (jeder Jumpscare einzeln). Enter oder Rechts öffnet eine Kategorie, Enter löst einen Cheat aus (und es geht weiter im Spiel), Esc oder Links geht eine Ebene zurück. Jeder Cheat steht in genau einer Kategorie (Test).
 Aus den Spielregeln heraus, nie zwei direkt hintereinander: nach einem Schreck 25–45 s Ruhe (Start: 15 s nach dem Kippen). Kleine Schrecken sobald der Markt gekippt ist, große ab „unruhig“ (v0.8: deutlich häufiger als in v0.7). Vor angekündigten Schrecken wird es kurz still (Musik `hush`).
 - **Tod:** das leere Gesicht des Fängers kurz in Großaufnahme, dann kippt das Bild weg.
 - **Umdrehen:** Wer abgelenkt ist (Zettel offen, Blick ins Regal: 60 %/s, sonst 4 %/s), hat bald einen Verfolger 1,6 m hinter sich, der wartet, bis man sich umdreht.

@@ -109,13 +109,16 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Werbeposter verrotten immer weiter.
 - Auf den hohen Stufen biegen sich die Gänge live: Regale schwanken, der Boden hebt und senkt sich (Steigung). Bereiche wandern beim Umbau: Kühlabschnitte tauschen die Plätze, die Tiefkühlreihe steht in einem anderen Gang, die Obst-Insel rückt.
 - Kunden flüstern miteinander, wenn sie sich begegnen.
+- Hinter Türöffnungen in der linken Wand liegen leere, völlig gleiche Räume mit einer flackernden Röhre. Je schlimmer es wird, desto mehr Räume, irgendwann ein Durchgang ins Nichts und ein Flur, der zu lang ist.
+- Dinge wiederholen sich: Alle Gänge tragen plötzlich dieselbe Nummer, alle Plakate sind gleich, und eine Szene, die du schon gesehen hast, steht im nächsten Gang wieder vor dir.
+- Manchmal steht ganz hinten im Gang jemand und sieht dich an. Wenn du näher kommst oder wegsiehst, ist er weg.
 - Der Boden verfällt: erst fehlende und gesprungene Fliesen und Ameisenstraßen, dann Fliesenstapel, Löcher (Hindernisse, hineinfallen kann man nicht) und Ratten. In der Decke klaffen Löcher mit Kabeln, am Ende tropft Blut von der Decke und sammelt sich am Boden.
 - Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
 - Mitarbeiter tragen kräftig blaue Dienstkleidung und leuchten im Dunkeln leicht, damit man sie von der Kundschaft unterscheiden kann.
 - Fata Morganen tauchen auf: eine Kundin, ein Mitarbeiter, ein voller Wagen, ein Ausgangsschild. Sie wirken echt, bis du auf etwa 3 m heran bist, dann flackern sie als Hologramm auf und sind weg.
 - Jumpscares, mit kurzen Ruhepausen dazwischen. Das Licht fällt aus und danach steht jemand vor dir, ein Verfolger steht plötzlich hinter dir, die Kassiererin beugt sich ruckartig zu dir vor, dein abgestellter Wagen verschwindet und rollt von selbst heran, aus Deckenlöchern stürzen Kabel, und auf dem Überwachungsmonitor an der Kasse steht jemand hinter dir, der nicht da ist, wenn du dich umdrehst. Dazu: jemand liegt in der Kühltruhe und richtet sich auf, eine Gestalt rennt kopfüber über die Decke, alle Kunden drehen sich gleichzeitig zu dir, im Dunkeln rennt jemand von hinten heran, ein Gesicht schiebt sich zwischen die Ware, in deinem Wagen hockt jemand, die Durchsage kreischt, ein Regal kracht auf dich. Jeder Schreck klingt und wirkt anders, und dieselbe Art kommt nicht direkt wieder.
 
-Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen).
+Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen). Bei jedem Umbau und jeder neuen Stufe flackert das Licht, geht kurz ganz aus, und wenn es wieder angeht, ist der Markt ein anderer.
 
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 

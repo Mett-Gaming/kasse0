@@ -538,6 +538,7 @@ impl App {
                         }
                 ),
                 hush: self.game.hush(),
+                muffle: self.game.wing_muffle(),
             });
         } else {
             self.game.sfx.clear();

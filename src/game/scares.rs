@@ -293,7 +293,7 @@ impl Game {
     /// Wie dunkel der Stromausfall das Bild gerade macht (0..1); am Ende flackert das Licht.
     pub fn blackout(&self) -> f32 {
         let steps = self.dark_steps_dark();
-        steps.max(match self.blackout {
+        steps.max(self.umbau_dark()).max(match self.blackout {
             Some((t, _)) if t > BLACKOUT_TIME - 0.3 => {
                 if ((t * 30.0) as i32) % 2 == 0 {
                     1.0

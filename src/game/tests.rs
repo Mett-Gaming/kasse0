@@ -101,11 +101,56 @@ fn cart_value_drives_escalation() {
     }
     assert!(g.cart_value() >= 1000);
     assert!(g.tier >= Tier::Uneasy);
+    assert!(g.customers.len() >= Tier::Uneasy.customers());
+    // der Umbau passiert im Dunkeln (umbau.rs): erst flackert das Licht, die Welt ist noch alt
+    assert!(g.umbau_running());
+    assert_eq!(g.world.aisle_z1 - g.world.aisle_z0, len_before);
+    g.god = true;
+    let dt = 1.0 / 60.0;
+    let mut seen = Vec::new();
+    for _ in 0..(super::umbau::FLICKER_OUT / dt) as usize {
+        g.update(dt, &mut Input::default());
+        seen.push(g.blackout());
+    }
+    assert!(
+        seen.iter().any(|&d| d < 0.5) && seen.iter().any(|&d| d > 0.5),
+        "flackert nicht: {seen:?}"
+    );
+    assert_eq!(g.world.aisle_z1 - g.world.aisle_z0, len_before, "zu frueh");
+    // ganz dunkel: jetzt ist umgebaut
+    step(&mut g, 0.25, Input::default());
+    assert_eq!(g.blackout(), 1.0);
     assert!(
         g.world.aisle_z1 - g.world.aisle_z0 > len_before,
         "Gaenge nicht verlaengert"
     );
-    assert!(g.customers.len() >= Tier::Uneasy.customers());
+    // Licht wieder da, Text zur Stufe erscheint
+    step(&mut g, 0.7, Input::default());
+    assert!(!g.umbau_running());
+    assert_eq!(g.blackout(), 0.0);
+    assert!(g.message.as_ref().is_some_and(|(m, _)| m.contains("länger")
+        || m.contains("dunkler")
+        || m.contains("nicht mehr")));
+}
+
+#[test]
+fn umbau_finishes_when_the_run_ends_and_is_never_doubled() {
+    let mut g = Game::new(7);
+    g.tip();
+    let len_before = g.world.aisle_z1 - g.world.aisle_z0;
+    g.raise_tier(Tier::Uneasy);
+    assert!(g.umbau_running());
+    // zweiter Ausloeser waehrend des Umbaus: kein zweiter Ablauf, gleiche Zeit
+    step(&mut g, 0.2, Input::default());
+    let t = g.umbau.as_ref().unwrap().t;
+    g.start_umbau(Some("Etwas hat sich verschoben."));
+    assert_eq!(g.umbau.as_ref().unwrap().t, t);
+    // Run vorbei: sofort fertig umgebaut, kein Dunkel mehr
+    g.outcome = Outcome::Caught;
+    g.update(1.0 / 60.0, &mut Input::default());
+    assert!(!g.umbau_running());
+    assert!(g.world.aisle_z1 - g.world.aisle_z0 > len_before);
+    assert_eq!(g.umbau_dark(), 0.0);
 }
 
 #[test]
@@ -1899,4 +1944,174 @@ fn goods_lie_in_the_cart_basket_instead_of_floating() {
         }
     }
     assert!(lying > 0, "keine hohe Ware im Test");
+}
+
+/// Gekippter Markt ohne NPCs, unverwundbar, auf Stufe `tier`.
+fn eerie_game(seed: u64, tier: Tier) -> Game {
+    let mut g = Game::new(seed);
+    g.tip();
+    if tier > Tier::Calm {
+        g.force_tier(tier);
+    }
+    g.customers.clear();
+    g.employees.clear();
+    g.god = true;
+    g.scare_cd = 1e6;
+    g
+}
+
+/// Spieler mitten in den `i`-ten Gang (Laufweg zwischen zwei Regalreihen), Blick `yaw`.
+fn stand_in_aisle(g: &mut Game, i: usize, z: f32, yaw: f32) {
+    let w = &g.world;
+    let pitch = (w.aisle_x1 - world::AISLES_X0) / w.aisle_count as f32;
+    g.player.pos = vec3(world::AISLES_X0 + pitch * i as f32, 0.0, z);
+    g.player.yaw = yaw;
+    g.player.pitch = 0.0;
+}
+
+#[test]
+fn a_distant_figure_stands_still_never_catches_and_vanishes() {
+    let mut spawned = 0;
+    for seed in 0..12u64 {
+        let mut g = Game::new(seed);
+        g.customers.clear();
+        g.employees.clear();
+        // im normalen Markt nie
+        g.update_watcher(1.0 / 60.0);
+        assert!(g.watcher.is_none(), "Gestalt im normalen Markt");
+        let mut g = eerie_game(seed, Tier::Calm);
+        let z = g.world.aisle_z0 + 1.0;
+        stand_in_aisle(&mut g, 1 + seed as usize % 3, z, std::f32::consts::PI);
+        if !g.spawn_watcher() {
+            continue;
+        }
+        spawned += 1;
+        let w = g.watcher.clone().unwrap();
+        let d = (w.pos - g.player.pos).length();
+        assert!((14.0..=25.5).contains(&d), "Abstand {d}");
+        assert!(g.sees(w.pos + vec3(0.0, 1.5, 0.0)), "nicht im Blick");
+        // hinsehen: sie bleibt reglos stehen, nichts passiert
+        step(&mut g, 2.0, Input::default());
+        let w2 = g.watcher.clone().expect("zu frueh weg");
+        assert_eq!(w2.pos, w.pos);
+        assert_eq!(g.outcome, Outcome::Running);
+        // wegsehen und wieder hin: weg
+        g.player.yaw += std::f32::consts::PI;
+        step(&mut g, 1.0, Input::default());
+        assert!(g.watcher.is_none(), "nach dem Wegsehen noch da");
+        // naeher als 10 m: weg
+        g.player.yaw -= std::f32::consts::PI;
+        if g.spawn_watcher() {
+            let p = g.watcher.as_ref().unwrap().pos;
+            let to = (p - g.player.pos).normalize();
+            g.player.pos = p - to * 6.0;
+            g.update(1.0 / 60.0, &mut Input::default());
+            assert!(g.watcher.is_none(), "aus der Naehe noch da");
+        }
+    }
+    assert!(spawned >= 4, "zu selten freie Sicht ({spawned})");
+}
+
+#[test]
+fn in_the_collapse_the_figure_comes_closer_but_never_too_close() {
+    let mut closer = 0;
+    for seed in 0..16u64 {
+        let mut g = eerie_game(seed, Tier::Collapse);
+        let z = g.world.aisle_z0 + 1.0;
+        stand_in_aisle(&mut g, 1 + seed as usize % 3, z, std::f32::consts::PI);
+        if !g.spawn_watcher() {
+            continue;
+        }
+        for _ in 0..4 {
+            g.update(0.2, &mut Input::default());
+            g.player.yaw += std::f32::consts::PI;
+            step(&mut g, 0.6, Input::default());
+            g.player.yaw -= std::f32::consts::PI;
+            g.update(1.0 / 60.0, &mut Input::default());
+            let Some(w) = &g.watcher else { break };
+            let d = vec3(w.pos.x - g.player.pos.x, 0.0, w.pos.z - g.player.pos.z).length();
+            assert!(d >= super::watcher::CLOSEST - 0.01, "zu nah: {d}");
+            if w.steps > 0 {
+                closer += 1;
+            }
+            assert_eq!(g.outcome, Outcome::Running);
+        }
+    }
+    assert!(closer > 0, "rueckt nie naeher");
+}
+
+#[test]
+fn the_same_scene_appears_again_in_another_aisle_and_turns_around() {
+    use super::dejavu::SHOWINGS;
+    let mut ok = false;
+    'seeds: for seed in 0..10u64 {
+        let mut g = eerie_game(seed, Tier::Uneasy);
+        let z = g.world.aisle_z0 + 4.0;
+        let side = std::f32::consts::FRAC_PI_2; // Blick zur Seite (+x), ins Regal
+        stand_in_aisle(&mut g, 1, z, side);
+        if !g.place_dejavu(None) {
+            continue;
+        }
+        let first = g.dejavu.clone().unwrap();
+        assert!(
+            !g.sees(first.pos + vec3(0.0, 0.8, 0.0)),
+            "taucht im Blick auf"
+        );
+        let offset = first.pos - g.player.pos;
+        for (k, aisle) in [(1u8, 1usize), (2, 2), (3, 3)] {
+            if aisle >= g.world.aisle_count as usize {
+                continue 'seeds;
+            }
+            if k > 1 {
+                // in einen anderen Gang, zur Seite schauen: dieselbe Szene steht wieder vorn
+                stand_in_aisle(&mut g, aisle, z, side);
+                g.update(1.0 / 60.0, &mut Input::default());
+                let Some(s) = g.dejavu.clone() else {
+                    continue 'seeds;
+                };
+                if s.aisle != aisle as i32 {
+                    continue 'seeds;
+                }
+                // wieder geradeaus vor einem im Gang (am liebsten im selben Abstand)
+                let now = s.pos - g.player.pos;
+                assert!(
+                    (now.x - offset.x).abs() < 1e-3,
+                    "andere Lage: {now} / {offset}"
+                );
+                assert!(now.z * offset.z > 0.0 && (7.0..=10.0).contains(&now.z.abs()));
+                assert_eq!(s.yaw, first.yaw, "anders ausgerichtet");
+                assert_eq!(s.customer, first.customer, "andere Kundin");
+                assert_eq!(
+                    s.turned,
+                    k >= SHOWINGS,
+                    "Kundin dreht sich zur falschen Zeit"
+                );
+            }
+            // hinsehen: zaehlt als gesehen
+            let to = g.dejavu.as_ref().unwrap().pos - g.player.pos;
+            g.player.yaw = to.x.atan2(-to.z);
+            g.update(1.0 / 60.0, &mut Input::default());
+            assert_eq!(g.dejavu.as_ref().unwrap().shown, k);
+        }
+        assert_eq!(g.outcome, Outcome::Running);
+        ok = true;
+        break;
+    }
+    assert!(ok, "kein Markt mit drei freien Gaengen");
+}
+
+#[test]
+fn the_side_wing_is_quiet_and_stalkers_find_the_way_in() {
+    let mut g = eerie_game(4, Tier::Uneasy);
+    assert_eq!(g.wing_muffle(), 0.0);
+    g.debug_to_wing();
+    assert!(g.world.in_wing(g.player.pos));
+    assert!(g.wing_muffle() > 0.5, "Musik nicht gedaempft");
+    // Verfolger koennen hinein: Weg von der Tuer im Markt bis zum Spieler
+    let field = npc::bfs(&g.world.nav, g.player.pos);
+    let door = g.world.wing.as_ref().unwrap().doors[0] + vec3(1.2, 0.0, 0.0);
+    assert_ne!(npc::field_at(&g.world.nav, &field, door), npc::UNREACHABLE);
+    // ein paar Sekunden im Trakt: kein Absturz, nichts Fremdes taucht auf
+    step(&mut g, 3.0, Input::default());
+    assert_eq!(g.outcome, Outcome::Running);
 }

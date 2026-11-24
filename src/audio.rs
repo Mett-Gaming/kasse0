@@ -79,6 +79,8 @@ pub struct Mood {
     pub paused: bool,
     /// 0..1: Stille vor einem Schreck (Musik und Brummen weg)
     pub hush: f32,
+    /// 0..1: im Seitentrakt - Musik fast weg (wie hinter Waenden), Roehrenbrummen lauter
+    pub muffle: f32,
 }
 
 pub struct Audio {
@@ -661,9 +663,12 @@ impl Audio {
         let pause = if m.paused { 0.35 } else { 1.0 };
         self.music.set_speed(speed.max(0.5));
         let quiet = 1.0 - m.hush.clamp(0.0, 1.0);
+        // im Seitentrakt: Musik nur noch ganz fern, das Brummen der Roehren ist nah
+        let muffle = m.muffle.clamp(0.0, 1.0);
         self.music
-            .set_volume(self.master * music_vol.max(0.1) * pause * quiet);
-        self.hum.set_volume(self.master * hum_vol * pause * quiet);
+            .set_volume(self.master * music_vol.max(0.1) * pause * quiet * (1.0 - 0.88 * muffle));
+        self.hum
+            .set_volume(self.master * (hum_vol + 0.35 * muffle) * pause * quiet);
     }
 }
 

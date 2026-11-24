@@ -9,8 +9,8 @@ pub mod layout;
 pub use gen::generate;
 pub use gen::REGISTER_SCALE;
 pub use gen::{
-    corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
-    CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
+    corridor_len_for, side_of, Corridor, Station, StationKind, AISLE_NUMBERS, CORRIDOR_H,
+    CORRIDOR_HALF_W, CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_SAME, POSTER_TEXTS,
 };
 #[cfg(test)]
 pub use gen::{COUNTER_HALF, COUNTER_TOP};
@@ -154,6 +154,8 @@ pub struct WorldParams {
     /// Laenge des Fluchtkorridors (Meter, aus der Run-Zeit beim Bezahlen, siehe
     /// `corridor_len_for`)
     pub corridor_len: f32,
+    /// Seitentrakt hinter der Westwand (0 = keiner, 1..4 waechst mit der Stufe, gen/wing.rs)
+    pub wing: u8,
 }
 
 impl WorldParams {
@@ -176,6 +178,7 @@ impl WorldParams {
             decay: 0,
             corridor_seed: 0,
             corridor_len: 40.0,
+            wing: 0,
         }
     }
 }
@@ -435,6 +438,8 @@ pub struct World {
     pub ceiling_holes: Vec<Vec3>,
     /// Wagenbox am Eingang
     pub corral: Vec3,
+    /// Seitentrakt hinter der Westwand (nur gekippt)
+    pub wing: Option<gen::Wing>,
 }
 
 const ITEM_CELL: f32 = 1.0;
@@ -611,6 +616,10 @@ impl World {
 
     /// Bildet eine Position aus einer Welt mit anderer Ganglaenge auf diese ab.
     pub fn remap_from(&self, old: &World, p: Vec3) -> Vec3 {
+        // im Seitentrakt: an dieselbe Stelle im entsprechenden Raum bzw. Flur
+        if let Some(ow) = old.wing.as_ref().filter(|w| w.contains(p)) {
+            return self.remap_in_wing(ow, p);
+        }
         let mut q = p;
         if p.z >= old.aisle_z0 && p.z <= old.aisle_z1 {
             let t = (p.z - old.aisle_z0) / (old.aisle_z1 - old.aisle_z0).max(0.01);
@@ -619,6 +628,34 @@ impl World {
             q.z = p.z - old.aisle_z1 + self.aisle_z1;
         }
         q
+    }
+
+    /// Punkt aus dem alten Seitentrakt `ow` in diesen Markt uebertragen: gleicher Raum (bzw.
+    /// letzter vorhandener), gleiche Lage darin; Flur nach Flur. Ohne Trakt: vor die alte Tuer.
+    fn remap_in_wing(&self, ow: &gen::Wing, p: Vec3) -> Vec3 {
+        let Some(nw) = &self.wing else {
+            let z = ow.doors.first().map_or(p.z, |d| d.z);
+            return vec3(1.0, p.y, z.clamp(self.aisle_z0, self.aisle_z1));
+        };
+        if let (Some(oh), Some(nh)) = (&ow.hall, &nw.hall) {
+            if oh.contains_xz(p) {
+                return p - oh.min + nh.min;
+            }
+        }
+        let k = ow
+            .room_of(p)
+            .unwrap_or(ow.rooms.len().saturating_sub(1))
+            .min(nw.rooms.len() - 1);
+        let from = ow.rooms.get(k).or(ow.rooms.last()).map_or(p, |r| r.min);
+        let local = (p - from).clamp(Vec3::ZERO, Vec3::splat(f32::MAX));
+        let to = nw.rooms[k].min;
+        let q = to + local;
+        vec3(q.x.min(nw.rooms[k].max.x), p.y, q.z.min(nw.rooms[k].max.z))
+    }
+
+    /// Liegt der Punkt im Seitentrakt?
+    pub fn in_wing(&self, p: Vec3) -> bool {
+        self.wing.as_ref().is_some_and(|w| w.contains(p))
     }
 
     /// Erreichbare Navigationszellen ab dem Eingang.
@@ -650,7 +687,7 @@ impl World {
         let nav = &self.nav;
         let steps = (r / nav.cell).ceil() as i32;
         let Some((cx, cz)) = nav.cell_of(vec3(
-            p.x.clamp(0.0, self.size.x - 0.01),
+            p.x.clamp(nav.origin.x, self.size.x - 0.01),
             0.0,
             p.z.clamp(0.0, self.size.z - 0.01),
         )) else {
@@ -712,12 +749,14 @@ impl World {
     }
 }
 
-fn build_nav(solids: &[Aabb], obbs: &[Obb], width: f32, depth: f32) -> NavGrid {
+fn build_nav(solids: &[Aabb], obbs: &[Obb], x_min: f32, width: f32, depth: f32) -> NavGrid {
     // Feines Raster: auch die schmalen Durchgaenge (0,75 m) zwischen versetzten Regalen
     // sind fuer NPCs (Radius 0,25 m) begehbar.
     let cell = NAV_CELL;
-    let origin = Vec3::ZERO;
-    let w = (width / cell).ceil() as usize;
+    // links vom Markt kann der Seitentrakt liegen (x < 0); auf das Raster gerundet, damit die
+    // Zellen im Markt genau dort liegen wie ohne Trakt (schmale Durchgaenge bleiben begehbar)
+    let origin = vec3((x_min.min(0.0) / cell).floor() * cell, 0.0, 0.0);
+    let w = ((width - origin.x) / cell).ceil() as usize;
     let h = (depth / cell).ceil() as usize;
     let r = NAV_CLEARANCE;
     let mut walkable = vec![true; w * h];
@@ -731,7 +770,11 @@ fn build_nav(solids: &[Aabb], obbs: &[Obb], width: f32, depth: f32) -> NavGrid {
         if s.max.y < 0.2 || s.min.y > 1.7 {
             continue;
         }
-        let (x0, x1) = range(s.min.x - r + 1e-4, s.max.x + r - 1e-4, w);
+        let (x0, x1) = range(
+            s.min.x - origin.x - r + 1e-4,
+            s.max.x - origin.x + r - 1e-4,
+            w,
+        );
         let (z0, z1) = range(s.min.z - r + 1e-4, s.max.z + r - 1e-4, h);
         for z in z0..z1 {
             for x in x0..x1 {
@@ -745,11 +788,11 @@ fn build_nav(solids: &[Aabb], obbs: &[Obb], width: f32, depth: f32) -> NavGrid {
             continue;
         }
         let ext = o.half.x.max(o.half.z) * 1.42 + r;
-        let (x0, x1) = range(o.center.x - ext, o.center.x + ext, w);
+        let (x0, x1) = range(o.center.x - origin.x - ext, o.center.x - origin.x + ext, w);
         let (z0, z1) = range(o.center.z - ext, o.center.z + ext, h);
         for z in z0..z1 {
             for x in x0..x1 {
-                let c = vec3((x as f32 + 0.5) * cell, 0.0, (z as f32 + 0.5) * cell);
+                let c = origin + vec3((x as f32 + 0.5) * cell, 0.0, (z as f32 + 0.5) * cell);
                 let l = o.to_local(c);
                 if l.x.abs() < o.half.x + r && l.z.abs() < o.half.z + r {
                     walkable[z * w + x] = false;

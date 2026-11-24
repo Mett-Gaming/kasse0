@@ -449,3 +449,113 @@ fn register_stands_fully_on_the_counter() {
         }
     }
 }
+
+fn with_wing(seed: u64, wing: u8) -> World {
+    let mut p = WorldParams::normal(seed);
+    p.tipped = true;
+    p.stretch = 2.0;
+    p.mix = wing.min(3);
+    p.wing = wing;
+    generate(&p)
+}
+
+/// Schriftzuege der Schilder eines Markts (Atlas-Zeilen).
+fn sign_ids(w: &World) -> Vec<u32> {
+    w.instances
+        .iter()
+        .filter(|i| i.extra[0] == material::SIGN)
+        .map(|i| i.extra[1] as u32)
+        .collect()
+}
+
+#[test]
+fn side_wing_only_when_tipped_and_grows_with_the_tier() {
+    assert!(gen(5, false).wing.is_none(), "Trakt im normalen Markt");
+    assert!(gen(5, true).wing.is_none(), "Trakt ohne Stufe");
+    for seed in [3u64, 8, 13] {
+        let mut last = 0;
+        for (wing, rooms, doors) in [(1u8, 2usize, 1usize), (2, 3, 2), (3, 4, 2), (4, 4, 2)] {
+            let w = with_wing(seed, wing);
+            let t = w.wing.as_ref().expect("kein Trakt");
+            assert!(t.rooms.len() >= last, "Trakt schrumpft");
+            assert!(t.rooms.len() <= rooms);
+            assert!(
+                t.rooms.len() >= rooms.min(2),
+                "{seed}/{wing}: {}",
+                t.rooms.len()
+            );
+            last = t.rooms.len();
+            assert_eq!(t.doors.len(), doors.min(t.rooms.len()));
+            // Tueren in der Westwand, alle Raeume gleich gross und links vom Markt
+            for d in &t.doors {
+                assert_eq!(d.x, 0.0);
+                assert!(d.z > w.aisle_z0 && d.z < w.aisle_z1);
+            }
+            let size = t.rooms[0].max - t.rooms[0].min;
+            for r in &t.rooms {
+                assert!(r.max.x <= 0.0);
+                assert!(
+                    ((r.max - r.min) - size).length() < 1e-4,
+                    "Raeume verschieden"
+                );
+            }
+            assert_eq!(t.hall.is_some(), wing >= 4);
+            assert_eq!(t.void.is_some(), wing >= 3 && t.rooms.len() >= 3);
+            // alles erreichbar: Markt wie bisher und jeder Raum (und der Flur)
+            assert!(
+                w.all_reachable(),
+                "{seed}/{wing}: Markt nicht mehr erreichbar"
+            );
+            let seen = w.reachable_cells();
+            for a in t.rooms.iter().chain(t.hall.iter()) {
+                let c = (a.min + a.max) * 0.5;
+                assert!(
+                    w.near_reachable(&seen, c, 1.0),
+                    "{seed}/{wing}: Raum unerreichbar"
+                );
+            }
+            // Durchgang ins Nichts und Flur-Ende sind nicht begehbar
+            for p in t.void.iter().chain(t.hall_end.iter()) {
+                let q = *p - vec3(0.4, 0.0, 0.0);
+                assert!(
+                    w.collide(q, 0.25).distance(q) > 0.05,
+                    "{seed}/{wing}: ins Nichts"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn aisle_numbers_repeat_and_posters_are_all_the_same() {
+    let a = crate::signs::atlas();
+    let nums = |w: &World| {
+        let ids = sign_ids(w);
+        let mut v: Vec<usize> = (0..AISLE_NUMBERS.len())
+            .filter(|&k| ids.contains(&a.id(AISLE_NUMBERS[k])))
+            .collect();
+        v.sort();
+        v
+    };
+    // normal: verschiedene Gangnummern ab 1
+    let n = gen(7, false);
+    assert!(nums(&n).len() >= 3 && !nums(&n).contains(&0));
+    // ab "unruhig": alle dieselbe, im Kollaps "Gang 0"
+    assert_eq!(nums(&with_wing(7, 2)).len(), 1);
+    assert_eq!(nums(&with_wing(7, 4)), vec![0]);
+    // Plakate: ab "falsch" alle mit demselben Text
+    let same = a.id(POSTER_SAME);
+    assert!(!sign_ids(&with_wing(7, 1)).contains(&same));
+    assert!(sign_ids(&with_wing(7, 3)).contains(&same));
+}
+
+#[test]
+fn places_inside_the_wing_stay_in_the_wing_after_a_rebuild() {
+    let a = with_wing(11, 2);
+    let b = with_wing(11, 4);
+    let t = a.wing.as_ref().unwrap();
+    let p = (t.rooms[1].min + t.rooms[1].max) * 0.5;
+    let q = b.remap_from(&a, p);
+    assert!(b.in_wing(q), "aus dem Trakt geworfen");
+    assert_eq!(b.wing.as_ref().unwrap().room_of(q), Some(1));
+}
