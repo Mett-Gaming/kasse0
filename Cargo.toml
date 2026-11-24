@@ -5,9 +5,9 @@ edition = "2021"
 description = "KASSE 0 - liminaler Supermarkt-Horror (Prototyp)"
 
 [workspace]
-members = [".", "mettgine"]
+members = [".", "mettgine", "mettgine/mpak", "mettgine/mettpack"]
 # `cargo test` prueft Spiel und Engine
-default-members = [".", "mettgine"]
+default-members = [".", "mettgine", "mettgine/mpak", "mettgine/mettpack"]
 
 [dependencies]
 mettgine = { path = "mettgine" }

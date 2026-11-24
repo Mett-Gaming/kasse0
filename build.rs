@@ -1,4 +1,4 @@
-//! Bettet Waren und Figuren ein, setzt die Version (Git-Tag) und das Windows-Manifest.
+//! Schreibt die Listen der Waren und Figuren, setzt die Version (Git-Tag) und das Windows-Manifest.
 //! Die Welt-Materialien liegen in shaders/, alle anderen Shader baut Mettgine selbst.
 
 use std::{env, fs, path::PathBuf};
@@ -6,7 +6,7 @@ use std::{env, fs, path::PathBuf};
 include!("mettgine/game_build.rs");
 include!("mettgine/game_shaders.rs");
 
-/// Erzeugt OUT_DIR/products_gen.rs: Katalog-JSON + alle Waren-Modelle eingebettet.
+/// Erzeugt OUT_DIR/products_gen.rs: Katalog-JSON + Namen der Waren-Modelle (die Modelle selbst liegen in den Spieldaten).
 fn gen_products(out: &std::path::Path) {
     println!("cargo:rerun-if-changed=tools/catalog.json");
     println!("cargo:rerun-if-changed=assets/products");
@@ -15,7 +15,6 @@ fn gen_products(out: &std::path::Path) {
     let text = fs::read_to_string(&catalog_path).expect("tools/catalog.json fehlt");
     let json: serde_json::Value = serde_json::from_str(&text).expect("catalog.json ungueltig");
     let mut ids = String::new();
-    let mut bytes = String::new();
     for m in json["meshes"].as_array().expect("meshes") {
         let id = m["id"].as_str().expect("mesh id");
         let file = root
@@ -28,15 +27,10 @@ fn gen_products(out: &std::path::Path) {
             file.display()
         );
         ids.push_str(&format!("    {id:?},\n"));
-        bytes.push_str(&format!(
-            "    include_bytes!({:?}),\n",
-            file.display().to_string()
-        ));
     }
     let code = format!(
         "pub const CATALOG_JSON: &str = include_str!({:?});\n\
-         pub const PRODUCT_MESH_IDS: &[&str] = &[\n{ids}];\n\
-         pub static PRODUCT_MESH_BYTES: &[&[u8]] = &[\n{bytes}];\n",
+         pub const PRODUCT_MESH_IDS: &[&str] = &[\n{ids}];\n",
         catalog_path.display().to_string()
     );
     fs::write(out.join("products_gen.rs"), code).unwrap();
@@ -58,24 +52,19 @@ fn gen_people(out: &std::path::Path) {
             "Figur fehlt: {} (tools/prepare_people.py ausfuehren)",
             file.display()
         );
-        format!("include_bytes!({:?})", file.display().to_string())
     };
     let mut variants = String::new();
-    let mut skins = String::new();
     for v in json["variants"].as_array().expect("variants") {
         let id = v["id"].as_str().expect("variant id");
         let female = v["g"].as_str() == Some("f");
         let staff = v["staff"].as_bool().unwrap_or(false);
         variants.push_str(&format!("    ({id:?}, {female}, {staff}),\n"));
-        skins.push_str(&format!("    {},\n", need(format!("{id}.k0s"))));
+        need(format!("{id}.k0s"));
     }
+    need("anim_m.k0a".into());
+    need("anim_f.k0a".into());
     let code = format!(
-        "/// (Variante, weiblich, Mitarbeiter)\npub const PEOPLE: &[(&str, bool, bool)] = &[\n{variants}];\n\
-         pub static PEOPLE_SKIN_BYTES: &[&[u8]] = &[\n{skins}];\n\
-         pub static ANIM_M_BYTES: &[u8] = {};\n\
-         pub static ANIM_F_BYTES: &[u8] = {};\n",
-        need("anim_m.k0a".into()),
-        need("anim_f.k0a".into())
+        "/// (Variante, weiblich, Mitarbeiter)\npub const PEOPLE: &[(&str, bool, bool)] = &[\n{variants}];\n"
     );
     fs::write(out.join("people_gen.rs"), code).unwrap();
 }

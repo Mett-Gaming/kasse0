@@ -1,6 +1,7 @@
-//! Modelle im .k0m-Format (erzeugt von tools/prepare_assets.py) - fest ins Spiel eingebaut.
+//! Modelle im .k0m-Format (erzeugt von tools/prepare_assets.py) - in den Spieldaten.
 
 use glam::{vec3, Vec3};
+use mettgine::asset::data;
 
 pub use mettgine::gpu::{MeshData, MeshVertex};
 
@@ -36,25 +37,25 @@ pub use gen::{CATALOG_JSON, PRODUCT_MESH_IDS};
 
 pub use crate::people::people_of;
 
-const SOURCES: [&[u8]; FIXED_COUNT - 1] = [
-    include_bytes!("../assets/cart.k0m"),
-    include_bytes!("../assets/register.k0m"),
-    include_bytes!("../assets/wet_floor_sign.k0m"),
-    include_bytes!("../assets/can.k0m"),
-    include_bytes!("../assets/cashier.k0m"),
-    include_bytes!("../assets/chair.k0m"),
-    include_bytes!("../assets/shutter.k0m"),
-    include_bytes!("../assets/camera.k0m"),
-    include_bytes!("../assets/terminal.k0m"),
-    include_bytes!("../assets/cigarettes.k0m"),
-    include_bytes!("../assets/rat.k0m"),
-    include_bytes!("../assets/cigarette.k0m"),
+const SOURCES: [&str; FIXED_COUNT - 1] = [
+    "cart.k0m",
+    "register.k0m",
+    "wet_floor_sign.k0m",
+    "can.k0m",
+    "cashier.k0m",
+    "chair.k0m",
+    "shutter.k0m",
+    "camera.k0m",
+    "terminal.k0m",
+    "cigarettes.k0m",
+    "rat.k0m",
+    "cigarette.k0m",
 ];
 
 /// Alle Modelle: feste (Index = MeshId) gefolgt von den Waren (Index = FIXED_COUNT + Katalog-Mesh).
 pub fn load_all() -> Vec<MeshData> {
     let mut v = vec![cube()];
-    v.extend(SOURCES.iter().map(|b| parse(b)));
+    v.extend(SOURCES.iter().map(|n| data::load::<MeshData>(n)));
     add_cart_basket(&mut v[MeshId::Cart as usize]);
     // Warnschild: Rohmodell fuer die gruseligen Fassungen merken, dann Aufschrift drauf
     let s = &v[MeshId::WetFloorSign as usize];
@@ -62,7 +63,11 @@ pub fn load_all() -> Vec<MeshData> {
     v[MeshId::WetFloorSign as usize]
         .vertices
         .extend(crate::wet_sign::decal(0));
-    v.extend(gen::PRODUCT_MESH_BYTES.iter().map(|b| parse(b)));
+    v.extend(
+        PRODUCT_MESH_IDS
+            .iter()
+            .map(|id| data::load::<MeshData>(&format!("products/{id}.k0m"))),
+    );
     // nach den Waren: die Warnschild-Fassungen 1 und 2 (siehe `wet_sign_mesh`)
     for variant in 1..crate::wet_sign::VARIANTS {
         let mut m = MeshData {
@@ -80,7 +85,7 @@ pub fn load_all() -> Vec<MeshData> {
 pub fn wet_sign_mesh(variant: usize) -> usize {
     match variant.min(crate::wet_sign::VARIANTS - 1) {
         0 => MeshId::WetFloorSign as usize,
-        v => FIXED_COUNT + gen::PRODUCT_MESH_BYTES.len() + v - 1,
+        v => FIXED_COUNT + PRODUCT_MESH_IDS.len() + v - 1,
     }
 }
 
@@ -265,7 +270,7 @@ fn push_box(vertices: &mut Vec<MeshVertex>, center: Vec3, half: Vec3, color: Vec
 }
 
 pub fn mesh_count() -> usize {
-    FIXED_COUNT + gen::PRODUCT_MESH_BYTES.len() + crate::wet_sign::VARIANTS - 1
+    FIXED_COUNT + PRODUCT_MESH_IDS.len() + crate::wet_sign::VARIANTS - 1
 }
 
 /// Halbe Groesse (Bounding Box) eines Modells; Modelle stehen auf y = 0, Mitte x/z = 0.
@@ -278,10 +283,6 @@ pub fn half_extent_idx(index: usize) -> Vec3 {
 #[allow(dead_code)]
 pub fn half_extent(id: MeshId) -> Vec3 {
     half_extent_idx(id as usize)
-}
-
-pub fn parse(bytes: &[u8]) -> MeshData {
-    mettgine::gpu::parse_mesh(bytes).expect("eingebautes Modell defekt")
 }
 
 /// Einheitswuerfel [-0.5, 0.5]^3 fuer dynamische Boxen (Waren, Wagen-Inhalt).
@@ -327,7 +328,7 @@ mod tests {
             }
         }
         // Wagen: das Rohmodell hat keinen Korb, der Drahtkorb kommt dazu
-        let raw = parse(SOURCES[MeshId::Cart as usize - 1]);
+        let raw = data::load::<MeshData>(SOURCES[MeshId::Cart as usize - 1]);
         let cart = &meshes[MeshId::Cart as usize];
         assert!(cart.vertices.len() > raw.vertices.len());
         // Raeder und Griff bleiben, die alte untere Ablage (Mitte, ~0,22 m) ist weg

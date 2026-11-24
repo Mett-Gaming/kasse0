@@ -1,0 +1,24 @@
+# Was ausgeliefert wird. Packen: cargo run --release -p mettpack -- packen
+# Anleitung: mettgine/docs/pakete.md
+name = "KASSE0"
+package = "kasse0"
+exe = "KASSE0.exe"
+ausgelassen = ["fonts/OFL.txt"]
+
+[daten]
+figuren = ["people/*"]
+waren = ["products/*"]
+modelle = [
+    "cart.k0m", "register.k0m", "wet_floor_sign.k0m", "can.k0m", "cashier.k0m", "chair.k0m",
+    "shutter.k0m", "camera.k0m", "terminal.k0m", "cigarettes.k0m", "rat.k0m", "cigarette.k0m",
+]
+schriften = ["fonts/*.ttf"]
+
+[schriften]
+"fonts/ArchivoBlack-Regular.ttf" = "Lizenzen/ArchivoBlack-OFL.txt"
+
+[beilagen]
+"LIESMICH.txt" = "packaging/LIESMICH.txt"
+"Credits.md" = "CREDITS.md"
+"Lizenzen/ArchivoBlack-OFL.txt" = "assets/fonts/OFL.txt"
+erfolge = "erfolge"

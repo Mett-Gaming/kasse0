@@ -28,31 +28,32 @@ pub fn people_of(staff: bool) -> Vec<usize> {
         .collect()
 }
 
+use mettgine::asset::data;
+pub use mettgine::gpu::SkinData;
 use mettgine::gpu::SkinVertex;
-pub use mettgine::gpu::{parse_skin, SkinData};
 
 /// Animationen fuer Maenner- bzw. Frauen-Skelett.
 pub fn anims(female: bool) -> &'static AnimSet {
     static M: OnceLock<AnimSet> = OnceLock::new();
     static F: OnceLock<AnimSet> = OnceLock::new();
     if female {
-        F.get_or_init(|| {
-            mettgine::anim::parse_anim(gen::ANIM_F_BYTES).expect("eingebaute Animation defekt")
-        })
+        F.get_or_init(|| data::load("people/anim_f.k0a"))
     } else {
-        M.get_or_init(|| {
-            mettgine::anim::parse_anim(gen::ANIM_M_BYTES).expect("eingebaute Animation defekt")
-        })
+        M.get_or_init(|| data::load("people/anim_m.k0a"))
     }
 }
 
-/// Alle Figuren, Index = Variante. Mitarbeiter bekommen den Brust-Schriftzug.
+/// Figur ohne Schriftzug.
+fn raw_skin(variant: usize) -> SkinData {
+    data::load(&format!("people/{}.k0s", PEOPLE[variant].0))
+}
+
+/// Alle Figuren, Index = Variante. Laedt auch die Animationen, damit es spaeter nicht ruckelt. Mitarbeiter bekommen den Brust-Schriftzug.
 pub fn load_skins() -> Vec<SkinData> {
-    gen::PEOPLE_SKIN_BYTES
-        .iter()
-        .enumerate()
-        .map(|(v, b)| {
-            let mut s = parse_skin(b).expect("eingebaute Figur defekt");
+    let _ = (anims(false), anims(true));
+    (0..PEOPLE.len())
+        .map(|v| {
+            let mut s = raw_skin(v);
             if PEOPLE[v].2 {
                 let badge = badge(&s, height(v));
                 s.vertices.extend(badge);
@@ -229,7 +230,7 @@ mod tests {
     fn staff_wear_the_lettering_on_the_chest() {
         let skins = load_skins();
         for (v, s) in skins.iter().enumerate() {
-            let raw = parse_skin(gen::PEOPLE_SKIN_BYTES[v]).unwrap();
+            let raw = raw_skin(v);
             let n = raw.vertices.len();
             if !PEOPLE[v].2 {
                 // Kunden bleiben, wie sie sind

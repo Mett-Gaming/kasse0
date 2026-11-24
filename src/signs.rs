@@ -13,7 +13,10 @@ pub const ROW_H: u32 = 32;
 pub const ATLAS_W: u32 = 512;
 
 /// Archivo Black (OFL), auch fuer die Aufschrift der Warnschilder (wet_sign.rs)
-pub(crate) const FONT: &[u8] = include_bytes!("../assets/fonts/ArchivoBlack-Regular.ttf");
+pub(crate) fn font_bytes() -> &'static [u8] {
+    static BYTES: OnceLock<Vec<u8>> = OnceLock::new();
+    BYTES.get_or_init(|| mettgine::asset::data::read("fonts/ArchivoBlack-Regular.ttf"))
+}
 
 /// Ladenname (eigene Marke, keine echte Kette)
 pub const BRAND: &str = "KAUF NULL";
@@ -112,7 +115,7 @@ fn all_texts() -> Vec<String> {
 }
 
 fn build() -> SignAtlas {
-    let font = FontRef::try_from_slice(FONT).expect("Archivo Black kaputt");
+    let font = FontRef::try_from_slice(font_bytes()).expect("Archivo Black kaputt");
     let texts = all_texts();
     let height = ROW_H * texts.len() as u32;
     let mut pixels = vec![0u8; (ATLAS_W * height) as usize];

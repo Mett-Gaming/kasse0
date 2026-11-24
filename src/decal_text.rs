@@ -1,4 +1,4 @@
-//! Text als kleines Pixelbild (Archivo Black, `crate::signs::FONT`) fuer Aufschriften,
+//! Text als kleines Pixelbild (Archivo Black, `crate::signs::font_bytes`) fuer Aufschriften,
 //! die als flache Streifen in Modelle gebacken werden (Warnschilder, Brust-Schriftzug).
 
 use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
@@ -7,7 +7,7 @@ use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
 /// Versalhoehe `h` Pixel; ist der Text zu breit, wird er kleiner (1 Pixel Rand je Seite).
 /// `set(x, y)` bekommt jedes gefuellte Pixel (kann ausserhalb des Bilds liegen).
 pub fn raster(s: &str, w: usize, y_top: f32, h: f32, set: &mut dyn FnMut(i32, i32)) {
-    let font = FontRef::try_from_slice(crate::signs::FONT).expect("Archivo Black kaputt");
+    let font = FontRef::try_from_slice(crate::signs::font_bytes()).expect("Archivo Black kaputt");
     let width = |px: f32| {
         let sf = font.as_scaled(PxScale::from(px));
         s.chars().map(|c| sf.h_advance(sf.glyph_id(c))).sum::<f32>()
