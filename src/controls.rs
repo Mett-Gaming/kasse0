@@ -23,6 +23,7 @@ pub enum Action {
     TakeOut,
     Complain,
     List,
+    UseItem,
 }
 
 /// Aktion, Speichername, Vorgabe
@@ -118,6 +119,8 @@ const DEFAULTS: &[(Action, &str, &[Bind])] = {
             "zettel",
             &[Bind::Key(Key::Tab), Bind::Pad(Pad::Select)],
         ),
+        // am Controller liegt es mit auf "Reklamieren" (pad.rs): die Knoepfe sind vergeben
+        (UseItem, "benutzen_item", &[Bind::Key(Key::KeyG)]),
     ]
 };
 
@@ -141,6 +144,7 @@ pub fn name(a: Action) -> &'static str {
         Action::TakeOut => "Ware herausnehmen",
         Action::Complain => "Reklamieren",
         Action::List => "Einkaufszettel",
+        Action::UseItem => "Item benutzen",
     }
 }
 
@@ -229,6 +233,12 @@ pub fn rebind(k: &mut Keys, action: Action, new: Bind) {
 
 /// Name der ersten Belegung auf einem Geraet.
 pub fn label(k: &Keys, action: Action, pad: bool) -> String {
+    // am Controller teilt sich das Item den Knopf mit dem Reklamieren
+    let action = if pad && action == Action::UseItem && !k.of(action).iter().any(is_pad) {
+        Action::Complain
+    } else {
+        action
+    };
     let binds = k.of(action);
     let found = binds.iter().find(|b| is_pad(b) == pad);
     found.map_or("-".into(), |b| bind_label(*b))
@@ -348,6 +358,7 @@ fn hints(k: &Keys, pad: bool) -> Vec<(String, String)> {
         (Action::Cart, &["Q"]),
         (Action::TakeOut, &["F"]),
         (Action::Complain, &["R"]),
+        (Action::UseItem, &["G"]),
     ] {
         if pad || label(k, a, false) != label(&d, a, false) {
             for w in words {
@@ -404,7 +415,9 @@ mod tests {
         let k = defaults();
         let mut seen = HashSet::new();
         for a in all() {
-            assert!(k.of(a).iter().any(is_pad), "{a:?} ohne Knopf");
+            if a != Action::UseItem {
+                assert!(k.of(a).iter().any(is_pad), "{a:?} ohne Knopf");
+            }
             assert!(k.of(a).iter().any(|b| !is_pad(b)), "{a:?} ohne Taste");
             for b in k.of(a) {
                 assert!(seen.insert(*b), "{b:?} doppelt");
@@ -425,7 +438,8 @@ mod tests {
         rebind(&mut k, Action::Jump, Bind::Pad(Pad::West));
         assert_eq!(label(&k, Action::Interact, true), "A");
         for a in all() {
-            assert!(k.of(a).iter().any(is_pad) && k.of(a).iter().any(|b| !is_pad(b)));
+            assert!(a == Action::UseItem || k.of(a).iter().any(is_pad));
+            assert!(k.of(a).iter().any(|b| !is_pad(b)));
         }
         // uebersteht das Speichern
         let mut kv = Default::default();

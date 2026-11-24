@@ -12,6 +12,8 @@ use mettgine::random::Random;
 const MAX: usize = 260;
 /// Davon hoechstens so viele Staubkoerner
 const MAX_DUST: usize = 140;
+/// Funken der Wunderkerze
+const MAX_SPARKS: usize = 90;
 /// Staub entsteht so weit um den Spieler (m)
 const DUST_RADIUS: f32 = 5.0;
 /// So hell sind Partikel im dunklen Markt (Anteil)
@@ -27,6 +29,10 @@ pub struct Air {
     wisp: StyleId,
     cloud: StyleId,
     breath: StyleId,
+    /// Wunderkerze
+    sparks: Particles,
+    spark: StyleId,
+    spark_rest: f32,
     rng: Random,
     smoke_rest: f32,
     dust_rest: f32,
@@ -92,6 +98,21 @@ impl Air {
             softness: 1.0,
             ..Default::default()
         });
+        let mut sparks = Particles::new(MAX_SPARKS, 31);
+        let spark = sparks.style(Style {
+            life: (0.15, 0.4),
+            speed: (0.3, 0.9),
+            spread: 1.0,
+            accel: vec3(0.0, -2.0, 0.0),
+            size: (0.006, 0.002),
+            color: (
+                Vec4::new(1.0, 0.9, 0.55, 1.0),
+                Vec4::new(1.0, 0.4, 0.1, 0.0),
+            ),
+            additive: 1.0,
+            softness: 0.5,
+            ..Default::default()
+        });
         Self {
             parts,
             dust,
@@ -99,6 +120,9 @@ impl Air {
             wisp,
             cloud,
             breath,
+            sparks,
+            spark,
+            spark_rest: 0.0,
             rng: Random::new(5),
             smoke_rest: 0.0,
             dust_rest: 0.0,
@@ -117,6 +141,11 @@ impl Air {
         }
         self.parts.update(dt);
         self.dust.update(dt);
+        self.sparks.update(dt);
+        if let Some(p) = g.sparkler_tip() {
+            self.sparks
+                .stream(self.spark, p, p, Vec3::Y, 220.0, dt, &mut self.spark_rest);
+        }
         self.spawn_dust(g, dt);
         self.spawn_smoke(g, dt);
         self.spawn_breath(g, dt);
@@ -180,6 +209,7 @@ impl Air {
                 }
             }
         }
+        out.extend_from_slice(self.sparks.instances(eye));
     }
 }
 

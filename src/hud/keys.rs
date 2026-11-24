@@ -11,7 +11,7 @@ pub enum KeyRow {
 }
 
 const TOP: f32 = 58.0;
-const STEP: f32 = 13.0;
+const STEP: f32 = 12.0;
 const LEFT: f32 = 60.0;
 const WIDTH: f32 = 360.0;
 const KEY_X: f32 = 220.0;

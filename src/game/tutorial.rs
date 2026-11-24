@@ -73,6 +73,7 @@ pub enum Phase {
     Water,
     Shopping,
     Deposit,
+    Kiosk,
     ToTill,
     Belt,
     Cashier,
@@ -80,7 +81,7 @@ pub enum Phase {
     Escape,
 }
 
-pub const PHASES: usize = 9;
+pub const PHASES: usize = 10;
 
 impl Phase {
     pub fn number(self) -> usize {
@@ -93,6 +94,7 @@ impl Phase {
             Phase::Water => "WASSER",
             Phase::Shopping => "EINKAUFEN",
             Phase::Deposit => "PFAND",
+            Phase::Kiosk => "KIOSK",
             Phase::ToTill => "ZUR KASSE",
             Phase::Belt => "BAND",
             Phase::Cashier => "KASSIERERIN",
@@ -157,6 +159,20 @@ impl Phase {
                     "Im echten Spiel laufen nicht alle",
                     "Automaten. Baut sich der Markt um,",
                     "ist alles Ungedruckte weg.",
+                    "Keine Lust? Geh gleich zur Kasse.",
+                ],
+            ],
+            Phase::Kiosk => &[
+                &[
+                    "Bring den Bon zum Kiosk (Pfeile)",
+                    "und drück E. Wähl Bon und Item,",
+                    "noch mal E kauft. Ein Bon pro Kauf:",
+                    "Was übrig ist, verfällt.",
+                ],
+                &[
+                    "Verbrauchbares benutzt du mit G,",
+                    "das Mausrad wählt aus. Bons und",
+                    "Items gelten nur diesen Einkauf.",
                     "Keine Lust? Geh gleich zur Kasse.",
                 ],
             ],
@@ -227,6 +243,11 @@ pub const MACHINE_HINTS: &[&str] = &[
     "E legt ein, sobald die Lampe grün ist.",
     "F druckt den Bon, Q schließt.",
 ];
+pub const KIOSK_HINTS: &[&str] = &[
+    "Erst den Bon wählen, dann das Item.",
+    "Ein Bon pro Kauf, der Rest verfällt.",
+    "E fragt nach, noch mal E kauft. Q schließt.",
+];
 pub const CARD_HINTS: &[&str] = &[
     "Erst E: Karte aus dem Portemonnaie nehmen.",
     "Dann die Maus gleichmäßig nach rechts.",
@@ -247,6 +268,9 @@ pub fn ui_hints(g: &Game) -> Option<&'static [&'static str]> {
     }
     if g.machine_window_open() {
         return Some(MACHINE_HINTS);
+    }
+    if g.kiosk_open() {
+        return Some(KIOSK_HINTS);
     }
     if g.till_paying() {
         return Some(match g.till.as_ref().map(|t| &t.pay) {
@@ -283,6 +307,8 @@ pub fn phase(g: &Game) -> Option<Phase> {
     } else if g.tipped {
         if g.list_complete() && !g.pfand.printed {
             Phase::Deposit
+        } else if g.list_complete() && !g.pfand.bought {
+            Phase::Kiosk
         } else if g.list_complete() {
             Phase::ToTill
         } else {
@@ -390,6 +416,8 @@ mod tests {
         g.fill_list_cheap();
         assert_eq!(g.tutorial_phase(), Some(Phase::Deposit));
         g.pfand.printed = true;
+        assert_eq!(g.tutorial_phase(), Some(Phase::Kiosk));
+        g.pfand.bought = true;
         assert_eq!(g.tutorial_phase(), Some(Phase::ToTill));
         // Ware auf dem Band: Band, alles gescannt: Bezahlen, bezahlt: Flucht
         let item = g.cart.remove(0);

@@ -2,6 +2,7 @@
 
 mod belt_window;
 pub mod keys;
+mod kiosk;
 pub mod options;
 mod pfand;
 mod till;
@@ -337,6 +338,24 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         stamina_meter(u, g.player.stamina, g.player.exhausted);
     }
 
+    // Tasche: was G benutzen wuerde
+    if let Some(i) = g.pfand.owned.selected() {
+        let n = g.pfand.owned.pocket.len();
+        let more = if n > 1 {
+            format!(" ({n})")
+        } else {
+            String::new()
+        };
+        let s = format!("[G] {}{more}", i.name());
+        u.hint_s(
+            ui::W - 12.0 - Ui::text_width(&s, 1.0),
+            238.0,
+            &s,
+            WHITE,
+            1.0,
+        );
+    }
+
     // Fadenkreuz
     u.rect(
         ui::W * 0.5 - 1.0,
@@ -380,6 +399,14 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                     let s = format!("[E] {}   Pfand {}", b.kind.name(), euro(b.kind.cents()));
                     u.hint_center(y, &s, WHITE, 1.0);
                 }
+            }
+            Some(Focus::Kiosk) => {
+                let s = if g.kiosk_has_open() {
+                    "[E] Kiosk"
+                } else {
+                    "Kiosk - gleich geöffnet"
+                };
+                u.hint_center(y, s, YELLOW, 1.0);
             }
             Some(Focus::Machine(i)) => {
                 if g.machine_works(i) {
@@ -557,6 +584,9 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     if let Some(w) = &g.pfand.window {
         pfand::draw(u, g, w, time);
     }
+    if let Some(w) = &g.pfand.kiosk {
+        kiosk::draw(u, g, w, time);
+    }
 
     // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN, Geldboerse
     till::draw(u, g, time);
@@ -671,6 +701,7 @@ pub const CONTROLS_MOVE: &[(&str, &str)] = &[
     ("Leer", "Springen"),
     ("C/Strg", "Ducken"),
     ("Esc", "Pause"),
+    ("G", "Item"),
 ];
 pub const CONTROLS_SHOP: &[(&str, &str)] = &[
     ("E", "Benutzen"),

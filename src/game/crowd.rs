@@ -233,7 +233,7 @@ impl Game {
             .chain(self.shoppers.iter().map(|s| s.pos))
             .collect();
         self.update_senses(dt);
-        let paused = self.dialog.is_some() || !self.tipped;
+        let paused = self.in_talk() || !self.tipped;
         self.director.update(dt, paused);
         self.update_shoppers(dt);
         self.update_customers(dt);
@@ -255,7 +255,7 @@ impl Game {
         self.update_whispers(dt);
         // Gangart: Animationszeit an die zurueckgelegte Strecke koppeln (Fuesse rutschen nicht)
         // im Gespraech (oder erstarrt): Kunden-Posen eingefroren (Animationszeit steht)
-        let talking = self.dialog.is_some();
+        let talking = self.in_talk();
         for i in 0..self.customers.len() {
             if talking || self.customers[i].brain.freeze > 0.0 {
                 continue;
@@ -349,7 +349,7 @@ impl Game {
         let chase = self.chasing();
         let tutorial = self.tutorial_run;
         // Im Gespraech mit einem Mitarbeiter steht die Welt still: kein Kunde rueckt naeher
-        let talking = self.dialog.is_some();
+        let talking = self.in_talk();
         let flankers = self.flankers();
         let pushers = self.pushers();
         for i in 0..self.customers.len() {
@@ -520,7 +520,7 @@ impl Game {
             // ... und an der Kasse, solange das Kassen-Minispiel laeuft, und im Tutorial immer
             let safe = self.god
                 || self.tutorial_run
-                || self.dialog.is_some()
+                || self.in_talk()
                 || self.grace > 0.0
                 || self.till_protects();
             if dist < CATCH_DIST && !self.paid_and_outside() && !safe {
@@ -648,7 +648,7 @@ impl Game {
     /// Niemand laeuft durch andere hindurch: Kunden, Personal und Kundschaft halten Abstand
     /// voneinander, zum Spieler und zum abgestellten Wagen. Im Gespraech bleiben Kunden stehen.
     fn separate_people(&mut self) {
-        let talking = self.dialog.is_some();
+        let talking = self.in_talk();
         let player = self.player.pos;
         let cart = (!self.trolley.pushing).then_some(self.trolley.pos);
         // (Position, darf geschoben werden); Jaeger draengen sich am Wagen vorbei
@@ -887,7 +887,7 @@ impl Game {
                 continue;
             }
             if interested {
-                let busy = self.checking_out();
+                let busy = self.checking_out() || self.in_talk();
                 let e = &mut self.employees[i];
                 e.state = EmpState::Approach;
                 let speed = if e.follow > 0.0 { 1.7 } else { 1.2 };
@@ -895,12 +895,7 @@ impl Game {
                 e.pos = npc::step_along(&self.world, &self.player_field, e.pos, player, speed, dt);
                 e.moving = (e.pos - old).length_squared() > 1e-8;
                 e.yaw = lerp_angle(e.yaw, npc::yaw_towards(e.pos, player), (dt * 8.0).min(1.0));
-                if dist < 1.7
-                    && los
-                    && self.dialog.is_none()
-                    && !busy
-                    && self.outcome == Outcome::Running
-                {
+                if dist < 1.7 && los && !busy && self.outcome == Outcome::Running {
                     if sprinting {
                         // Vorbeigerannt: kein Gespraech, aber das faellt auf
                         if e.sprint_cd <= 0.0 {

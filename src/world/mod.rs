@@ -431,6 +431,8 @@ pub struct World {
     pub spots: Vec<Spot>,
     /// Kuehltruhen-Stuecke: (Mitte, Laengsrichtung, Laenge)
     pub freezers: Vec<(Vec3, f32, f32)>,
+    /// Kiosk vor den Kassen (nicht in jeder Welt)
+    pub kiosk: Option<gen::Kiosk>,
     pub nav: NavGrid,
     /// Deko: Warnschilder "Rutschgefahr"
     pub signs: Vec<(Vec3, f32)>,

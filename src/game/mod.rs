@@ -80,6 +80,8 @@ pub struct Input {
     pub choice: Option<usize>,
     /// Zifferntaste 0-9 (PIN am Kartenterminal)
     pub digit: Option<u8>,
+    /// G: Item aus der Tasche benutzen
+    pub use_item: bool,
     /// R: an der Kasse reklamieren (falsch gescannt)
     pub complain: bool,
     /// C oder Strg gehalten: ducken
@@ -241,6 +243,8 @@ pub enum Focus {
     Bottle(usize),
     /// Pfandautomat (Index in wing.machines)
     Machine(usize),
+    /// Kiosk (pfand/kiosk.rs)
+    Kiosk,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1015,7 +1019,7 @@ impl Game {
         self.update_umbau(dt);
 
         if self.outcome != Outcome::Running || self.dying.is_some() {
-            self.close_machine();
+            self.close_pointer_window();
         }
         if self.outcome != Outcome::Running {
             self.outcome_timer += dt;
@@ -1032,6 +1036,7 @@ impl Game {
             input.interact = false;
             input.cart_toggle = false;
             input.take_out = false;
+            input.use_item = false;
             input.jump = false;
             input.choice = None;
             input.digit = None;
@@ -1046,6 +1051,7 @@ impl Game {
             input.interact = false;
             input.cart_toggle = false;
             input.take_out = false;
+            input.use_item = false;
             input.jump = false;
             input.choice = None;
             input.digit = None;
@@ -1071,6 +1077,8 @@ impl Game {
         } else if self.machine_window_open() {
             // Pfandautomat (pfand/machine.rs)
             self.update_machine(dt, input);
+        } else if self.kiosk_open() {
+            self.update_kiosk(input);
         } else if self.till_paying() {
             // Karte durchziehen / PIN: man steht am Terminal still
             self.update_till_pay(dt, input);
@@ -1089,14 +1097,22 @@ impl Game {
             if input.take_out {
                 self.take_out();
             }
+            if input.use_item {
+                self.use_item();
+            }
+            if input.wheel != 0 && !matches!(self.focus, Some(Focus::Cart | Focus::Belt)) {
+                self.cycle_item(-input.wheel);
+            }
         }
         // Kassen-Minispiel: Fragen, Weggehen, Misstrauen, Leben
         self.update_till(dt, input);
         self.update_cigarette(dt, cig_key);
         self.update_trip(dt);
+        self.update_items(dt);
         input.interact = false;
         input.cart_toggle = false;
         input.take_out = false;
+        input.use_item = false;
         input.jump = false;
         input.wheel = 0;
         input.choice = None;

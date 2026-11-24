@@ -83,6 +83,8 @@ Beim **allerersten Einkauf** fragt das Spiel, ob du das **Tutorial** spielen wil
 ### Pfand
 Im gekippten Markt liegen **leere Flaschen und Dosen**. Heb sie auf (E) und leg sie in die **Tüte am Wagen** (höchstens 5, sie klirren). In den Nebenräumen hinter der Westwand stehen **Pfandautomaten**: Dreh die Flasche, bis der Strichcode oben ist (A/D), leg sie bei grüner Lampe ein (E) und drucke den Bon (F). Baut sich der Markt um, ist Ungedrucktes weg. Je schlimmer der Markt, desto weniger Automaten laufen – und desto weniger solltest du ihnen trauen.
 
+**Kiosk:** Die Bons löst du am Kiosk vor den Kassen ein (nur im gekippten Markt offen): Sticker, Energy-Drink, Wunderkerze, Beruhigungstee, Öl, Mettbrötchen, Filzsohlen, Glöckchen, Taschenlampe. **Ein Bon pro Kauf**, ist er mehr wert, verfällt der Rest. Verbrauchbares benutzt du mit **G** (Mausrad wählt). Alles gilt nur für diesen Einkauf.
+
 ### In der Luft
 Staub schwebt im Licht der Lampen, die Zigarette raucht wirklich, und an der Kühlung sieht man deinen Atem.
 
@@ -130,7 +132,7 @@ Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umd
 
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 
-**Controller:** Stick laufen/umsehen, A springen, B ducken, X benutzen, Y Wagen, LT rennen, RT Ware herausnehmen, LB/RB auswählen, Select Zettel, Start Pause, Kreuz: Antworten, PIN, Reklamieren. Die Hinweise im Bild wechseln mit.
+**Controller:** Stick laufen/umsehen, A springen, B ducken, X benutzen, Y Wagen, LT rennen, RT Ware herausnehmen, LB/RB auswählen, Select Zettel, Start Pause, Kreuz: Antworten, PIN, Reklamieren, Item benutzen. Die Hinweise im Bild wechseln mit.
 
 ## Optionen
 Waagerechte Reiter (Tab, Q/E oder Mausklick): **Anzeige** (VHS-Effekt, Sichtfeld, Schatten, Vollbild, höchste Bildrate, „Weniger Verzögerung“ über NVIDIA Reflex bzw. AMD Anti-Lag), **Gameplay** (Lautstärke, Musik, Jumpscares) und **Steuerung** (Maus- und Controller-Blick, Vibration, alle Tasten umbelegen). Schieberegler lassen sich anklicken. Hast du das Tutorial einmal geschafft, gibt es hier auch **„Tutorial spielen“**. Das Spiel startet im **randlosen Vollbild**; abgeschaltet läuft es im Fenster (1280×720). Sie werden in `%APPDATA%\.mettlauncher\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.

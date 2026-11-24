@@ -255,6 +255,7 @@ impl Game {
                     near(self.pfand.bottles.iter().map(|b| b.pos).collect())
                 }
             }
+            Phase::Kiosk => self.world.kiosk.map(|k| k.front()),
             Phase::ToTill => self.open_lane().map(|l| l.scan_point),
             // erst zur Ladentuer, im Korridor zur Ausgangstuer am Ende
             Phase::Escape => Some(match &self.world.corridor {
@@ -499,6 +500,9 @@ mod tests {
         assert!(g.world.in_wing(goal), "Pfeile nicht zum Automaten");
         arrows_lead_to_goal(&mut g);
         g.pfand.printed = true;
+        assert_eq!(g.tutorial_phase(), Some(Phase::Kiosk));
+        arrows_lead_to_goal(&mut g);
+        g.pfand.bought = true;
         assert_eq!(g.tutorial_phase(), Some(Phase::ToTill));
         arrows_lead_to_goal(&mut g);
         assert!(g.tutorial.as_ref().unwrap().guide.marked.is_empty());

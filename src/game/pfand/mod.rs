@@ -4,6 +4,8 @@
 //!
 //! Pfand ist keine Ware: zaehlt nicht zum Warenwert, nicht zum Zettel und kommt nicht aufs Band.
 
+pub mod items;
+pub mod kiosk;
 pub mod machine;
 #[cfg(test)]
 mod tests;
@@ -95,6 +97,10 @@ pub struct Pfand {
     /// noch nicht gedruckt: Betrag je Automat (Raum)
     pub sums: Vec<i64>,
     pub window: Option<MachineWindow>,
+    pub kiosk: Option<kiosk::KioskWindow>,
+    pub owned: items::Owned,
+    /// schon einmal etwas gekauft (Tutorial)
+    pub bought: bool,
     /// Blick auf die Tuete (statt auf den Wagen)
     pub aim_bag: bool,
     /// wie oft umgebaut wurde: andere Automaten laufen
@@ -114,6 +120,9 @@ impl Pfand {
             bons: Vec::new(),
             sums: Vec::new(),
             window: None,
+            kiosk: None,
+            owned: Default::default(),
+            bought: false,
             aim_bag: false,
             shift: 0,
             printed: false,
@@ -182,6 +191,7 @@ impl Game {
     /// Nach einem Umbau: Flaschen mitnehmen, Ungedrucktes verfaellt, auffuellen.
     pub(super) fn pfand_after_rebuild(&mut self, old: &World) {
         self.close_machine();
+        self.close_kiosk();
         self.pfand.shift += 1;
         let w = &self.world;
         let cells = w.reachable_centers();
@@ -312,6 +322,15 @@ impl Game {
                 }
                 "Tüte voll.".into()
             }
+            3 => {
+                let Some(k) = self.world.kiosk else {
+                    return "Kein Kiosk.".into();
+                };
+                self.player.pos = self.world.collide(k.front(), PLAYER_RADIUS);
+                self.player.yaw = -FRAC_PI_2;
+                self.player.pitch = -0.1;
+                "Am Kiosk.".into()
+            }
             _ => {
                 self.pfand.bons.push(250);
                 self.pfand.printed = true;
@@ -345,6 +364,7 @@ impl Game {
         }
         self.collect_bag_draws(out);
         self.collect_machine_draws(out);
+        self.collect_item_draws(out);
     }
 
     /// Tuete aus Boxen, Flaschenhaelse schauen heraus.

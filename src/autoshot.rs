@@ -542,6 +542,28 @@ impl App {
                 return Some(0.5);
             }
             90 => self.shot_request = Some(shot("42_pfand_flasche")),
+            91 => {
+                // Kiosk: erst von vorn, dann das Fenster mit zwei Bons
+                self.game.cheat(game::PFAND_CHEATS + 2);
+                self.game.pfand.bons.push(85);
+                self.game.cheat(game::PFAND_CHEATS + 3);
+                self.game.message = None;
+                let p = self.game.player.pos;
+                self.game.player.pos = p + vec3(1.2, 0.0, 0.5);
+                self.game.player.yaw = -1.25;
+                return Some(0.6);
+            }
+            92 => self.shot_request = Some(shot("43_kiosk")),
+            93 => {
+                self.game.cheat(game::PFAND_CHEATS + 3);
+                self.game.message = None;
+                return Some(0.3);
+            }
+            94 => {
+                self.input.interact = true;
+                return Some(0.5);
+            }
+            95 => self.shot_request = Some(shot("44_kiosk_fenster")),
             _ => return None,
         }
         Some(0.6)

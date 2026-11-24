@@ -61,7 +61,7 @@ impl Game {
             && self.scare_cd <= 0.0
             && self.outcome == Outcome::Running
             && self.dying.is_none()
-            && self.dialog.is_none()
+            && !self.in_talk()
             && !self.paid
             && !self.till_paying()
             && self.director.allows_scares()
@@ -351,7 +351,7 @@ impl Game {
                 };
             }
             CartGhost::Rolling => {
-                if self.dialog.is_some() {
+                if self.in_talk() {
                     return; // pausiert, solange man redet
                 }
                 if self.trolley.pushing || carried {

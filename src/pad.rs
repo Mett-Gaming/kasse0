@@ -60,10 +60,15 @@ impl App {
             Action::Cart if down => i.cart_toggle = true,
             Action::TakeOut if down => i.take_out = true,
             Action::Complain if down => i.complain = true,
+            Action::UseItem if down => i.use_item = true,
             Action::Interact if down => i.interact = true,
             Action::Jump if down => i.jump = true,
-            Action::Cart | Action::TakeOut | Action::Complain | Action::Interact | Action::Jump => {
-            }
+            Action::Cart
+            | Action::TakeOut
+            | Action::Complain
+            | Action::Interact
+            | Action::Jump
+            | Action::UseItem => {}
         }
     }
 
@@ -219,6 +224,12 @@ impl App {
                         Action::Left | Action::Right | Action::Forward | Action::Back
                     ));
             if !down || !taken {
+                // Reklamieren geht nur an der Kasse, sonst benutzt der Knopf das Item
+                let a = if a == Action::Complain && !self.game.till_active() {
+                    Action::UseItem
+                } else {
+                    a
+                };
                 self.action(a, down);
             }
         }

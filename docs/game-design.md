@@ -298,7 +298,7 @@ Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `ce
 **Cheats:** Im Cheat-Menü (F1, Kategorie „Schrecken“) lässt sich jeder Schreck einzeln auslösen; der Cheat teleportiert an eine passende Stelle.
 
 ## Tutorial-Modus (`src/game/tutorial.rs`, Wegweiser `src/game/tutorial/guide.rs`)
-Kein eigener Menüpunkt: Beim allerersten „Neuer Einkauf“ fragt ein Fenster „Willst du das Tutorial spielen?“ (Ja/Nein; gespeichert als `tutorial_asked` in `settings.txt`, Esc fragt beim nächsten Mal wieder). „Nein“ zeigt „OK Champ, hab nicht gedacht, dass du so schlau bist.“, OK startet den normalen Einkauf. Der normale Einkauf hat kein Tutorial-Fenster mehr, die frühere Option „Tutorial an/aus“ ist weg. Der Tutorial-Modus ist ein ganzer Einkauf mit neun Phasen, die aus dem Spielzustand abgeleitet werden: 1 Steuerung (Tasten-Liste wie früher), 2 Wasser, 3 Einkaufen, 4 Pfand, 5 Zur Kasse, 6 Band, 7 Kassiererin, 8 Bezahlen, 9 Flucht. Ab Phase 2 erklärt ein Kasten oben links der Mitte die Phase (ausgeblendet im Kassenfenster, beim Bezahlen und im Gespräch).
+Kein eigener Menüpunkt: Beim allerersten „Neuer Einkauf“ fragt ein Fenster „Willst du das Tutorial spielen?“ (Ja/Nein; gespeichert als `tutorial_asked` in `settings.txt`, Esc fragt beim nächsten Mal wieder). „Nein“ zeigt „OK Champ, hab nicht gedacht, dass du so schlau bist.“, OK startet den normalen Einkauf. Der normale Einkauf hat kein Tutorial-Fenster mehr, die frühere Option „Tutorial an/aus“ ist weg. Der Tutorial-Modus ist ein ganzer Einkauf mit zehn Phasen, die aus dem Spielzustand abgeleitet werden: 1 Steuerung (Tasten-Liste wie früher), 2 Wasser, 3 Einkaufen, 4 Pfand, 5 Kiosk, 6 Zur Kasse, 7 Band, 8 Kassiererin, 9 Bezahlen, 10 Flucht. Ab Phase 2 erklärt ein Kasten oben links der Mitte die Phase (ausgeblendet im Kassenfenster, beim Bezahlen und im Gespräch).
 - **Pfeile am Boden** (aus Boxen, leuchten gelb-grün, flackern im gekippten Markt): alle 1,5 m, die nächsten fünf, entlang eines eigenen Distanzfelds über das Raster (der Kassenbereich ist für den Spieler offen). Ziele: Wasser im Getränkeraum (schon ab dem Start, während der Tasten-Liste; Wasser im Gang wird nicht angezeigt) bzw. Tür des Getränkeraums, nächste fehlende Ware, offene Kasse, Korridor-Ende bzw. Ladentür.
 - **Leuchtende Waren:** gleiche Hervorhebung wie im normalen Spiel (`highlight.rs`: etwas größer, pulsierend hell), aber für alle echten, noch fehlenden Zettel-Waren im Umkreis von 12 m (höchstens 40) statt nur der nächsten in 1 m. Die Hervorhebung des normalen Spiels bleibt im Tutorial zusätzlich an.
 - **Erklär-Kasten mit Seiten:** Eine Phase kann mehrere Seiten haben, die alle 8 s wechseln (Seitenzahl rechts oben). Einkaufen: 1 Zettel und falsche Ware, 2 Kunden (kommen näher, wenn man nicht hinsieht; nicht anrempeln, anstarren, Tomatensaft nehmen), 3 Mitarbeiter (sprechen manchmal an, 6 s für die Antwort 1/2/3, gute Antworten bringen Abstand, falsche Auffälligkeit), 4 gesperrte Gänge (Mettarbeiter spannen Absperrband, dann außen herum; gute Antwort öffnet, schlechte lässt einen Gang sperren; im Tutorial sperrt keiner).
@@ -370,3 +370,21 @@ Option „Schatten“ (Aus, Niedrig, Hoch; Vorgabe Hoch). Niedrig: 4 Lampen, 384
 - **Automaten:** je Raum einer. Ruhig laufen alle, unruhig einer nicht, ab „falsch“ nur noch einer; welcher, wechselt mit jedem Umbau. Minispiel: Flasche drehen (A/D, Mausrad, LB/RB, 8 Stellungen), bis der Strichcode oben ist, bei grüner Lampe (0,8 s) mit E einlegen. Falsch oder zu früh: Fehlerton, 10 m Lärm. Ab „unruhig“ lehnt er zu 15 % grundlos ab und redet, ab „falsch“ behält er bis zu 3 ct. Im Kollaps greift nach 12 s ein Arm heraus (Schreck, 20 m Lärm, Flasche weg, kein Tod; nur wenn gerade Schrecken erlaubt sind).
 - **Bons:** F druckt den Betrag des Automaten. Ungedrucktes ist nach einem Umbau weg. Bons gelten nur im laufenden Run und stehen auf dem Einkaufszettel (TAB).
 - **Tutorial:** Abschnitt „Pfand“ mit Pfeilen (Flasche, dann Automat), leuchtenden Flaschen und Erklärleiste; alle Automaten laufen, nichts wird abgelehnt, kein Arm, nichts verfällt, zwei Plastikflaschen liegen nahe der Tür. Wer gleich zur Kasse geht, überspringt ihn.
+
+### Kiosk und Items
+`game/pfand/kiosk.rs`, `items.rs`, Fenster `hud/kiosk.rs`, Bau `world/gen/kiosk.rs`. Südwestecke vor den Kassen, im normalen Markt „Gleich geöffnet“, nach dem Bezahlen zu. Dahinter steht ein Mettarbeiter; ab „unruhig“ folgt sein Kopf, ab „falsch“ sind die Schilder der Auslage falsch geschrieben (Preis und Wirkung stimmen).
+- **Ein Bon pro Kauf**, kein Zusammenlegen, kein Wechselgeld: Ist der Bon mehr wert, ist er trotzdem ganz weg (wird vorher gefragt).
+- Solange das Fenster offen ist, gilt es wie ein Gespräch (`Game::in_talk`): Kunden stehen, niemand wird gefangen, danach 2,5 s Schonfrist.
+- Alles gilt nur im laufenden Run. Verbrauchbares kommt in die Tasche (höchstens 4): G benutzt, Mausrad wählt; am Controller benutzt der Knopf zum Reklamieren (Kreuz unten) außerhalb der Kasse das Item.
+
+| Item | Preis | Wirkung |
+|---|---|---|
+| Sticker Kunde 0 | 0,15 € | klebt am Wagen |
+| Energy-Drink | 0,40 € | 20 s rennen ohne Ausdauer |
+| Wunderkerze | 0,50 € | funkelt 15 s |
+| Beruhigungstee | 0,75 € | Auffälligkeit halbiert |
+| Öl | 1,00 € | Wagen quietscht nicht mehr, Flaschen klirren weiter |
+| Mettbrötchen | 1,00 € | kann man essen |
+| Filzsohlen | 1,25 € | Schritte halb so weit hörbar |
+| Glöckchen | 1,50 € | klingelt am Wagen, wenn ein Verfolger näher als 6 m hinter einem ist |
+| Taschenlampe | 2,50 € | Kameralicht im dunklen Markt doppelt so hell (`Renderer::set_camera_light`) |

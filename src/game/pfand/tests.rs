@@ -357,3 +357,267 @@ fn the_tutorial_bottles_are_near_and_worth_enough() {
         assert!(near >= 2, "{seed}: {near}");
     }
 }
+
+// --- Kiosk und Items ---
+
+use super::items::{Item, ENERGY_TIME, POCKET_MAX, SPARKLE_TIME};
+use super::kiosk::Column;
+
+fn at_kiosk(seed: u64, bons: &[i64]) -> Game {
+    let mut g = market(seed);
+    g.pfand_cheat(3);
+    g.pfand.bons = bons.to_vec();
+    step(&mut g, Input::default());
+    assert_eq!(g.focus, Some(Focus::Kiosk));
+    step(&mut g, press(|i| i.interact = true));
+    assert!(g.kiosk_open());
+    g
+}
+
+fn choose(g: &mut Game, item: Item) {
+    let w = g.pfand.kiosk.as_mut().unwrap();
+    w.column = Column::Items;
+    w.item = Item::ALL.iter().position(|i| *i == item).unwrap();
+    w.confirm = false;
+}
+
+#[test]
+fn the_kiosk_is_reachable_everywhere_and_blocks_nothing() {
+    for seed in 0..12u64 {
+        let mut g = Game::new(seed);
+        assert!(!g.kiosk_has_open(), "offen im normalen Markt");
+        assert!(g.world.all_reachable(), "{seed}: normaler Markt versperrt");
+        g.tip();
+        for tier in [Tier::Calm, Tier::Uneasy, Tier::Wrong, Tier::Collapse] {
+            if tier > Tier::Calm {
+                g.force_tier(tier);
+                g.finish_umbau();
+            }
+            let k = g.world.kiosk.unwrap();
+            let f = k.front();
+            assert!(g.world.all_reachable(), "{seed}/{tier:?}: versperrt");
+            assert!(
+                g.world.collide(f, 0.42).distance(f) < 1e-3,
+                "{seed}/{tier:?}: kein Platz vor dem Kiosk"
+            );
+            let cells = g.world.reachable_centers();
+            assert!(cells.iter().any(|c| c.distance(f) < 0.7), "{seed}/{tier:?}");
+            assert!(g.kiosk_seller().is_some());
+        }
+    }
+}
+
+#[test]
+fn one_receipt_per_purchase_and_the_rest_is_lost() {
+    let mut g = at_kiosk(20, &[200, 90]);
+    choose(&mut g, Item::Energy);
+    step(&mut g, press(|i| i.interact = true));
+    // erst nachfragen, noch nichts verkauft
+    assert!(g.pfand.kiosk.as_ref().unwrap().confirm);
+    assert!(g.pfand.kiosk.as_ref().unwrap().text.contains("verfällt"));
+    assert_eq!(g.pfand.bons.len(), 2);
+    step(&mut g, press(|i| i.interact = true));
+    // der Bon ueber 2,00 ist ganz weg, der andere unberuehrt
+    assert_eq!(g.pfand.bons, vec![90]);
+    assert_eq!(g.pfand.owned.pocket, vec![Item::Energy]);
+    assert!(g.pfand.bought);
+}
+
+#[test]
+fn small_receipts_do_not_add_up() {
+    let mut g = at_kiosk(21, &[60, 60, 60]);
+    choose(&mut g, Item::Oil); // 1,00
+    for _ in 0..3 {
+        step(&mut g, press(|i| i.interact = true));
+    }
+    assert_eq!(g.pfand.bons.len(), 3);
+    assert!(!g.pfand.owned.has(Item::Oil));
+    // ohne Bon gibt es nichts
+    let mut g = at_kiosk(21, &[]);
+    choose(&mut g, Item::Sticker);
+    for _ in 0..3 {
+        step(&mut g, press(|i| i.interact = true));
+    }
+    assert!(!g.pfand.owned.has(Item::Sticker));
+}
+
+#[test]
+fn refused_purchases_cost_nothing() {
+    let mut g = at_kiosk(22, &[250, 250]);
+    g.pfand.owned.kept.push(Item::Torch);
+    choose(&mut g, Item::Torch);
+    for _ in 0..3 {
+        step(&mut g, press(|i| i.interact = true));
+    }
+    g.pfand.owned.pocket = vec![Item::Tea; POCKET_MAX];
+    choose(&mut g, Item::Mett);
+    for _ in 0..3 {
+        step(&mut g, press(|i| i.interact = true));
+    }
+    assert_eq!(g.pfand.bons.len(), 2);
+    assert_eq!(g.pfand.owned.pocket.len(), POCKET_MAX);
+}
+
+#[test]
+fn mouse_and_keys_operate_the_kiosk() {
+    let mut g = at_kiosk(23, &[150, 40]);
+    step(&mut g, Input::default());
+    // zweiten Bon anklicken, dann das zweite Item
+    let click = |x: f32, y: f32| {
+        press(move |i| {
+            i.ui_mouse = (x, y);
+            i.ui_pressed = true;
+        })
+    };
+    let (b, s) = (kiosk::BONS, kiosk::SHELF);
+    step(&mut g, click(b.0 + 20.0, b.1 + 14.0 + kiosk::ROW * 1.5));
+    assert_eq!(g.pfand.kiosk.as_ref().unwrap().bon, 1);
+    step(&mut g, click(s.0 + 20.0, s.1 + 14.0 + kiosk::ROW * 1.5));
+    assert!(g.pfand.kiosk.as_ref().unwrap().confirm);
+    step(&mut g, click(s.0 + 20.0, s.1 + 14.0 + kiosk::ROW * 1.5));
+    assert_eq!(g.pfand.bons, vec![150]);
+    assert_eq!(g.pfand.owned.pocket, vec![Item::Energy]);
+    // Tasten: Spalte wechseln, Zeile weiter
+    let item = g.pfand.kiosk.as_ref().unwrap().item;
+    step(&mut g, press(|i| i.back = true));
+    assert_eq!(g.pfand.kiosk.as_ref().unwrap().item, item + 1);
+    step(&mut g, Input::default());
+    step(&mut g, press(|i| i.left = true));
+    assert_eq!(g.pfand.kiosk.as_ref().unwrap().column, Column::Bons);
+    step(&mut g, press(|i| i.cart_toggle = true));
+    assert!(!g.kiosk_open());
+    assert!(g.grace > 1.0, "keine Schonfrist");
+}
+
+#[test]
+fn customers_stand_still_and_nobody_is_caught_at_the_kiosk() {
+    let mut g = at_kiosk(24, &[100]);
+    g.customers.clear();
+    let p = g.player.pos + vec3(1.2, 0.0, 0.0);
+    g.spawn_customer_at(p);
+    g.customers[0].stalker = true;
+    g.player.yaw = -FRAC_PI_2; // Blick zum Kiosk, Kunde im Ruecken
+    let from = g.customers[0].pos;
+    for _ in 0..540 {
+        g.employees.clear();
+        g.update(DT, &mut Input::default());
+    }
+    assert!(
+        g.customers[0].pos.distance(from) < 0.01,
+        "Kunde bewegt sich"
+    );
+    assert!(g.dying.is_none() && g.outcome == Outcome::Running);
+}
+
+#[test]
+fn items_work_and_wear_off() {
+    let mut g = market(25);
+    // Tee
+    g.suspicion = 0.8;
+    g.receive_item(Item::Tea);
+    g.use_item();
+    assert!((g.suspicion - 0.4).abs() < 1e-5);
+    assert!(g.pfand.owned.pocket.is_empty());
+    // Energy
+    g.receive_item(Item::Energy);
+    step(&mut g, press(|i| i.use_item = true));
+    assert!(g.energized());
+    // Wunderkerze und Mett
+    g.receive_item(Item::Sparkler);
+    g.receive_item(Item::Mett);
+    assert_eq!(g.pfand.owned.selected(), Some(Item::Mett));
+    g.cycle_item(1);
+    assert_eq!(g.pfand.owned.selected(), Some(Item::Sparkler));
+    g.use_item();
+    assert!(g.sparkler_tip().is_some());
+    g.use_item();
+    wait(&mut g, ENERGY_TIME.max(SPARKLE_TIME) + 0.5);
+    assert!(!g.energized() && g.sparkler_tip().is_none());
+    g.use_item(); // leer: nur ein Hinweis
+                  // Taschenlampe
+    assert_eq!(g.camera_light(), 1.0);
+    g.receive_item(Item::Torch);
+    assert!(g.camera_light() > 1.5);
+}
+
+#[test]
+fn energy_keeps_stamina_full() {
+    let run = |drink: bool| {
+        let mut g = market(26);
+        g.trolley.pushing = false;
+        g.trolley.pos = g.world.corral;
+        if drink {
+            g.receive_item(Item::Energy);
+            g.use_item();
+        }
+        for _ in 0..120 {
+            step(
+                &mut g,
+                press(|i| {
+                    i.forward = true;
+                    i.run = true;
+                }),
+            );
+        }
+        g.player.stamina
+    };
+    assert!(run(false) < 0.9);
+    assert_eq!(run(true), 1.0);
+}
+
+#[test]
+fn oil_and_soles_make_you_quieter() {
+    let loudest = |items: &[Item], push: bool| {
+        let mut g = market(27);
+        for i in items {
+            g.receive_item(*i);
+        }
+        g.trolley.pushing = push;
+        if !push {
+            g.trolley.pos = g.world.corral;
+        }
+        let mut worst = 0.0f32;
+        for k in 0..240 {
+            let turn = k as f32 * 0.03;
+            g.player.yaw = turn;
+            g.noises.clear();
+            let input = press(|i| i.forward = true);
+            g.update_movement(DT, &input);
+            worst = g.noises.iter().map(|n| n.1).fold(worst, f32::max);
+        }
+        worst
+    };
+    assert!(loudest(&[Item::Oil], true) < loudest(&[], true));
+    assert!(loudest(&[Item::Soles], false) < loudest(&[], false));
+}
+
+#[test]
+fn the_bell_rings_only_for_stalkers_behind() {
+    let mut g = market(28);
+    g.receive_item(Item::Bell);
+    let p = g.player.pos;
+    g.player.yaw = 0.0; // Blick nach -z
+    let mut ring = |behind: bool, stalker: bool| {
+        g.customers.clear();
+        let z = if behind { 3.0 } else { -3.0 };
+        g.spawn_customer_at(p);
+        g.customers[0].pos = p + vec3(0.0, 0.0, z);
+        g.customers[0].stalker = stalker;
+        g.sfx_at.clear();
+        g.pfand.owned.kept = vec![Item::Bell];
+        for _ in 0..100 {
+            g.update_items(DT);
+        }
+        g.sfx_at.iter().any(|s| matches!(s.0, Sfx::Bell))
+    };
+    assert!(ring(true, true));
+    assert!(!ring(false, true));
+    assert!(!ring(true, false));
+}
+
+#[test]
+fn bought_things_are_gone_in_the_next_run() {
+    let n = Game::new(29);
+    assert!(n.pfand.owned.pocket.is_empty() && n.pfand.owned.kept.is_empty());
+    assert_eq!(n.camera_light(), 1.0);
+}

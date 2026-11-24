@@ -77,7 +77,7 @@ impl Game {
         let still = self.player.vel.length() < 0.1;
         self.player_still = if still { self.player_still + dt } else { 0.0 };
         let reached = std::mem::take(&mut self.player_reached);
-        if !self.tipped || self.dialog.is_some() {
+        if !self.tipped || self.in_talk() {
             return;
         }
         let player = self.player.pos;

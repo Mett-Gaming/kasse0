@@ -89,13 +89,14 @@ impl Game {
 
     /// Ein eigenes Fenster mit Mauszeiger (Kassenfenster oder Automat).
     pub fn pointer_window_open(&self) -> bool {
-        self.belt_window_open() || self.machine_window_open()
+        self.belt_window_open() || self.machine_window_open() || self.kiosk_open()
     }
 
     /// Esc oder B: was gerade offen ist, schliessen.
     pub fn close_pointer_window(&mut self) {
         self.close_belt_window();
         self.close_machine();
+        self.close_kiosk();
     }
 
     /// Laeuft dieser Automat? Ruhig: alle; unruhig: einer nicht; danach nur einer.

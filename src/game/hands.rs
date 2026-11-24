@@ -73,7 +73,7 @@ impl Game {
             wish = forward * sy + right * sx;
         }
         // im Fluchtkorridor: Ausdauer unendlich; dort auch Tempo-Grenzen (Stolpern, Engstellen)
-        let endless = self.corridor_endless_stamina();
+        let endless = self.corridor_endless_stamina() || self.energized();
         let (slow, cap) = self.corridor_speed();
         let pushing = self.trolley.pushing;
         // Ducken (weich) und Springen (nur am Boden, nicht geduckt)
@@ -182,15 +182,23 @@ impl Game {
                 self.squeak_acc = 0.0;
                 self.cart_turn = 0.0;
                 self.squeak_next = self.rng.gen_range(lo..hi);
-                self.sfx.push((sfx, vol));
+                // geoelt (Kiosk): nur die Flaschen sind noch zu hoeren
+                let oiled = self.pfand.owned.has(super::pfand::items::Item::Oil);
+                if !oiled {
+                    self.sfx.push((sfx, vol));
+                }
                 if self.tipped {
                     // Flaschen in der Tuete klirren mit
                     let n = self.pfand.bag.len();
                     if n > 0 {
                         self.play(Sfx::Clink, 0.06 * n as f32);
                     }
-                    self.make_noise(radius + n as f32 * super::pfand::CLINK_RADIUS);
-                    if !self.squeak_hinted {
+                    let squeak = if oiled { 0.0 } else { radius };
+                    let heard = squeak + n as f32 * super::pfand::CLINK_RADIUS;
+                    if heard > 0.0 {
+                        self.make_noise(heard);
+                    }
+                    if !self.squeak_hinted && !oiled {
                         self.squeak_hinted = true;
                         self.say("Das Rad quietscht. Die Mitarbeiter hören das.", 4.0);
                     }
@@ -219,14 +227,21 @@ impl Game {
         p.step_acc += moved;
         if p.step_acc > 0.7 {
             p.step_acc = 0.0;
-            self.sfx.push((Sfx::Step, if running { 0.5 } else { 0.25 }));
+            // Filzsohlen (Kiosk): leiser und nicht so weit
+            let soft = if self.pfand.owned.has(super::pfand::items::Item::Soles) {
+                super::pfand::items::SOLES
+            } else {
+                1.0
+            };
+            self.sfx
+                .push((Sfx::Step, if running { 0.5 } else { 0.25 } * soft));
             // Schritte hoert man: Rennen weit, Gehen kaum
             let r = if running {
                 super::senses::NOISE_RUN
             } else {
                 super::senses::NOISE_WALK
             };
-            self.noise(pos, r);
+            self.noise(pos, r * soft);
         }
         if let Some(t) = &mut self.tutorial {
             t.walked += moved;
@@ -453,6 +468,12 @@ impl Game {
             self.aim_cart = false;
             self.pfand.aim_bag = false;
         }
+        if let Some(t) = self.kiosk_hit(eye, dir, best) {
+            best = t;
+            self.focus = Some(Focus::Kiosk);
+            self.aim_cart = false;
+            self.pfand.aim_bag = false;
+        }
         // Beim Schieben reicht ein Blick nach unten in den Korb
         if self.trolley.pushing && self.player.pitch < -0.35 {
             self.aim_cart = true;
@@ -558,6 +579,7 @@ impl Game {
             // E an einer Tuer im Fluchtkorridor: aufdruecken (game/corridor/obstacles.rs)
             Some(Focus::Door(i)) => return self.push_door(i),
             Some(Focus::Machine(i)) => return self.open_machine(i),
+            Some(Focus::Kiosk) => return self.open_kiosk(),
             _ => {}
         }
         if self.held.is_some() {

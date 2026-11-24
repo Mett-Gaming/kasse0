@@ -251,6 +251,23 @@ impl Game {
             out.push(d);
         }
 
+        // Verkaeufer am Kiosk; ab "unruhig" folgt der Kopf
+        if let Some((variant, pos, yaw)) = self.kiosk_seller() {
+            let mut d = person(
+                variant,
+                Clip::Idle,
+                t * 0.8,
+                pos,
+                yaw,
+                Vec4::new(1.0, 1.0, 1.0, 0.1),
+            );
+            if self.tier >= Tier::Uneasy && pos.distance(eye) < 8.0 {
+                d.look_at = Some(eye);
+                d.fx.look_limit = STAFF_LOOK_LIMIT;
+            }
+            out.push(d);
+        }
+
         // Schrecken: aufgestandene Kassiererin, Gestalt im Deckenloch, Gesicht beim Tod
         self.collect_scare_people(out);
 

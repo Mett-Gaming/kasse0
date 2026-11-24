@@ -284,7 +284,7 @@ impl Game {
         self.update_freezer(dt);
         self.update_announcement(dt);
         // freie Schrecken: einer davon, zufaellig, aber nie dieselbe Art kurz hintereinander
-        if !self.can_scare(true) || self.checking_out() || self.dialog.is_some() {
+        if !self.can_scare(true) || self.checking_out() || self.in_talk() {
             return;
         }
         if !self

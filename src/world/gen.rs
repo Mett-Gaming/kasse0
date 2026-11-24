@@ -5,6 +5,7 @@ mod canvas;
 mod corridor;
 mod decay;
 mod fixtures;
+mod kiosk;
 pub(super) mod sortiment;
 mod wing;
 
@@ -13,6 +14,7 @@ pub use corridor::{
     corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
     CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
 };
+pub use kiosk::Kiosk;
 pub use sortiment::texts as sortiment_texts;
 pub use wing::Wing;
 
@@ -984,6 +986,9 @@ pub fn generate(params: &WorldParams) -> World {
         );
     }
 
+    // --- Kiosk in der Suedwestecke vor den Kassen (gen/kiosk.rs) ---
+    let kiosk = g.build_kiosk(aisle_z1 + 1.1);
+
     // --- Kassen ---
     let spacing = (aisles_x1 - aisles_x0) / lanes_n as f32;
     let mut lanes = Vec::new();
@@ -1427,6 +1432,8 @@ pub fn generate(params: &WorldParams) -> World {
             vec3(door_cx, 0.0, depth),
             vec3(drinks_door_cx, 0.0, DRINKS_D + 0.5),
             corral,
+            kiosk.counter,
+            kiosk.front(),
         ];
         keep_free.extend(lanes.iter().map(|l| l.scan_point));
         let area = DecayArea {
@@ -1510,6 +1517,7 @@ pub fn generate(params: &WorldParams) -> World {
         corridor,
         spots,
         freezers,
+        kiosk: Some(kiosk),
         nav,
         signs,
         giants,

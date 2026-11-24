@@ -45,6 +45,8 @@ const FIXED: &[&str] = &[
     "Getränke",
     "Getränke & Pfand",
     "Pfand",
+    "Kiosk",
+    "Gleich geöffnet",
     "Eingang",
     "Kein Ausgang",
     "Danke für Ihren Einkauf",

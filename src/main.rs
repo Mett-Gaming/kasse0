@@ -863,6 +863,8 @@ impl App {
         };
         self.air.instances(g, &mut self.air_draws);
         stage.renderer.queue_particles(&self.air_draws);
+        // Taschenlampe vom Kiosk
+        stage.renderer.set_camera_light(g.camera_light());
         stage.draw(&input);
     }
 

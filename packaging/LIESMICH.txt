@@ -104,6 +104,8 @@ Hast du das Tutorial einmal geschafft, kannst du es in den Optionen mit
 
 Pfand: Leere Flaschen kommen in die Tüte am Wagen (höchstens 5). In den
 Nebenräumen stehen Automaten: A/D dreht, E legt bei Grün ein, F druckt den Bon.
+Bons löst du am Kiosk vor den Kassen ein: ein Bon pro Kauf, der Rest verfällt.
+G benutzt ein Item aus der Tasche.
 
 Controller werden unterstützt (A springen, B ducken, X benutzen, Y Wagen, LT rennen);
 alle Tasten lassen sich unter Optionen - Steuerung umbelegen.

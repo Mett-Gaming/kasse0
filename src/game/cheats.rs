@@ -57,26 +57,27 @@ pub const CHEATS: &[&str] = &[
     "Zum Pfandautomaten",
     "Pfand: Tüte füllen",
     "Pfandbon 2,50 €",
+    "Zum Kiosk",
 ];
 
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 11;
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 12;
 /// Direkt in den laengsten Fluchtkorridor (140 m)
-pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 10;
+pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 11;
 /// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
-pub const DIE_CHEAT: usize = CHEATS.len() - 9;
+pub const DIE_CHEAT: usize = CHEATS.len() - 10;
 /// Abgelaufenen Tomatensaft trinken: 30 s Rausch, dann kotzen (trip.rs)
-pub const TRIP_CHEAT: usize = CHEATS.len() - 8;
+pub const TRIP_CHEAT: usize = CHEATS.len() - 9;
 /// In den ersten Raum des Seitentrakts (kippt den Markt vorher, world/gen/wing.rs)
-pub const WING_CHEAT: usize = CHEATS.len() - 7;
+pub const WING_CHEAT: usize = CHEATS.len() - 8;
 /// Gestalt in der Ferne aufstellen (watcher.rs)
-pub const WATCHER_CHEAT: usize = CHEATS.len() - 6;
+pub const WATCHER_CHEAT: usize = CHEATS.len() - 7;
 /// Deja-vu-Szene vor einen stellen (dejavu.rs)
-pub const DEJAVU_CHEAT: usize = CHEATS.len() - 5;
+pub const DEJAVU_CHEAT: usize = CHEATS.len() - 6;
 /// Ein Mettarbeiter sperrt sofort einen Gang (closures.rs)
-pub const CLOSURE_CHEAT: usize = CHEATS.len() - 4;
+pub const CLOSURE_CHEAT: usize = CHEATS.len() - 5;
 /// Vor einen laufenden Pfandautomaten, Tuete voll, Bon
-pub const PFAND_CHEATS: usize = CHEATS.len() - 3;
+pub const PFAND_CHEATS: usize = CHEATS.len() - 4;
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;

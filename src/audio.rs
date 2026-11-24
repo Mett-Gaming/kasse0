@@ -74,6 +74,10 @@ pub enum Sfx {
     Machine,
     /// Bon wird gedruckt
     Print,
+    /// Gloeckchen am Wagen
+    Bell,
+    /// Mettbroetchen
+    Munch,
 }
 
 /// Bis zu dieser Entfernung hoert man Geraeusche mit Ort (Meter)
@@ -552,6 +556,19 @@ fn synth(sfx: Sfx) -> Vec<f32> {
             };
             (hit(0.0, 2900.0) + hit(0.07, 3500.0)) * 0.22 + rng.next() * (-t * 300.0).exp() * 0.1
         }),
+        Sfx::Bell => gen(0.8, &mut |t| {
+            let ring = (TAU * 2100.0 * t).sin() + 0.6 * (TAU * 3170.0 * t).sin();
+            let again = 0.5 + 0.5 * (TAU * 9.0 * t).sin();
+            ring * 0.22 * (-t * 5.0).exp() * again
+        }),
+        Sfx::Munch => {
+            let mut lp = 0.0f32;
+            gen(1.3, &mut |t| {
+                lp += (rng.next() - lp) * 0.22;
+                let chew = (t * 3.4).fract();
+                lp * 1.1 * (-chew * 7.0).exp() * ((1.3 - t) * 4.0).clamp(0.0, 1.0)
+            })
+        }
         Sfx::Machine => {
             let mut lp = 0.0f32;
             gen(0.9, &mut |t| {
@@ -645,6 +662,8 @@ impl Audio {
             Sfx::Clink,
             Sfx::Machine,
             Sfx::Print,
+            Sfx::Bell,
+            Sfx::Munch,
         ]
         .into_iter()
         .map(|s| (s, Sound::new(synth(s))))
@@ -779,6 +798,8 @@ mod tests {
             Sfx::Clink,
             Sfx::Machine,
             Sfx::Print,
+            Sfx::Bell,
+            Sfx::Munch,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());
