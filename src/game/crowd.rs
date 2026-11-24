@@ -22,6 +22,10 @@ const PLAYER_GAP: f32 = 0.45;
 const CART_GAP: f32 = 0.55;
 /// So lange sieht sich ein Mitarbeiter am Ort eines Geraeuschs um
 const LOOK_AROUND: f32 = 2.5;
+/// So oft kommt ein Mitarbeiter auf einen zu, wenn er einen bemerkt (sonst laesst er einen
+/// so lange in Ruhe, s)
+pub const APPROACH_CHANCE: f64 = 0.7;
+const APPROACH_SKIP: f32 = 12.0;
 
 impl Game {
     // --------------------------------------------------------------- Spawns
@@ -805,6 +809,11 @@ impl Game {
                 self.carry_step(i, dt);
                 continue;
             }
+            // sperrt gerade einen Gang (closures.rs): hingehen, Band spannen, Wache stehen
+            if self.is_guard(i) {
+                self.guard_step(i, dt);
+                continue;
+            }
             let someone_carrying = self.employees.iter().any(|e| e.carrying);
             let e = &self.employees[i];
             if unattended
@@ -821,8 +830,22 @@ impl Game {
             // im Tutorial laesst einen das Personal ganz in Ruhe: kein Hinterherlaufen, kein
             // Nachsehen bei Geraeuschen
             let calm = self.tutorial_run;
-            let interested =
+            let mut interested =
                 !calm && (e.follow > 0.0 || sees) && e.ignore <= 0.0 && !self.till_protects();
+            // Nur 70 % kommen auf einen zu, wenn sie einen bemerken (einmal je Bemerken
+            // gewuerfelt, eigener Zufall); nach einer schlechten Antwort (follow) immer
+            if interested && e.follow <= 0.0 && !e.approach_rolled {
+                let comes = self.eerie_rng.gen_bool(APPROACH_CHANCE);
+                let e = &mut self.employees[i];
+                e.approach_rolled = true;
+                if !comes {
+                    e.ignore = APPROACH_SKIP;
+                    interested = false;
+                }
+            } else if !interested {
+                self.employees[i].approach_rolled = false;
+            }
+            let e = &self.employees[i];
             // hat etwas gehoert: geht nachsehen, wo es war (nicht direkt zum Spieler)
             let investigating = !interested
                 && !calm

@@ -758,6 +758,24 @@ pub fn generate(params: &WorldParams) -> World {
         );
     }
 
+    // --- Gangenden (fuer Sperren durch Mitarbeiter, game/closures.rs): je Laufweg zwischen
+    // zwei Regalreihen Mitte und halbe Breite von Regalkante zu Regalkante ---
+    let aisle_gates: Vec<AisleGate> = (0..aisle_count as usize - 1)
+        .map(|i| {
+            let end = |z: f32| {
+                let (a, b) = (center_x(i, z), center_x(i + 1, z));
+                (vec3((a + b) * 0.5, 0.0, z), (b - a) * 0.5 - GONDOLA_HALF_W)
+            };
+            let (n, hn) = end(aisle_z0 + 0.3);
+            let (s, hs) = end(aisle_z1 - 0.3);
+            AisleGate {
+                aisle: i,
+                ends: [n, s],
+                half: hn.min(hs).max(0.3),
+            }
+        })
+        .collect();
+
     // --- Gangnummern an beiden Enden jedes Gangs. Im gekippten Markt ab "unruhig" tragen
     // alle dieselbe Nummer, im Kollaps steht ueberall "Gang 0" (Wiederholung, Deja-vu) ---
     {
@@ -1508,6 +1526,7 @@ pub fn generate(params: &WorldParams) -> World {
         ceiling_holes,
         corral,
         wing,
+        aisle_gates,
     };
     world.index_items();
     // In den Kassenbereich kommen keine NPCs (der Spieler schon)

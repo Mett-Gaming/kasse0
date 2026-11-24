@@ -53,22 +53,25 @@ pub const CHEATS: &[&str] = &[
     "Seitentrakt: hinein",
     "Gestalt in der Ferne",
     "Déjà-vu-Szene",
+    "Gang sperren lassen",
 ];
 
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 7;
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 8;
 /// Direkt in den laengsten Fluchtkorridor (140 m)
-pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 6;
+pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 7;
 /// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
-pub const DIE_CHEAT: usize = CHEATS.len() - 5;
+pub const DIE_CHEAT: usize = CHEATS.len() - 6;
 /// Abgelaufenen Tomatensaft trinken: 30 s Rausch, dann kotzen (trip.rs)
-pub const TRIP_CHEAT: usize = CHEATS.len() - 4;
+pub const TRIP_CHEAT: usize = CHEATS.len() - 5;
 /// In den ersten Raum des Seitentrakts (kippt den Markt vorher, world/gen/wing.rs)
-pub const WING_CHEAT: usize = CHEATS.len() - 3;
+pub const WING_CHEAT: usize = CHEATS.len() - 4;
 /// Gestalt in der Ferne aufstellen (watcher.rs)
-pub const WATCHER_CHEAT: usize = CHEATS.len() - 2;
+pub const WATCHER_CHEAT: usize = CHEATS.len() - 3;
 /// Deja-vu-Szene vor einen stellen (dejavu.rs)
-pub const DEJAVU_CHEAT: usize = CHEATS.len() - 1;
+pub const DEJAVU_CHEAT: usize = CHEATS.len() - 2;
+/// Ein Mettarbeiter sperrt sofort einen Gang (closures.rs)
+pub const CLOSURE_CHEAT: usize = CHEATS.len() - 1;
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
@@ -94,8 +97,8 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         ),
         (
             "Leute",
-            "Mitarbeiter rufen, alle entfernen, Wagen klauen",
-            vec![8, 9, 17],
+            "Mitarbeiter rufen, alle entfernen, Wagen, Gang sperren",
+            vec![8, 9, 17, CLOSURE_CHEAT],
         ),
         (
             "Schrecken",
@@ -256,6 +259,7 @@ impl Game {
                 "Langer Korridor. Lauf!".into()
             }
             WING_CHEAT => self.debug_to_wing(),
+            CLOSURE_CHEAT => self.debug_closure(),
             WATCHER_CHEAT => {
                 self.tip();
                 self.watcher = None;

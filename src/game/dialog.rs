@@ -80,7 +80,9 @@ pub const CART_QUESTION: Question = Question {
 pub const REPLY_GOOD: &str = "Schönen Tag noch.";
 pub const REPLY_NEUTRAL: &str = "Hm.";
 pub const REPLY_BAD: &str = "...";
-pub const ANSWER_TIME: f32 = 9.0;
+pub const ANSWER_TIME: f32 = 6.0;
+/// So lange steht die Antwort des Mitarbeiters da (s)
+pub const REPLY_TIME: f32 = 1.0;
 
 pub struct DialogState {
     pub employee: usize,

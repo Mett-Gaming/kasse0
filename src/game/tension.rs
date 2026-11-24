@@ -34,6 +34,7 @@ impl Game {
             *t -= dt;
             if *t <= 0.0 {
                 let v = d.chosen.map(verdict).unwrap_or(Verdict::Bad);
+                let who = d.employee;
                 let e = &mut self.employees[d.employee];
                 e.state = EmpState::Patrol;
                 if d.cart_talk {
@@ -58,6 +59,21 @@ impl Game {
                 }
                 e.retarget = 0.0;
                 self.dialog = None;
+                // Folge fuer die Gaenge (closures.rs): gute Antwort macht einen gesperrten Gang
+                // wieder auf, schlechte laesst den Gang der naechsten fehlenden Ware sperren
+                match v {
+                    Verdict::Good => {
+                        if self.open_closure_soon() {
+                            self.say("\u{201E}Ich mach kurz auf.\u{201C}", 2.5);
+                        }
+                    }
+                    Verdict::Bad if self.tipped && !self.tutorial_run => {
+                        if self.start_closure_except(true, None, Some(who)) {
+                            self.say("Irgendwo wird ein Gang gesperrt.", 2.5);
+                        }
+                    }
+                    _ => {}
+                }
             }
             return;
         }
@@ -78,7 +94,7 @@ impl Game {
             None => (Some(2), dialog::REPLY_BAD, 0.2), // geschwiegen
         };
         d.chosen = answer;
-        d.reply = Some((reply, 1.6));
+        d.reply = Some((reply, dialog::REPLY_TIME));
         let silent = choice.is_none();
         let cart = d.cart_talk;
         self.suspicion += sus;
