@@ -300,7 +300,16 @@ fn endless_stamina_in_the_corridor() {
             ..Default::default()
         },
     );
-    assert!(g.player.stamina > 0.99, "Ausdauer sinkt im Gang");
+    // voll und bleibt voll (der Balken erscheint erst unter 99,9 %), im Gang ohnehin ausgeblendet
+    assert!(
+        g.player.stamina >= 0.999,
+        "Ausdauer sinkt im Gang: {}",
+        g.player.stamina
+    );
+    assert!(
+        g.corridor_endless_stamina(),
+        "Balken wuerde im Gang erscheinen"
+    );
     assert!(g.player.running);
 }
 

@@ -97,7 +97,7 @@ impl Game {
         }
         // Ausdauer: Rennen kostet, Gehen und Stehen erholen (geduckt rennt man nicht)
         p.running = input.run && !p.exhausted && wish.length_squared() > 0.0 && p.crouch < 0.5;
-        if p.running {
+        if p.running && !endless {
             p.stamina -= dt / STAMINA_RUN;
             if p.stamina <= 0.0 {
                 p.stamina = 0.0;
