@@ -29,7 +29,8 @@ impl Kiosk {
 }
 
 impl Gen<'_> {
-    pub(super) fn build_kiosk(&mut self, z: f32) -> Kiosk {
+    /// `signs_x`: x-Stellen der Wegweiser (z = vor den Regalenden).
+    pub(super) fn build_kiosk(&mut self, z: f32, signs_x: &[f32]) -> Kiosk {
         let tipped = self.params.tipped;
         let k = Kiosk {
             counter: vec3(1.0, 0.0, z),
@@ -78,6 +79,7 @@ impl Gen<'_> {
             if tipped { 0.6 } else { 1.0 },
             if tipped { 0.35 } else { 0.0 },
         );
+        self.kiosk_signs(z, signs_x);
         if !tipped {
             self.b.label(
                 k.counter + vec3(h.x + 0.014, 0.74, 0.0),
@@ -115,5 +117,66 @@ impl Gen<'_> {
             }
         }
         k
+    }
+
+    /// Grosses Leuchtschild ueber dem Kiosk, warmes Licht und Wegweiser unter der Decke.
+    /// Bleibt auch im dunklen Markt ruhig an: Man soll ihn finden.
+    fn kiosk_signs(&mut self, z: f32, signs_x: &[f32]) {
+        let gold = vec3(0.85, 0.5, 0.08);
+        let metal = vec3(0.25, 0.25, 0.27);
+        // haengt quer in den Gang, von beiden Seiten und von vorn lesbar
+        let c = vec3(1.75, 2.75, z);
+        self.b.add(c, vec3(0.34, 0.3, 0.34), metal, PLAIN);
+        for (off, yaw) in [
+            (vec3(0.36, 0.0, 0.0), FRAC_PI_2),
+            (vec3(0.0, 0.0, 0.36), 0.0),
+            (vec3(0.0, 0.0, -0.36), PI),
+        ] {
+            self.b
+                .label(c + off, yaw, 0.7, 0.2, "Kiosk", gold, 0.0, 1.6, 0.0);
+        }
+        self.b.add(
+            c + vec3(0.0, 0.65, 0.0),
+            vec3(0.02, 0.35, 0.02),
+            metal,
+            PLAIN,
+        );
+        // warmes Licht ueber dem Tresen
+        self.b.add_ex(
+            vec3(1.0, 2.15, z),
+            vec3(0.1, 0.02, 0.6),
+            vec3(1.0, 0.75, 0.4),
+            EMISSIVE,
+            3.0,
+            1.3,
+            0.0,
+        );
+        self.b.light(
+            vec3(1.15, 2.0, z),
+            5.0,
+            vec3(1.0, 0.72, 0.42),
+            0.7,
+            3.0,
+            0.0,
+        );
+        // Wegweiser: nach Westen geht es zum Kiosk
+        for &x in signs_x {
+            let p = vec3(x, 2.85, z + 0.2);
+            self.b.add(p, vec3(0.03, 0.2, 0.03), metal, PLAIN);
+            self.b.add(
+                p + vec3(0.0, 0.6, 0.0),
+                vec3(0.015, 0.45, 0.015),
+                metal,
+                PLAIN,
+            );
+            for (off, yaw, text) in [
+                (vec3(0.0, 0.0, 0.04), 0.0, "< Kiosk"),
+                (vec3(0.0, 0.0, -0.04), PI, "Kiosk >"),
+                (vec3(0.04, 0.0, 0.0), FRAC_PI_2, "Kiosk"),
+            ] {
+                self.b
+                    .label(p + off, yaw, 0.6, 0.15, text, gold, 0.0, 1.2, 0.0);
+            }
+        }
     }
 }

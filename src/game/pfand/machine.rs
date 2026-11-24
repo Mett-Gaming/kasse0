@@ -10,6 +10,8 @@ use super::Empty;
 
 /// Stellungen einer Flasche; 0 = Strichcode oben
 pub const TURNS: u8 = 8;
+/// Wo man Bons einloest (nach jedem Bondruck)
+const KIOSK_HINT: &str = "Bon einlösen: Kiosk vor den Kassen, an der Westwand.";
 /// So lange ist die Lampe nach dem Nachlegen rot (s)
 pub const LAMP_TIME: f32 = 0.8;
 /// Wagen muss so nah stehen, damit die Tuete erreichbar ist (m)
@@ -331,6 +333,7 @@ impl Game {
         self.pfand.sums[i] = 0;
         self.pfand.bons.push(sum);
         self.pfand.printed = true;
+        self.say(KIOSK_HINT, 5.0);
         self.play(Sfx::Print, 0.6);
     }
 

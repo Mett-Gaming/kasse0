@@ -621,3 +621,39 @@ fn bought_things_are_gone_in_the_next_run() {
     assert!(n.pfand.owned.pocket.is_empty() && n.pfand.owned.kept.is_empty());
     assert_eq!(n.camera_light(), 1.0);
 }
+
+#[test]
+fn one_can_find_the_kiosk() {
+    let ids = ["Kiosk", "< Kiosk", "Kiosk >"].map(|t| crate::signs::atlas().id(t));
+    for seed in 0..8u64 {
+        let mut g = Game::new(seed);
+        g.tip();
+        for tier in [Tier::Calm, Tier::Collapse] {
+            if tier > Tier::Calm {
+                g.force_tier(tier);
+                g.finish_umbau();
+            }
+            // Leuchtschild und Wegweiser, ohne Flackern, unter der Decke
+            let signs: Vec<_> = g
+                .world
+                .instances
+                .iter()
+                .filter(|b| b.half[2] < 0.007 && ids.contains(&(b.extra[1] as u32)))
+                .filter(|b| b.extra[0] == 5.0 && b.extra[3] == 0.0)
+                .filter(|b| b.extra[2] > 1.0 && b.center[1] < 3.3)
+                .collect();
+            assert!(signs.len() >= 9, "{seed}/{tier:?}: {}", signs.len());
+            // vom Eingangsbereich aus sieht man einen Wegweiser
+            let eye = g.world.spawn + vec3(0.0, 1.6, -5.0);
+            let seen = signs.iter().any(|b| {
+                let p = vec3(b.center[0], b.center[1], b.center[2]);
+                g.world.line_of_sight(eye, p)
+            });
+            assert!(seen, "{seed}/{tier:?}: kein Schild zu sehen");
+        }
+    }
+    let mut g = at_machine(30, &[Empty::Can]);
+    insert_right(&mut g);
+    g.print_bon();
+    assert!(g.message.as_ref().unwrap().0.contains("Kiosk"));
+}

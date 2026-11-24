@@ -372,7 +372,7 @@ Option „Schatten“ (Aus, Niedrig, Hoch; Vorgabe Hoch). Niedrig: 4 Lampen, 384
 - **Tutorial:** Abschnitt „Pfand“ mit Pfeilen (Flasche, dann Automat), leuchtenden Flaschen und Erklärleiste; alle Automaten laufen, nichts wird abgelehnt, kein Arm, nichts verfällt, zwei Plastikflaschen liegen nahe der Tür. Wer gleich zur Kasse geht, überspringt ihn.
 
 ### Kiosk und Items
-`game/pfand/kiosk.rs`, `items.rs`, Fenster `hud/kiosk.rs`, Bau `world/gen/kiosk.rs`. Südwestecke vor den Kassen, im normalen Markt „Gleich geöffnet“, nach dem Bezahlen zu. Dahinter steht ein Mettarbeiter; ab „unruhig“ folgt sein Kopf, ab „falsch“ sind die Schilder der Auslage falsch geschrieben (Preis und Wirkung stimmen).
+`game/pfand/kiosk.rs`, `items.rs`, Fenster `hud/kiosk.rs`, Bau `world/gen/kiosk.rs`. Südwestecke vor den Kassen (vom Eingang aus ganz links), mit großem Leuchtschild, warmem Licht und zwei Wegweisern vor den Regalenden, die auch im dunklen Markt nicht flackern; nach jedem Bondruck sagt ein Hinweis, wo er ist. Im normalen Markt „Gleich geöffnet“, nach dem Bezahlen zu. Dahinter steht ein Mettarbeiter; ab „unruhig“ folgt sein Kopf, ab „falsch“ sind die Schilder der Auslage falsch geschrieben (Preis und Wirkung stimmen).
 - **Ein Bon pro Kauf**, kein Zusammenlegen, kein Wechselgeld: Ist der Bon mehr wert, ist er trotzdem ganz weg (wird vorher gefragt).
 - Solange das Fenster offen ist, gilt es wie ein Gespräch (`Game::in_talk`): Kunden stehen, niemand wird gefangen, danach 2,5 s Schonfrist.
 - Alles gilt nur im laufenden Run. Verbrauchbares kommt in die Tasche (höchstens 4): G benutzt, Mausrad wählt; am Controller benutzt der Knopf zum Reklamieren (Kreuz unten) außerhalb der Kasse das Item.

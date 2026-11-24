@@ -83,7 +83,7 @@ Beim **allerersten Einkauf** fragt das Spiel, ob du das **Tutorial** spielen wil
 ### Pfand
 Im gekippten Markt liegen **leere Flaschen und Dosen**. Heb sie auf (E) und leg sie in die **Tüte am Wagen** (höchstens 5, sie klirren). In den Nebenräumen hinter der Westwand stehen **Pfandautomaten**: Dreh die Flasche, bis der Strichcode oben ist (A/D), leg sie bei grüner Lampe ein (E) und drucke den Bon (F). Baut sich der Markt um, ist Ungedrucktes weg. Je schlimmer der Markt, desto weniger Automaten laufen – und desto weniger solltest du ihnen trauen.
 
-**Kiosk:** Die Bons löst du am Kiosk vor den Kassen ein (nur im gekippten Markt offen): Sticker, Energy-Drink, Wunderkerze, Beruhigungstee, Öl, Mettbrötchen, Filzsohlen, Glöckchen, Taschenlampe. **Ein Bon pro Kauf**, ist er mehr wert, verfällt der Rest. Verbrauchbares benutzt du mit **G** (Mausrad wählt). Alles gilt nur für diesen Einkauf.
+**Kiosk:** Die Bons löst du am Kiosk vor den Kassen ein (vom Eingang aus ganz links an der Wand, Wegweiser hängen vor den Regalen; nur im gekippten Markt offen): Sticker, Energy-Drink, Wunderkerze, Beruhigungstee, Öl, Mettbrötchen, Filzsohlen, Glöckchen, Taschenlampe. **Ein Bon pro Kauf**, ist er mehr wert, verfällt der Rest. Verbrauchbares benutzt du mit **G** (Mausrad wählt). Alles gilt nur für diesen Einkauf.
 
 ### In der Luft
 Staub schwebt im Licht der Lampen, die Zigarette raucht wirklich, und an der Kühlung sieht man deinen Atem.

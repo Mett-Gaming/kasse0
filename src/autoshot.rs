@@ -554,6 +554,20 @@ impl App {
                 return Some(0.6);
             }
             92 => self.shot_request = Some(shot("43_kiosk")),
+            96 => {
+                // vom Eingangsbereich nach Westen: sieht man den Kiosk?
+                self.game.close_pointer_window();
+                self.game.message = None;
+                if let Some(k) = self.game.world.kiosk {
+                    let w = &self.game.world;
+                    self.game.player.pos =
+                        w.collide(vec3(w.spawn.x - 1.0, 0.0, k.counter.z + 0.8), 0.3);
+                    self.game.player.yaw = -std::f32::consts::FRAC_PI_2;
+                    self.game.player.pitch = 0.08;
+                }
+                return Some(0.8);
+            }
+            97 => self.shot_request = Some(shot("45_kiosk_weg")),
             93 => {
                 self.game.cheat(game::PFAND_CHEATS + 3);
                 self.game.message = None;

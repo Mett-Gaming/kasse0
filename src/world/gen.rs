@@ -987,7 +987,10 @@ pub fn generate(params: &WorldParams) -> World {
     }
 
     // --- Kiosk in der Suedwestecke vor den Kassen (gen/kiosk.rs) ---
-    let kiosk = g.build_kiosk(aisle_z1 + 1.1);
+    let kiosk = g.build_kiosk(
+        aisle_z1 + 1.1,
+        &[(aisles_x0 + aisles_x1) * 0.5, aisles_x1 + 0.6],
+    );
 
     // --- Kassen ---
     let spacing = (aisles_x1 - aisles_x0) / lanes_n as f32;
