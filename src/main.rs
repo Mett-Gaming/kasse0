@@ -3,12 +3,14 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod achievements;
 mod air;
 mod assets;
 mod audio;
 mod autoshot;
 mod catalog;
 mod controls;
+mod decal_text;
 // Engine-Teile aus Mettgine unter den gewohnten Namen
 use mettgine::app::{AppConfig, Stage};
 use mettgine::presence::Status;
@@ -96,6 +98,9 @@ struct App {
     perf: Option<(u32, f32, f32)>,
     /// dazu: Durchgang der Grafikkarte und seine kleinste Zeit (ms)
     perf_passes: Vec<(&'static str, f32)>,
+    /// Erfolge: Beobachter und Draht zum Launcher (kommt mit dem Fenster)
+    tracker: achievements::Tracker,
+    achievements: mettgine::launcher::Achievements,
 }
 
 fn random_seed() -> u64 {
@@ -151,6 +156,8 @@ impl App {
                 || std::env::var_os("KASSE0_AUTOSHOT").is_some())
             .then_some((0, 0.0, 0.0)),
             perf_passes: Vec::new(),
+            tracker: achievements::Tracker::load(),
+            achievements: Default::default(),
         }
     }
 
@@ -229,6 +236,7 @@ impl App {
     /// Neuer Einkauf; `tutorial` = Tutorial-Modus (Anleitung, Wegweiser, entschaerft).
     fn start_game(&mut self, seed: u64, tutorial: bool) {
         self.tutorial_mode = tutorial;
+        self.tracker.start();
         self.game = if tutorial {
             Game::new_tutorial(seed)
         } else {
@@ -548,6 +556,13 @@ impl App {
         // Screenshots wechseln den Bildschirm: Wuensche gleich erfuellen
         self.sync(stage);
 
+        // Overlay des Launchers offen: wie Pause
+        if stage.overlay_open()
+            && self.screen == Screen::Playing
+            && self.game.outcome == Outcome::Running
+        {
+            self.go(Screen::Paused);
+        }
         self.poll_pad(stage, dt);
 
         match self.screen {
@@ -573,6 +588,9 @@ impl App {
                             t_upd.elapsed().as_secs_f32() * 1000.0
                         ));
                     }
+                }
+                if self.autoshot.is_none() {
+                    self.tracker.step(&self.game, &self.achievements);
                 }
                 self.air.update(&self.game, dt);
                 let wait = if self.game.outcome == Outcome::Caught {
@@ -995,6 +1013,8 @@ impl mettgine::app::Game for App {
     }
 
     fn ready(&mut self, stage: &mut Stage) {
+        self.achievements = stage.achievements.clone();
+        self.tracker.report_totals(&self.achievements);
         self.apply_settings();
         // Mit festem Seed direkt ins Spiel (praktisch zum Testen)
         if let Some(seed) = self

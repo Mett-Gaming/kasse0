@@ -50,7 +50,7 @@ impl Default for Settings {
 /// Waehlbare Bildraten
 const FPS_LIMITS: [u32; 5] = [0, 60, 120, 144, 240];
 
-const APP: &str = "kasse0";
+pub const APP: &str = "kasse0";
 const FILE: &str = "settings.txt";
 
 impl Settings {

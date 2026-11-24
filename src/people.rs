@@ -28,6 +28,7 @@ pub fn people_of(staff: bool) -> Vec<usize> {
         .collect()
 }
 
+use mettgine::gpu::SkinVertex;
 pub use mettgine::gpu::{parse_skin, SkinData};
 
 /// Animationen fuer Maenner- bzw. Frauen-Skelett.
@@ -45,12 +46,123 @@ pub fn anims(female: bool) -> &'static AnimSet {
     }
 }
 
-/// Alle Figuren, Index = Variante.
+/// Alle Figuren, Index = Variante. Mitarbeiter bekommen den Brust-Schriftzug.
 pub fn load_skins() -> Vec<SkinData> {
     gen::PEOPLE_SKIN_BYTES
         .iter()
-        .map(|b| parse_skin(b).expect("eingebaute Figur defekt"))
+        .enumerate()
+        .map(|(v, b)| {
+            let mut s = parse_skin(b).expect("eingebaute Figur defekt");
+            if PEOPLE[v].2 {
+                let badge = badge(&s, height(v));
+                s.vertices.extend(badge);
+            }
+            s
+        })
         .collect()
+}
+
+/// Brust-Schriftzug der Mitarbeiter
+pub const BADGE_TEXT: &str = "Mettarbeiter";
+/// Pixelbild: Breite, Hoehe (Pixel) und Pixelgroesse (Meter) -> 22 cm breit
+const BADGE_W: usize = 110;
+const BADGE_H: usize = 22;
+const BADGE_PIX: f32 = 0.002;
+/// Mitte des Schriftzugs (Anteil der Koerpergroesse) und Abstand vor der Brust (Meter)
+const BADGE_Y: f32 = 0.74;
+const BADGE_LIFT: f32 = 0.008;
+
+/// Vorderste Stelle der Dreiecke `tris` bei (x, y): groesstes z der Dreiecke, die in der
+/// Ansicht von vorn dort liegen (None = keins).
+pub(crate) fn surface_z(tris: &[SkinVertex], x: f32, y: f32) -> Option<f32> {
+    tris.chunks_exact(3)
+        .filter_map(|t| {
+            let [a, b, c] = [t[0].pos, t[1].pos, t[2].pos].map(Vec3::from);
+            let d = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+            if d.abs() < 1e-9 {
+                return None;
+            }
+            let l1 = ((x - a.x) * (c.y - a.y) - (c.x - a.x) * (y - a.y)) / d;
+            let l2 = ((b.x - a.x) * (y - a.y) - (x - a.x) * (b.y - a.y)) / d;
+            let inside = l1 >= 0.0 && l2 >= 0.0 && l1 + l2 <= 1.0;
+            inside.then(|| a.z + l1 * (b.z - a.z) + l2 * (c.z - a.z))
+        })
+        .reduce(f32::max)
+}
+
+/// Dreiecke des Schriftzugs "Mettarbeiter" vorn auf der Brust (Figur schaut nach +z, Fuss
+/// bei y = 0). Der Schriftzug folgt der Brustform (immer `BADGE_LIFT` vor der Oberflaeche)
+/// und jeder Vertex bewegt sich mit dem naechsten Brust-Vertex der Figur mit.
+fn badge(s: &SkinData, body_h: f32) -> Vec<SkinVertex> {
+    let mut px = vec![false; BADGE_W * BADGE_H];
+    crate::decal_text::raster(
+        BADGE_TEXT,
+        BADGE_W,
+        2.0,
+        BADGE_H as f32 - 6.0,
+        &mut |x, y| {
+            if (0..BADGE_W as i32).contains(&x) && (0..BADGE_H as i32).contains(&y) {
+                px[y as usize * BADGE_W + x as usize] = true;
+            }
+        },
+    );
+    let cy = body_h * BADGE_Y;
+    let half_w = BADGE_W as f32 * BADGE_PIX * 0.5;
+    let half_h = BADGE_H as f32 * BADGE_PIX * 0.5;
+    // Brust: Dreiecke der Vorderseite im Bereich des Schriftzugs (etwas grosszuegiger)
+    let near_chest =
+        |v: &SkinVertex| v.pos[0].abs() < half_w + 0.03 && (v.pos[1] - cy).abs() < half_h + 0.06;
+    let tris: Vec<SkinVertex> = s
+        .vertices
+        .chunks_exact(3)
+        .filter(|t| t.iter().any(|v| near_chest(v) && v.pos[2] > 0.0))
+        .flatten()
+        .copied()
+        .collect();
+    let chest: Vec<&SkinVertex> = tris
+        .iter()
+        .filter(|v| near_chest(v) && v.pos[2] > 0.0)
+        .collect();
+    let Some(front) = chest.iter().map(|v| v.pos[2]).reduce(f32::max) else {
+        return Vec::new();
+    };
+    let top = cy + half_h;
+    let at = |u: f32, y: f32| {
+        let z = surface_z(&tris, u, y).unwrap_or(front) + BADGE_LIFT;
+        let p = Vec3::new(u, y, z);
+        let near = chest
+            .iter()
+            .min_by(|a, b| {
+                let d = |v: &&&SkinVertex| Vec3::from(v.pos).distance_squared(p);
+                d(a).total_cmp(&d(b))
+            })
+            .expect("Brust ohne Vertices");
+        SkinVertex {
+            pos: p.to_array(),
+            normal: [0.0, 0.0, 1.0],
+            color: [0.95, 0.95, 0.95],
+            joints: near.joints,
+            weights: near.weights,
+        }
+    };
+    let mut out = Vec::new();
+    for (row, x0, x1) in crate::decal_text::runs(&px, BADGE_W, BADGE_H) {
+        let u0 = (x0 as f32 - BADGE_W as f32 * 0.5) * BADGE_PIX;
+        let u1 = (x1 as f32 - BADGE_W as f32 * 0.5) * BADGE_PIX;
+        let (y0, y1) = (
+            top - (row + 1) as f32 * BADGE_PIX,
+            top - row as f32 * BADGE_PIX,
+        );
+        out.extend([
+            at(u0, y0),
+            at(u1, y0),
+            at(u1, y1),
+            at(u0, y0),
+            at(u1, y1),
+            at(u0, y1),
+        ]);
+    }
+    out
 }
 
 /// Koerpergroesse einer Figur (Meter).
@@ -111,6 +223,55 @@ mod tests {
                 "Animation steht still"
             );
         }
+    }
+
+    #[test]
+    fn staff_wear_the_lettering_on_the_chest() {
+        let skins = load_skins();
+        for (v, s) in skins.iter().enumerate() {
+            let raw = parse_skin(gen::PEOPLE_SKIN_BYTES[v]).unwrap();
+            let n = raw.vertices.len();
+            if !PEOPLE[v].2 {
+                // Kunden bleiben, wie sie sind
+                assert_eq!(s.vertices.len(), n, "{}", PEOPLE[v].0);
+                assert!(s
+                    .vertices
+                    .iter()
+                    .zip(&raw.vertices)
+                    .all(|(a, b)| a.pos == b.pos && a.color == b.color));
+                continue;
+            }
+            assert!(s.vertices.len() > n, "{}: kein Schriftzug", PEOPLE[v].0);
+            let added = &s.vertices[n..];
+            assert_eq!(added.len() % 3, 0);
+            let front = raw
+                .vertices
+                .iter()
+                .map(|vx| vx.pos[2])
+                .fold(f32::MIN, f32::max);
+            let cy = height(v) * BADGE_Y;
+            let (mut lo, mut hi, mut worst) = (f32::MAX, f32::MIN, 0.0f32);
+            for vx in added {
+                let [x, y, z] = vx.pos;
+                lo = lo.min(x);
+                hi = hi.max(x);
+                assert!((y - cy).abs() < 0.03, "{}: Hoehe {y}", PEOPLE[v].0);
+                assert!(z > 0.05 && z <= front + 0.01, "{}: z {z}", PEOPLE[v].0);
+                assert_eq!(vx.color, [0.95; 3]);
+                let w: f32 = vx.weights.iter().sum();
+                assert!((w - 1.0).abs() < 1e-3, "{}: Gewichte {w}", PEOPLE[v].0);
+                // liegt auf der Brust, nicht frei in der Luft und nicht darin: Abstand zur
+                // Koerperoberflaeche direkt dahinter (Strahl nach -z) wenige Millimeter
+                let body = surface_z(&raw.vertices, x, y).expect("keine Brust dahinter");
+                worst = worst.max(z - body);
+                assert!(z - body > 0.004, "{}: steckt in der Brust", PEOPLE[v].0);
+            }
+            assert!(worst < 0.015, "{}: {worst} m vor der Brust", PEOPLE[v].0);
+            // ungefaehr 22 cm breit, mittig
+            assert!(hi - lo > 0.18 && hi - lo < 0.23, "Breite {}", hi - lo);
+            assert!((hi + lo).abs() < 0.02);
+        }
+        assert!(!people_of(true).is_empty() && !people_of(false).is_empty());
     }
 
     /// Alle Vertices einer Figur in der Pose `clip` bei t = 0 (Engine-Koordinaten).

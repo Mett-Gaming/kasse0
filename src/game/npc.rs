@@ -391,6 +391,8 @@ pub struct Employee {
     pub cart_cd: f32,
     /// Abklingzeit fuer "an ihm vorbeigerannt"
     pub sprint_cd: f32,
+    /// schon gewuerfelt, ob er auf den Spieler zukommt (70 %, siehe crowd.rs)
+    pub approach_rolled: bool,
 }
 
 impl Employee {
@@ -414,6 +416,7 @@ impl Employee {
             heard: 0.0,
             cart_cd: 0.0,
             sprint_cd: 0.0,
+            approach_rolled: false,
         }
     }
 

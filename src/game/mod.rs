@@ -21,6 +21,7 @@ pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
 pub use cheats::{cheat_groups, CHEATS, PFAND_CHEATS, TUTORIAL_CHEAT};
+pub mod closures;
 pub mod dejavu;
 pub mod dialog;
 pub mod escalation;
@@ -274,6 +275,8 @@ pub struct Game {
     /// Tutorial-Modus: man kann nicht verlieren, Fehler werden nur erklaert
     pub tutorial_run: bool,
     pub suspicion: f32,
+    /// in diesem Einkauf wurde ein Cheat benutzt (dann keine Erfolge, achievements.rs)
+    pub cheated: bool,
     /// Cheat: Kunden koennen einen nicht erwischen
     pub god: bool,
     /// Schonfrist nach einem Gespraech
@@ -357,6 +360,9 @@ pub struct Game {
     dejavu_timer: f32,
     /// umgeworfene Warnschilder (wet_signs.rs), Index wie `world.signs`
     pub sign_falls: Vec<Option<wet_signs::SignFall>>,
+    /// gesperrter Gang (closures.rs) und Zeit bis zur naechsten Sperre
+    pub closure: Option<closures::Closure>,
+    closure_timer: f32,
     pub puddles: Vec<trip::Puddle>,
     pub cig: smoke::Cigarette,
     pub butts: Vec<smoke::Butt>,
@@ -535,6 +541,7 @@ impl Game {
             tutorial: None,
             tutorial_run: false,
             suspicion: 0.0,
+            cheated: false,
             god: false,
             grace: 0.0,
             deaths: 0,
@@ -591,6 +598,8 @@ impl Game {
             dejavu: None,
             dejavu_timer: 25.0,
             sign_falls: Vec::new(),
+            closure: None,
+            closure_timer: 45.0,
             puddles: Vec::new(),
             cig: smoke::Cigarette::None,
             butts: Vec::new(),
@@ -1104,6 +1113,7 @@ impl Game {
         self.update_watcher(dt);
         self.update_dejavu(dt);
         self.update_wet_signs(dt);
+        self.update_closures(dt);
         self.update_spark_sounds();
         self.update_scares(dt, input);
         // Zeit im gekippten Markt kann die Stufe auch ohne Einkauf anheben

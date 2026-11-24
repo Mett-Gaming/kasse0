@@ -21,6 +21,7 @@ impl Game {
         self.collect_checkout_draws(out);
         self.collect_pfand_draws(out);
         self.collect_barrier_draws(out);
+        self.collect_closure_draws(out);
         // Tutorial-Modus: Pfeile am Boden, benoetigte Waren leuchten
         self.collect_guide_draws(out);
         // Fluchtkorridor: Tueren, Regale, Wagen, Decke, Waende (game/corridor/)

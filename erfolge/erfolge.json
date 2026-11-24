@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "achievements": [
+    { "id": "ausgelernt", "name": "Ausgelernt", "text": "Schaff das Tutorial." },
+    { "id": "kassenbon", "name": "Kassenbon", "text": "Schaff deinen ersten Einkauf." },
+    { "id": "stammkunde", "name": "Stammkunde", "text": "Schaff zehn Einkäufe.", "goal": 10 },
+    { "id": "unauffaellig", "name": "Unauffällig", "text": "Schaff einen Einkauf, ohne erwischt zu werden." },
+    { "id": "schnell_rein_schnell_raus", "name": "Schnell rein, schnell raus", "text": "Schaff einen Einkauf in unter zehn Minuten." },
+    { "id": "grosseinkauf", "name": "Großeinkauf", "text": "Treib es mit deinem Einkauf bis zur letzten Stufe." },
+    { "id": "perfekte_kundschaft", "name": "Perfekte Kundschaft", "text": "Schaff einen Einkauf mit allen drei Kassen-Leben." },
+    { "id": "stimmt_so", "name": "Stimmt so", "text": "Zahl bar und komm raus." },
+    { "id": "raucherpause", "name": "Raucherpause", "text": "Rauch im Laden." },
+    { "id": "frisch_gewischt", "name": "Frisch gewischt", "text": "Renn ein Warnschild um." },
+    { "id": "irgendwas_ist_anders", "name": "Irgendwas ist anders", "text": "Komm aus der Getränkeabteilung zurück.", "hidden": true },
+    { "id": "nicht_dein_saft", "name": "Nicht dein Saft", "text": "Trink einem Kunden den Tomatensaft weg.", "hidden": true },
+    { "id": "hinter_der_wand", "name": "Hinter der Wand", "text": "Betritt die leeren Räume.", "hidden": true },
+    { "id": "gesicht_gezeigt", "name": "Kunde 0 hat ein Gesicht", "text": "Bezahl. Und dann lauf.", "hidden": true },
+    { "id": "durchschaut", "name": "Durchschaut", "text": "Verlier alle Kassen-Leben.", "hidden": true },
+    { "id": "nicht_umdrehen", "name": "Dreh dich nicht um", "text": "Du hast dich umgedreht.", "hidden": true },
+    { "id": "nicht_rausgekommen", "name": "Nicht mehr rausgekommen", "text": "Bleib für immer im Markt.", "hidden": true }
+  ]
+}

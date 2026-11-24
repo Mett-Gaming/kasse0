@@ -258,6 +258,15 @@ pub struct ShelfItem {
     pub rot: u8,
 }
 
+/// Ein Laufweg zwischen zwei Regalreihen: Index, Mitte der beiden Enden (Nord, Sued) und
+/// halbe Breite von Regalkante zu Regalkante (Meter).
+#[derive(Clone, Copy, Debug)]
+pub struct AisleGate {
+    pub aisle: usize,
+    pub ends: [Vec3; 2],
+    pub half: f32,
+}
+
 /// Riesige Ware als Hindernis im Gang (nicht greifbar).
 #[derive(Clone, Copy, Debug)]
 pub struct Giant {
@@ -441,6 +450,8 @@ pub struct World {
     pub corral: Vec3,
     /// Seitentrakt hinter der Westwand (nur gekippt)
     pub wing: Option<gen::Wing>,
+    /// Gangenden je Laufweg (fuer Sperren durch Mitarbeiter)
+    pub aisle_gates: Vec<AisleGate>,
 }
 
 const ITEM_CELL: f32 = 1.0;

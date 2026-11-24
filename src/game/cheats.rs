@@ -53,26 +53,28 @@ pub const CHEATS: &[&str] = &[
     "Seitentrakt: hinein",
     "Gestalt in der Ferne",
     "Déjà-vu-Szene",
+    "Gang sperren lassen",
     "Zum Pfandautomaten",
     "Pfand: Tüte füllen",
     "Pfandbon 2,50 €",
 ];
 
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 10;
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 11;
 /// Direkt in den laengsten Fluchtkorridor (140 m)
-pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 9;
+pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 10;
 /// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
-pub const DIE_CHEAT: usize = CHEATS.len() - 8;
+pub const DIE_CHEAT: usize = CHEATS.len() - 9;
 /// Abgelaufenen Tomatensaft trinken: 30 s Rausch, dann kotzen (trip.rs)
-pub const TRIP_CHEAT: usize = CHEATS.len() - 7;
+pub const TRIP_CHEAT: usize = CHEATS.len() - 8;
 /// In den ersten Raum des Seitentrakts (kippt den Markt vorher, world/gen/wing.rs)
-pub const WING_CHEAT: usize = CHEATS.len() - 6;
+pub const WING_CHEAT: usize = CHEATS.len() - 7;
 /// Gestalt in der Ferne aufstellen (watcher.rs)
-pub const WATCHER_CHEAT: usize = CHEATS.len() - 5;
+pub const WATCHER_CHEAT: usize = CHEATS.len() - 6;
 /// Deja-vu-Szene vor einen stellen (dejavu.rs)
-pub const DEJAVU_CHEAT: usize = CHEATS.len() - 4;
-
+pub const DEJAVU_CHEAT: usize = CHEATS.len() - 5;
+/// Ein Mettarbeiter sperrt sofort einen Gang (closures.rs)
+pub const CLOSURE_CHEAT: usize = CHEATS.len() - 4;
 /// Vor einen laufenden Pfandautomaten, Tuete voll, Bon
 pub const PFAND_CHEATS: usize = CHEATS.len() - 3;
 
@@ -103,8 +105,8 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         ),
         (
             "Leute",
-            "Mitarbeiter rufen, alle entfernen, Wagen klauen",
-            vec![8, 9, 17],
+            "Mitarbeiter rufen, alle entfernen, Wagen, Gang sperren",
+            vec![8, 9, 17, CLOSURE_CHEAT],
         ),
         (
             "Schrecken",
@@ -142,7 +144,9 @@ impl Game {
         self.catcher = Some(self.player.pos + vec3(f.x, 0.0, f.z).normalize_or_zero() * 0.6);
     }
 
+    /// Cheat ausloesen. Danach zaehlt dieser Einkauf nicht mehr fuer Erfolge.
     pub fn cheat(&mut self, i: usize) {
+        self.cheated = true;
         let msg: String = match i {
             0 => {
                 self.god = !self.god;
@@ -265,6 +269,7 @@ impl Game {
                 "Langer Korridor. Lauf!".into()
             }
             WING_CHEAT => self.debug_to_wing(),
+            CLOSURE_CHEAT => self.debug_closure(),
             i if i >= PFAND_CHEATS => self.pfand_cheat(i - PFAND_CHEATS),
             WATCHER_CHEAT => {
                 self.tip();

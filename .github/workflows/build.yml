@@ -40,6 +40,7 @@ jobs:
           # Symbole: Absturzberichte zeigen damit Funktionsnamen und Zeilen
           Copy-Item target/release/kasse0.pdb "$dir/kasse0.pdb"
           Copy-Item packaging/LIESMICH.txt "$dir/LIESMICH.txt"
+          Copy-Item erfolge "$dir/erfolge" -Recurse
           Copy-Item CREDITS.md "$dir/Credits.md"
           Copy-Item assets/fonts/OFL.txt "$dir/Lizenzen/ArchivoBlack-OFL.txt"
           $tag = "${{ github.ref_name }}" -replace '[^A-Za-z0-9._-]', '-'

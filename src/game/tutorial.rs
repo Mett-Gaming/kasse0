@@ -127,10 +127,17 @@ impl Phase {
                 ],
                 &[
                     "MITARBEITER (ohne Gesicht) sprechen",
-                    "dich im echten Spiel an: Antwort",
-                    "mit 1/2/3. Gute Antworten bringen",
-                    "Abstand, falsche machen auffällig.",
+                    "dich manchmal an: 6 s für 1/2/3.",
+                    "Gute Antworten bringen Abstand,",
+                    "falsche machen auffällig.",
                     "Im Tutorial lassen sie dich in Ruhe.",
+                ],
+                &[
+                    "GESPERRTE GÄNGE: Mettarbeiter",
+                    "spannen manchmal Absperrband. Dann",
+                    "außen herum. Gute Antwort: Gang",
+                    "geht auf. Schlechte: einer sperrt.",
+                    "Im Tutorial sperrt keiner.",
                 ],
             ],
             Phase::Deposit => &[
@@ -527,9 +534,11 @@ mod tests {
         let pages = Shopping.pages();
         assert!(pages.iter().any(|p| p[0].starts_with("KUNDEN")));
         assert!(pages.iter().any(|p| p[0].starts_with("MITARBEITER")));
+        // und die gesperrten Gaenge (Mettarbeiter-Overhaul)
+        assert!(pages.iter().any(|p| p[0].starts_with("GESPERRTE")));
         assert_eq!(Shopping.page(0.0).0, 0);
         assert_eq!(Shopping.page(PAGE_TIME + 0.1).0, 1);
-        assert_eq!(Shopping.page(PAGE_TIME * 3.0 + 0.1).0, 0);
+        assert_eq!(Shopping.page(PAGE_TIME * 4.0 + 0.1).0, 0);
         assert!(Controls.page(5.0).1.is_empty());
     }
 }

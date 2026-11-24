@@ -21,9 +21,27 @@ Analog/liminaler Horror, 3D First-Person, kurze Runs mit zufälligem Seed, damit
 - **Nicht auffallen:** nicht rennen, nicht anstarren, keine falschen Waren in den Wagen.
 - **Nicht hinsehen:** Sobald du wegschaust (außer Sicht oder verdeckt), gehen sie langsam auf dich zu. Erreichen sie dich, ist der Run verloren.
 
-## Gesichtslose Mitarbeiter
+## Gesichtslose Mitarbeiter („Mettarbeiter“)
 - Sie sprechen dich an, verfolgen dich und verwickeln dich in einen Dialog mit Antwortoptionen.
 - Gute Antworten bringen Abstand und Zeit. Falsche Antworten erhöhen die Auffälligkeit, und sie folgen dir weiter.
+
+**Overhaul (Gänge sperren, seltener ansprechen):**
+- **Seltener ansprechen** (`crowd.rs`, `APPROACH_CHANCE`): Bemerkt dich ein Mitarbeiter, wird einmal gewürfelt.
+  - Mit 70 % kommt er auf dich zu.
+  - Sonst lässt er dich 12 s in Ruhe und macht weiter, was er tat.
+  - Nach einer schlechten Antwort folgt er immer.
+  - Gewürfelt wird mit eigenem Zufall (`eerie_rng`).
+- **Kürzere Gespräche:** 6 s zum Antworten (vorher 9), die Antwort steht 1 s da (vorher 1,6).
+- **Gänge sperren** (`game/closures.rs`, Gangenden aus `World::aisle_gates`):
+  - Wann: Im gekippten Markt (nie im Tutorial, nicht an der Kasse, nicht nach dem Bezahlen) sperrt ein Mettarbeiter ab und zu einen Gang, bis „unruhig“ alle 60–90 s, ab „falsch“ alle 35–60 s.
+  - Ablauf: Er geht ans nähere Gangende, kniet 2 s und spannt gelb-schwarzes Band an beiden Enden. Dann steht er Wache und blickt in den Gang. Nach 40 s (im Kollaps 60 s) kniet er 1,5 s, baut ab und geht zurück auf Streife. Braucht er länger als 30 s zum Gang, fällt die Sperre aus.
+  - Wirkung: Spieler und geschobener Wagen kommen nicht durch das Band (man gleitet entlang, Hinweis „Gang gesperrt: Wird befüllt.“). Die NPC-Zellen am Band sind gesperrt und werden beim Abbau wieder frei. Durchgänge in gebogenen Regalen bleiben offen.
+  - Welcher Gang: Nie der Gang, in dem du stehst. Ab „falsch“ bevorzugt der Gang mit der nächsten noch fehlenden Ware vom Zettel.
+- **Gespräche haben Folgen:**
+  - Gute Antwort: Ein gesperrter Gang wird in 3 s wieder frei („Ich mach kurz auf.“).
+  - Schlechte Antwort oder Schweigen: Ein anderer Mettarbeiter sperrt sofort den Gang mit der nächsten fehlenden Ware. Der Fragende folgt dir weiter.
+- Cheat: „Gang sperren lassen“ (Gruppe „Leute“) sperrt sofort einen Gang.
+- **Uniform** (`people.rs`, Text-Rasterung `decal_text.rs`): Auf der Brust jeder Mitarbeiter-Figur steht weiß „Mettarbeiter“, beim Laden als flache Pixel-Streifen ins Modell gebacken. Jeder Punkt übernimmt Knochen und Gewichte des nächsten Brust-Vertex und bewegt sich so mit der Animation.
 
 ## Auffälligkeit
 Ein verstecktes Meter. Es wird über stärkere VHS-Störungen und Tracking-Fehler im Bild sichtbar, nicht über das HUD.
@@ -283,12 +301,15 @@ Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `ce
 Kein eigener Menüpunkt: Beim allerersten „Neuer Einkauf“ fragt ein Fenster „Willst du das Tutorial spielen?“ (Ja/Nein; gespeichert als `tutorial_asked` in `settings.txt`, Esc fragt beim nächsten Mal wieder). „Nein“ zeigt „OK Champ, hab nicht gedacht, dass du so schlau bist.“, OK startet den normalen Einkauf. Der normale Einkauf hat kein Tutorial-Fenster mehr, die frühere Option „Tutorial an/aus“ ist weg. Der Tutorial-Modus ist ein ganzer Einkauf mit neun Phasen, die aus dem Spielzustand abgeleitet werden: 1 Steuerung (Tasten-Liste wie früher), 2 Wasser, 3 Einkaufen, 4 Pfand, 5 Zur Kasse, 6 Band, 7 Kassiererin, 8 Bezahlen, 9 Flucht. Ab Phase 2 erklärt ein Kasten oben links der Mitte die Phase (ausgeblendet im Kassenfenster, beim Bezahlen und im Gespräch).
 - **Pfeile am Boden** (aus Boxen, leuchten gelb-grün, flackern im gekippten Markt): alle 1,5 m, die nächsten fünf, entlang eines eigenen Distanzfelds über das Raster (der Kassenbereich ist für den Spieler offen). Ziele: Wasser im Getränkeraum (schon ab dem Start, während der Tasten-Liste; Wasser im Gang wird nicht angezeigt) bzw. Tür des Getränkeraums, nächste fehlende Ware, offene Kasse, Korridor-Ende bzw. Ladentür.
 - **Leuchtende Waren:** gleiche Hervorhebung wie im normalen Spiel (`highlight.rs`: etwas größer, pulsierend hell), aber für alle echten, noch fehlenden Zettel-Waren im Umkreis von 12 m (höchstens 40) statt nur der nächsten in 1 m. Die Hervorhebung des normalen Spiels bleibt im Tutorial zusätzlich an.
-- **Erklär-Kasten mit Seiten:** Eine Phase kann mehrere Seiten haben, die alle 8 s wechseln (Seitenzahl rechts oben). Einkaufen: 1 Zettel und falsche Ware, 2 Kunden (kommen näher, wenn man nicht hinsieht; nicht anrempeln, anstarren, Tomatensaft nehmen), 3 Mitarbeiter (sprechen an, Antwort 1/2/3, gute Antworten bringen Abstand, falsche Auffälligkeit).
+- **Erklär-Kasten mit Seiten:** Eine Phase kann mehrere Seiten haben, die alle 8 s wechseln (Seitenzahl rechts oben). Einkaufen: 1 Zettel und falsche Ware, 2 Kunden (kommen näher, wenn man nicht hinsieht; nicht anrempeln, anstarren, Tomatensaft nehmen), 3 Mitarbeiter (sprechen manchmal an, 6 s für die Antwort 1/2/3, gute Antworten bringen Abstand, falsche Auffälligkeit), 4 gesperrte Gänge (Mettarbeiter spannen Absperrband, dann außen herum; gute Antwort öffnet, schlechte lässt einen Gang sperren; im Tutorial sperrt keiner).
 - **Pfeile auf dem verzerrten Boden:** Beide Enden jedes Balkens folgen `Game::on_floor` (gleiche Verschiebung `sway_at` wie im Shader, 2 cm darüber), der Pfeil liegt also schräg mit auf. Die leuchtenden Waren wandern mit dem Regal.
 - **Erklärleiste in den Kassen-Fenstern** (nur Tutorial, `tutorial::ui_hints`): klein und mittig auf der Oberkante von Kassenfenster, Kartenleser/PIN und Geldbörse (y = 16, gelber Rahmen; ganz oben am Bildrand schnitt der VHS-Effekt sie ab), Hinweise wechseln alle 5 s (Seitenzahl rechts): Band (ziehen, ab 1 kg zuerst, roter Rahmen, R reklamiert, danach Terminal), Karte (E Karte nehmen, gleichmäßig nach rechts, PIN mit 0–9), Bargeld (genau passend, A/D oder Mausrad, E/F, Restzeit).
 - **Lob beim Zurück ins Hauptmenü:** Nach einem gewonnenen Tutorial führt „Hauptmenü“ auf dem Endbildschirm erst über das Fenster „Tutorial geschafft – Du bist jetzt schlau genug, um einkaufen zu können. WOW.“ (OK).
 - **NPCs verfolgen nicht:** Im Tutorial jagt kein Kunde (auch bei Verdacht 100 % und bei der Flucht), Personal folgt einem nicht, geht keinen Geräuschen nach und spricht einen nicht an; es läuft nur Streife. Gefangen wird man nie.
 - **Entschärft:** Erwischt werden (nur noch über den Schreck-Cheat), Kassenfehler (kein Kassen-Leben weg, Misstrauen zurück auf 0) und Umdrehen im Korridor beenden nichts. Es gibt eine Erklärung, einen roten Blitz und 4 s Schonfrist. Jumpscares bleiben. Gewinnt man, wird `tutorial_done` gespeichert (das Lob kommt nicht unter den Bon, sondern als Fenster beim Gang ins Hauptmenü): Ab dann gibt es in den Optionen (Hauptmenü und Pause) die Zeile „Tutorial spielen“ vor „Zurück“.
+
+## Erfolge (`src/achievements.rs`, Liste in `erfolge/erfolge.json`)
+17 Erfolge über den Mett Launcher, sieben davon verborgen, damit nichts verraten wird. Der erste Cheat sperrt sie für den laufenden Einkauf (`Game::cheated`), ein neuer Einkauf oder Neustart zählt wieder. Schon Freigeschaltetes bleibt. Das Tutorial zählt nur für „Ausgelernt“, der Autoshot gar nicht. Anleitung: `mettgine/docs/erfolge.md`.
 
 ## Cheat-Menü (F1, `src/game/cheats.rs`, Anzeige in `src/hud.rs`)
 Zwei Ebenen. Zuerst die Kategorien mit Anzahl und einer kurzen Beschreibung der gewählten: **Spieler** (Unverwundbar, Leben auffüllen, Tutorial starten (neuer Einkauf im Tutorial-Modus, auch wenn man beim ersten Mal „Nein“ gesagt hat), Tutorial überspringen (beendet Anleitung und Entschärfung im Tutorial-Modus), Auffälligkeit 0/100 %, Sofort sterben), **Markt & Einkauf** (kippen, Zettel füllen, +10 €, zur Getränkeabteilung, umbauen, Durchsage, Seitentrakt: hinein, Gestalt in der Ferne, Déjà-vu-Szene), **Kasse & Flucht** (zur Kasse, Karten-/Barzahlung, Flucht: Korridor), **Leute** (Mitarbeiter rufen, alle entfernen, Wagen wird mitgenommen), **Schrecken** (jeder Jumpscare einzeln). Enter oder Rechts öffnet eine Kategorie, Enter löst einen Cheat aus (und es geht weiter im Spiel), Esc oder Links geht eine Ebene zurück. Jeder Cheat steht in genau einer Kategorie (Test).
