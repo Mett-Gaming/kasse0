@@ -2,7 +2,6 @@
 
 mod belt_window;
 pub mod options;
-mod smoke;
 mod till;
 
 use crate::game::dialog::CART_OPENER;
@@ -479,7 +478,6 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     }
 
     // die nutzlose Zigarette (1/2/3)
-    smoke::draw(u, g, time);
 
     // Kassenfenster (Waren mit der Maus aufs Band)
     belt_window::draw(u, g, time);

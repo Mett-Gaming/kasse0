@@ -296,3 +296,6 @@ Das Spiel startet im randlosen Vollbild (`Settings::fullscreen`, Standard an). D
 
 ## Raumklang (v0.30)
 Klang läuft über `mettgine::audio`. Geräusche mit Ort bewegen sich beim Umdrehen mit, klingen hinter dem Kopf etwas und hinter Regalen deutlich dumpfer und leiser (`Game::sound_hidden`, Sichtlinie ohne den letzten halben Meter). Im Tomatensaft-Rausch und beim Sterben wird alles dumpf. Musik hat einen eigenen Regler.
+
+## Was in der Luft liegt (v0.32)
+`src/air.rs`, nur fürs Auge: Staub im Lichtkegel brennender Lampen (höchstens 140 Körner), Rauchfahne an der Glut und Wolke beim Ausatmen als echte Partikel in der Welt (ersetzt den gezeichneten HUD-Rauch), Atemwolken alle 3,2 s an Kühlwand und Kühltruhen. Spiegel und Monitor zeigen sie nicht.

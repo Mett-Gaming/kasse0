@@ -3,6 +3,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod air;
 mod assets;
 mod audio;
 mod autoshot;
@@ -54,6 +55,9 @@ struct App {
     ui: ui::Ui,
     draws: Vec<render::MeshDraw>,
     ghosts: Vec<render::MeshDraw>,
+    /// Staub, Rauch, Atem
+    air: air::Air,
+    air_draws: Vec<mettgine::particles::ParticleInst>,
     /// animierte Figuren dieses Frames und ihre Knochen-Matrizen
     people: Vec<people::PersonDraw>,
     skins: Vec<render::SkinDraw>,
@@ -106,6 +110,8 @@ impl App {
             ui: ui::Ui::default(),
             draws: Vec::new(),
             ghosts: Vec::new(),
+            air: air::Air::new(),
+            air_draws: Vec::new(),
             people: Vec::new(),
             skins: Vec::new(),
             monitor_skins: Vec::new(),
@@ -511,6 +517,7 @@ impl App {
                         ));
                     }
                 }
+                self.air.update(&self.game, dt);
                 let wait = if self.game.outcome == Outcome::Caught {
                     2.2
                 } else {
@@ -764,6 +771,8 @@ impl App {
             ui: &self.ui.verts,
             ..Default::default()
         };
+        self.air.instances(g.eye(), &mut self.air_draws);
+        stage.renderer.queue_particles(&self.air_draws);
         stage.draw(&input);
     }
 

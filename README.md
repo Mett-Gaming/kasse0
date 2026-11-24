@@ -79,6 +79,9 @@ Beim **allerersten Einkauf** fragt das Spiel, ob du das **Tutorial** spielen wil
 - Sortiert ist logisch nach Warengruppen. Mit steigender Eskalation verschieben sich die Abteilungen: erst tauschen Unterabteilungen (Fisch ↔ Käse), dann wandern ganze Abteilungen in fremde Einrichtungen, am Ende steht Ware wild durcheinander und **die Schilder lügen**.
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
+### In der Luft
+Staub schwebt im Licht der Lampen, die Zigarette raucht wirklich, und an der Kühlung sieht man deinen Atem.
+
 ### Passende Ware leuchtet
 Stehst du höchstens **4 m** von einer Ware entfernt, die zu einem offenen Zettel-Eintrag passt, pulsiert sie kräftig gelblich hell und wirkt etwas größer. Es leuchtet immer nur **eine**, die nächste. Auch **falsch beschriftete** und teure Ware leuchtet: Hinsehen musst du selbst. Mit Ware in der Hand, in Gesprächen und an der Kasse leuchtet nichts.
 
