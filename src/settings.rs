@@ -1,6 +1,6 @@
 //! Optionen, gespeichert als key=value in %APPDATA%\.mettlauncher\kasse0\settings.txt.
 
-use std::path::PathBuf;
+use mettgine::settings::KeyValues;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
@@ -29,66 +29,43 @@ impl Default for Settings {
     }
 }
 
-fn path() -> Option<PathBuf> {
-    crate::crash::data_dir("kasse0").map(|d| d.join("settings.txt"))
-}
+const APP: &str = "kasse0";
+const FILE: &str = "settings.txt";
 
 impl Settings {
-    pub fn parse(text: &str) -> Self {
-        let mut s = Self::default();
-        for line in text.lines() {
-            let Some((k, v)) = line.split_once('=') else {
-                continue;
-            };
-            let v = v.trim();
-            let f = v.parse::<f32>().ok();
-            match k.trim() {
-                "sensitivity" => s.sensitivity = f.unwrap_or(s.sensitivity).clamp(0.2, 3.0),
-                "volume" => s.volume = f.unwrap_or(s.volume).clamp(0.0, 1.0),
-                "vhs" => s.vhs = f.unwrap_or(s.vhs).clamp(0.0, 1.5),
-                "fov" => s.fov = f.unwrap_or(s.fov).clamp(55.0, 100.0),
-                "fullscreen" => s.fullscreen = v != "false",
-                "tutorial_asked" => s.tutorial_asked = v == "true",
-                "tutorial_done" => s.tutorial_done = v == "true",
-                // frueher gab es "tutorial" (an/aus): wird ignoriert
-                _ => {}
-            }
+    fn from_values(kv: &KeyValues) -> Self {
+        let d = Self::default();
+        let on = |key| kv.str(key) == Some("true");
+        Self {
+            sensitivity: kv.f32("sensitivity", d.sensitivity, 0.2, 3.0),
+            volume: kv.f32("volume", d.volume, 0.0, 1.0),
+            vhs: kv.f32("vhs", d.vhs, 0.0, 1.5),
+            fov: kv.f32("fov", d.fov, 55.0, 100.0),
+            fullscreen: kv.str("fullscreen") != Some("false"),
+            // frueher gab es "tutorial" (an/aus): wird ignoriert
+            tutorial_asked: on("tutorial_asked"),
+            tutorial_done: on("tutorial_done"),
         }
-        s
     }
 
-    pub fn to_text(&self) -> String {
-        format!(
-            "sensitivity={}\nvolume={}\nvhs={}\nfov={}\nfullscreen={}\ntutorial_asked={}\n\
-             tutorial_done={}\n",
-            self.sensitivity,
-            self.volume,
-            self.vhs,
-            self.fov,
-            self.fullscreen,
-            self.tutorial_asked,
-            self.tutorial_done
-        )
+    fn to_values(&self) -> KeyValues {
+        let mut kv = KeyValues::default();
+        kv.set("sensitivity", self.sensitivity);
+        kv.set("volume", self.volume);
+        kv.set("vhs", self.vhs);
+        kv.set("fov", self.fov);
+        kv.set("fullscreen", self.fullscreen);
+        kv.set("tutorial_asked", self.tutorial_asked);
+        kv.set("tutorial_done", self.tutorial_done);
+        kv
     }
 
     pub fn load() -> Self {
-        path()
-            .and_then(|p| std::fs::read_to_string(p).ok())
-            .map(|t| Self::parse(&t))
-            .unwrap_or_default()
+        Self::from_values(&mettgine::settings::load(APP, FILE))
     }
 
     pub fn save(&self) {
-        if let Some(p) = path() {
-            if let Some(dir) = p.parent() {
-                let _ = std::fs::create_dir_all(dir);
-            }
-            if let Err(e) = std::fs::write(&p, self.to_text()) {
-                crate::crash::log(&format!(
-                    "Einstellungen konnten nicht gespeichert werden: {e}"
-                ));
-            }
-        }
+        mettgine::settings::save(APP, FILE, &self.to_values());
     }
 }
 
@@ -96,11 +73,15 @@ impl Settings {
 mod tests {
     use super::*;
 
+    fn parse(text: &str) -> Settings {
+        Settings::from_values(&KeyValues::parse(text))
+    }
+
     #[test]
     fn starts_fullscreen_unless_switched_off() {
         assert!(Settings::default().fullscreen);
-        assert!(Settings::parse("volume=0.5").fullscreen);
-        assert!(!Settings::parse("fullscreen=false").fullscreen);
+        assert!(parse("volume=0.5").fullscreen);
+        assert!(!parse("fullscreen=false").fullscreen);
     }
 
     #[test]
@@ -114,15 +95,15 @@ mod tests {
             tutorial_asked: true,
             tutorial_done: true,
         };
-        assert_eq!(Settings::parse(&s.to_text()), s);
+        assert_eq!(parse(&s.to_values().to_text()), s);
         // neue Spieler: noch nicht gefragt, Tutorial noch nicht geschafft
         assert!(!Settings::default().tutorial_asked);
         assert!(!Settings::default().tutorial_done);
-        let bad = Settings::parse("volume=7\nfov=abc\nunbekannt=1");
+        let bad = parse("volume=7\nfov=abc\nunbekannt=1");
         assert_eq!(bad.volume, 1.0);
         assert_eq!(bad.fov, 70.0);
         // aeltere Datei mit der frueheren Tutorial-Option wird ohne Fehler gelesen
-        let old = Settings::parse("fullscreen=true\ntutorial=false\n");
+        let old = parse("fullscreen=true\ntutorial=false\n");
         assert!(old.fullscreen && !old.tutorial_asked);
     }
 }

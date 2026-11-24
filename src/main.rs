@@ -8,7 +8,10 @@ mod audio;
 mod autoshot;
 mod catalog;
 // Engine-Teile aus Mettgine unter den gewohnten Namen
-pub use mettgine::{crash, crash_window, render, ui};
+use mettgine::app::{AppConfig, Stage};
+use mettgine::presence::Status;
+use mettgine::time::FixedStep;
+pub use mettgine::{crash, render, ui};
 mod game;
 mod hud;
 mod people;
@@ -22,24 +25,24 @@ use hud::Screen;
 use settings::Settings;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use winit::{
-    application::ApplicationHandler,
-    dpi::LogicalSize,
-    event::{DeviceEvent, DeviceId, ElementState, KeyEvent, MouseButton, WindowEvent},
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
-    window::{CursorGrabMode, Fullscreen, Window, WindowId},
+    window::Window,
 };
 
 const FIXED_STEP: f32 = 1.0 / 60.0;
 
-struct Running {
-    // Reihenfolge wichtig: Renderer (Surface) vor dem Fenster freigeben.
-    renderer: render::Renderer,
-    window: Window,
+/// Wuensche an das Fenster; erfuellt werden sie nach jedem Ereignis (siehe `App::sync`).
+#[derive(Default)]
+struct Wishes {
+    grab: Option<bool>,
+    fullscreen: Option<bool>,
+    title: Option<String>,
+    quit: bool,
 }
 
 struct App {
-    running: Option<Running>,
+    wishes: Wishes,
     game: Game,
     settings: Settings,
     audio: Option<Audio>,
@@ -61,8 +64,7 @@ struct App {
     grabbed: bool,
     /// Kassenfenster im letzten Bild offen (dann Maus wieder einfangen, wenn es zugeht)
     window_was_open: bool,
-    last_frame: Instant,
-    accumulator: f32,
+    takt: FixedStep,
     clock: f32,
     fade: f32,
     fixed_seed: Option<u64>,
@@ -73,8 +75,6 @@ struct App {
     shot_request: Option<std::path::PathBuf>,
     /// Sekunden, die der Troll-Jumpscare im Optionsmenue noch laeuft
     menu_scare: f32,
-    /// bis zur naechsten Momentaufnahme fuer Absturzberichte
-    crash_ctx_t: f32,
     /// Frame-Zeit-Log (KASSE0_PERF=1 oder im Autoshot): (Frames, Summe, schlechtester Frame)
     perf: Option<(u32, f32, f32)>,
 }
@@ -94,7 +94,7 @@ impl App {
         let mut game = Game::new(random_seed());
         game.player.pos = game.world.spawn + glam::vec3(0.0, 0.0, -2.0);
         Self {
-            running: None,
+            wishes: Wishes::default(),
             game,
             settings,
             audio,
@@ -113,8 +113,7 @@ impl App {
             cursor: (0.0, 0.0),
             grabbed: false,
             window_was_open: false,
-            last_frame: Instant::now(),
-            accumulator: 0.0,
+            takt: FixedStep::new(FIXED_STEP),
             clock: 0.0,
             fade: 1.0,
             fixed_seed,
@@ -123,7 +122,6 @@ impl App {
                 .map(|d| (std::path::PathBuf::from(d), 0.0, 0)),
             shot_request: None,
             menu_scare: 0.0,
-            crash_ctx_t: 0.0,
             perf: (std::env::var_os("KASSE0_PERF").is_some()
                 || std::env::var_os("KASSE0_AUTOSHOT").is_some())
             .then_some((0, 0.0, 0.0)),
@@ -155,34 +153,32 @@ impl App {
         (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare)
     }
 
-    /// Laeuft noch das Startbild der Engine? Dann gibt es keine Eingaben.
-    fn splash_active(&self) -> bool {
-        self.running
-            .as_ref()
-            .is_some_and(|r| r.renderer.splash_active())
-    }
-
     fn set_grab(&mut self, grab: bool) {
-        let Some(r) = &self.running else { return };
-        if grab {
-            let ok = r
-                .window
-                .set_cursor_grab(CursorGrabMode::Locked)
-                .or_else(|_| r.window.set_cursor_grab(CursorGrabMode::Confined))
-                .is_ok();
-            r.window.set_cursor_visible(false);
-            self.grabbed = ok;
-        } else {
-            let _ = r.window.set_cursor_grab(CursorGrabMode::None);
-            r.window.set_cursor_visible(true);
-            self.grabbed = false;
-        }
+        self.wishes.grab = Some(grab);
+        self.grabbed = grab;
     }
 
     /// Randloses Vollbild laut Optionen; Autoshot bleibt im Fenster (feste Bildgroesse).
-    fn wanted_fullscreen(&self) -> Option<Fullscreen> {
-        (self.settings.fullscreen && self.autoshot.is_none())
-            .then_some(Fullscreen::Borderless(None))
+    fn wanted_fullscreen(&self) -> bool {
+        self.settings.fullscreen && self.autoshot.is_none()
+    }
+
+    /// Wuensche ans Fenster erfuellen.
+    fn sync(&mut self, stage: &mut Stage) {
+        let w = std::mem::take(&mut self.wishes);
+        if let Some(grab) = w.grab {
+            stage.set_grab(grab);
+            self.grabbed = stage.grabbed();
+        }
+        if let Some(full) = w.fullscreen {
+            stage.set_fullscreen(full);
+        }
+        if let Some(t) = w.title {
+            stage.window.set_title(&t);
+        }
+        if w.quit {
+            stage.quit();
+        }
     }
 
     fn apply_settings(&mut self) {
@@ -191,12 +187,7 @@ impl App {
         if let Some(a) = &mut self.audio {
             a.set_master(self.settings.volume);
         }
-        if let Some(r) = &self.running {
-            let want = self.wanted_fullscreen();
-            if r.window.fullscreen().is_some() != want.is_some() {
-                r.window.set_fullscreen(want);
-            }
-        }
+        self.wishes.fullscreen = Some(self.wanted_fullscreen());
     }
 
     /// Neuer Einkauf; `tutorial` = Tutorial-Modus (Anleitung, Wegweiser, entschaerft).
@@ -209,18 +200,15 @@ impl App {
         };
         self.apply_settings();
         self.input = game::Input::default();
-        self.accumulator = 0.0;
+        self.takt.reset();
         self.fade = 1.0;
         self.screen = Screen::Playing;
         self.set_grab(true);
-        if let Some(r) = &self.running {
-            let title = if tutorial {
-                "KASSE 0  |  Tutorial".to_string()
-            } else {
-                format!("KASSE 0  |  Band #{seed}")
-            };
-            r.window.set_title(&title);
-        }
+        self.wishes.title = Some(if tutorial {
+            "KASSE 0  |  Tutorial".to_string()
+        } else {
+            format!("KASSE 0  |  Band #{seed}")
+        });
     }
 
     /// Wurde gerade ein Tutorial-Einkauf gewonnen? (Endbildschirm -> Lob vor dem Hauptmenue)
@@ -249,7 +237,7 @@ impl App {
     }
 
     /// Menuepunkt ausloesen. `dir` = +1/-1 fuer Optionswerte.
-    fn activate(&mut self, event_loop: &ActiveEventLoop, dir: i32) {
+    fn activate(&mut self, dir: i32) {
         self.sfx(Sfx::Click);
         match self.screen {
             Screen::Title => match self.sel {
@@ -263,7 +251,7 @@ impl App {
                     }
                 }
                 1 => self.go(self.options_screen(false)),
-                _ => event_loop.exit(),
+                _ => self.wishes.quit = true,
             },
             Screen::AskTutorial => {
                 // gefragt wird nur einmal, egal wie die Antwort ist
@@ -285,7 +273,7 @@ impl App {
                 1 => self.go(self.options_screen(true)),
                 2 => self.start_game(self.game.seed, self.tutorial_mode),
                 3 => self.to_title(),
-                _ => event_loop.exit(),
+                _ => self.wishes.quit = true,
             },
             Screen::End => match self.sel {
                 0 => self.start_game(self.game.seed, self.tutorial_mode),
@@ -381,9 +369,7 @@ impl App {
         self.apply_settings();
         self.fade = 1.0;
         self.go(Screen::Title);
-        if let Some(r) = &self.running {
-            r.window.set_title("KASSE 0");
-        }
+        self.wishes.title = Some("KASSE 0".to_string());
     }
 
     fn back(&mut self) {
@@ -416,36 +402,7 @@ impl App {
         }
     }
 
-    fn frame(&mut self, event_loop: &ActiveEventLoop) {
-        let now = Instant::now();
-        let dt = (now - self.last_frame).as_secs_f32().min(0.1);
-        self.last_frame = now;
-        // Zustand fuer Absturzberichte (einmal pro Sekunde)
-        self.crash_ctx_t -= dt;
-        if self.crash_ctx_t <= 0.0 {
-            self.crash_ctx_t = 1.0;
-            let g = &self.game;
-            crash::context("Bildschirm", format!("{:?}", self.screen));
-            crash::context("Seed", g.seed.to_string());
-            crash::context(
-                "Markt",
-                format!(
-                    "{} (Stufe: {})",
-                    if g.tipped { "gekippt" } else { "normal" },
-                    g.tier.name()
-                ),
-            );
-            crash::context("Spieler", format!("{:.1?}", g.player.pos));
-            crash::context(
-                "NPCs",
-                format!(
-                    "{} Kunden, {} Personal",
-                    g.customers.len(),
-                    g.employees.len()
-                ),
-            );
-            crash::context("Bild", format!("{:.1} ms", dt * 1000.0));
-        }
+    fn run_frame(&mut self, stage: &mut Stage, dt: f32) {
         if let Some((n, sum, worst)) = &mut self.perf {
             let raw = dt;
             *n += 1;
@@ -475,14 +432,14 @@ impl App {
             }
         }
         self.fade = (self.fade - dt * 1.2).max(0.0);
-        let splash = self.splash_active();
+        let splash = stage.splash_active();
         if let Some((dir, mut timer, step)) = self.autoshot.clone().filter(|_| !splash) {
             timer -= dt;
             if timer <= 0.0 {
                 match self.autoshot_step(step, &dir) {
                     Some(wait) => self.autoshot = Some((dir, wait, step + 1)),
                     None => {
-                        event_loop.exit();
+                        self.wishes.quit = true;
                         return;
                     }
                 }
@@ -490,11 +447,10 @@ impl App {
                 self.autoshot = Some((dir, timer, step));
             }
         }
-        let Some(size) = self.running.as_ref().map(|r| r.window.inner_size()) else {
-            return;
-        };
-        let aspect = size.width.max(1) as f32 / size.height.max(1) as f32;
+        let aspect = stage.aspect();
         self.game.aspect = aspect;
+        // Screenshots wechseln den Bildschirm: Wuensche gleich erfuellen
+        self.sync(stage);
 
         match self.screen {
             Screen::Playing => {
@@ -509,8 +465,8 @@ impl App {
                 self.input.ui_mouse = self.cursor;
                 let (mx, my) = std::mem::take(&mut self.mouse_delta);
                 self.game.look(mx, my);
-                self.accumulator += dt;
-                while self.accumulator >= FIXED_STEP {
+                self.takt.add(dt);
+                while self.takt.step() {
                     let t_upd = Instant::now();
                     self.game.update(FIXED_STEP, &mut self.input);
                     if self.perf.is_some() && t_upd.elapsed().as_secs_f32() > 0.008 {
@@ -519,7 +475,6 @@ impl App {
                             t_upd.elapsed().as_secs_f32() * 1000.0
                         ));
                     }
-                    self.accumulator -= FIXED_STEP;
                 }
                 let wait = if self.game.outcome == Outcome::Caught {
                     2.2
@@ -624,27 +579,20 @@ impl App {
                 .npc_debug_labels()
                 .into_iter()
                 .filter_map(|(at, text)| {
-                    let c = vp * at.extend(1.0);
-                    if c.w <= 0.05 {
-                        return None;
-                    }
-                    let (x, y) = (c.x / c.w, c.y / c.w);
-                    (x.abs() < 1.0 && y.abs() < 1.0)
-                        .then(|| ((x * 0.5 + 0.5) * ui::W, (0.5 - y * 0.5) * ui::H, text))
+                    let p = render::project(&vp, at)?;
+                    let inside = p.x > 0.0 && p.x < 1.0 && p.y > 0.0 && p.y < 1.0;
+                    inside.then(|| (p.x * ui::W, p.y * ui::H, text))
                 })
                 .collect();
             hud::draw_npc_debug(&mut self.ui, &labels, &self.game);
         }
 
-        let Some(r) = self.running.as_mut() else {
-            return;
-        };
         if let Some(path) = self.shot_request.take() {
-            r.renderer.capture_next(path);
+            stage.renderer.capture_next(path);
         }
         let t_up = Instant::now();
         if self.game.take_world_dirty() {
-            if let Err(e) = r
+            if let Err(e) = stage
                 .renderer
                 .upload_world(&self.game.world.instances, &self.game.world.lights)
             {
@@ -653,20 +601,20 @@ impl App {
                     &format!("Fehler beim Hochladen der Welt: {e}"),
                     "Der Markt passte nicht in den Grafikspeicher.",
                 );
-                event_loop.exit();
+                self.wishes.quit = true;
                 return;
             }
         }
         if self.game.take_statics_dirty() {
             let mut statics = Vec::new();
             self.game.world.item_draws(&mut statics);
-            if let Err(e) = r.renderer.upload_statics(&statics) {
+            if let Err(e) = stage.renderer.upload_statics(&statics) {
                 crash::fatal(
                     "Grafikspeicher",
                     &format!("Fehler beim Hochladen der Waren: {e}"),
                     "Die Waren passten nicht in den Grafikspeicher.",
                 );
-                event_loop.exit();
+                self.wishes.quit = true;
                 return;
             }
         }
@@ -772,19 +720,12 @@ impl App {
             camera_skins: &self.monitor_skins,
             bones: &self.bones,
             ui: &self.ui.verts,
+            ..Default::default()
         };
-        if let Err(e) = r.renderer.draw(&input) {
-            crash::fatal(
-                "Renderfehler",
-                &format!("{e}"),
-                "Beim Zeichnen ist ein Grafikfehler aufgetreten. Ein Neustart hilft oft, sonst \
-                 den Grafiktreiber aktualisieren.",
-            );
-            event_loop.exit();
-        }
+        stage.draw(&input);
     }
 
-    fn key(&mut self, event_loop: &ActiveEventLoop, code: KeyCode, pressed: bool, repeat: bool) {
+    fn key(&mut self, code: KeyCode, pressed: bool, repeat: bool) {
         if code == KeyCode::F12 && pressed && !repeat {
             let dir = std::env::var_os("USERPROFILE")
                 .map(std::path::PathBuf::from)
@@ -866,20 +807,20 @@ impl App {
                 if matches!(self.screen, Screen::Options { .. })
                     && self.sel < hud::OPTION_VALUES =>
             {
-                self.activate(event_loop, -1)
+                self.activate(-1)
             }
             KeyCode::ArrowRight | KeyCode::KeyD
                 if matches!(self.screen, Screen::Options { .. })
                     && self.sel < hud::OPTION_VALUES =>
             {
-                self.activate(event_loop, 1)
+                self.activate(1)
             }
             // Cheat-Menue: rechts oeffnet die Kategorie, links geht zurueck
             KeyCode::ArrowRight | KeyCode::KeyD
                 if self.screen == (Screen::Cheats { group: None })
                     && self.sel < game::cheat_groups().len() =>
             {
-                self.activate(event_loop, 1)
+                self.activate(1)
             }
             // lange Kategorie (zwei Spalten): links/rechts wechselt die Spalte
             KeyCode::ArrowRight | KeyCode::KeyD
@@ -900,7 +841,7 @@ impl App {
                 self.back()
             }
             KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space | KeyCode::KeyE if !repeat => {
-                self.activate(event_loop, 1)
+                self.activate(1)
             }
             KeyCode::Escape if !repeat => self.back(),
             _ => {}
@@ -908,27 +849,12 @@ impl App {
     }
 }
 
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.running.is_some() {
-            return;
-        }
-        let attrs = Window::default_attributes()
-            .with_title("KASSE 0")
-            .with_inner_size(LogicalSize::new(1280.0, 720.0))
-            .with_fullscreen(self.wanted_fullscreen());
-        let window = match event_loop.create_window(attrs) {
-            Ok(w) => w,
-            Err(e) => {
-                crash::fatal(
-                    "Fenster",
-                    &format!("Fenster konnte nicht erstellt werden: {e}"),
-                    "Das Spielfenster konnte nicht geöffnet werden.",
-                );
-                event_loop.exit();
-                return;
-            }
-        };
+impl mettgine::app::Game for App {
+    fn starts_fullscreen(&self) -> bool {
+        self.wanted_fullscreen()
+    }
+
+    fn renderer(&mut self, window: &Window) -> mettgine::app::Result<render::Renderer> {
         let skins = people::load_skins();
         let meshes = assets::load_all();
         let font = ui::font_atlas();
@@ -941,26 +867,14 @@ impl ApplicationHandler for App {
             second_camera: Some(MONITOR_SIZE),
             smooth: false,
             last_wins: false,
+            world: WORLD,
             ..render::Config::new(&meshes, &skins, (&font, 128, 128))
         };
-        let renderer = match render::Renderer::new(&window, &config) {
-            Ok(r) => r,
-            Err(e) => {
-                crash::fatal(
-                    "Vulkan",
-                    &format!("Vulkan-Initialisierung fehlgeschlagen: {e}"),
-                    "Die Grafik konnte nicht gestartet werden. KASSE 0 braucht eine Grafikkarte \
-                     mit Vulkan 1.3. Bitte den Grafiktreiber aktualisieren.",
-                );
-                event_loop.exit();
-                return;
-            }
-        };
-        crash::context("GPU", renderer.gpu_name());
-        crash::log(&format!("GPU: {}", renderer.gpu_name()));
-        self.running = Some(Running { renderer, window });
+        render::Renderer::new(window, &config)
+    }
+
+    fn ready(&mut self, stage: &mut Stage) {
         self.apply_settings();
-        self.last_frame = Instant::now();
         // Mit festem Seed direkt ins Spiel (praktisch zum Testen)
         if let Some(seed) = self
             .fixed_seed
@@ -968,26 +882,16 @@ impl ApplicationHandler for App {
         {
             self.start_game(seed, false);
         }
+        self.sync(stage);
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        if self.splash_active()
-            && matches!(
-                event,
-                WindowEvent::KeyboardInput { .. }
-                    | WindowEvent::MouseInput { .. }
-                    | WindowEvent::MouseWheel { .. }
-            )
-        {
-            return;
-        }
+    fn frame(&mut self, stage: &mut Stage, dt: f32) {
+        self.run_frame(stage, dt);
+        self.sync(stage);
+    }
+
+    fn event(&mut self, stage: &mut Stage, event: &WindowEvent) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::Resized(size) => {
-                if let Some(r) = &mut self.running {
-                    r.renderer.resize(size.width, size.height);
-                }
-            }
             WindowEvent::Focused(false) => {
                 if self.screen == Screen::Playing
                     && self.game.outcome == Outcome::Running
@@ -997,25 +901,21 @@ impl ApplicationHandler for App {
                 }
                 self.set_grab(false);
             }
-            WindowEvent::CursorMoved { position, .. } => {
-                if let Some(r) = &self.running {
-                    let s = r.window.inner_size();
-                    let x = position.x as f32 / s.width.max(1) as f32 * ui::W;
-                    let y = position.y as f32 / s.height.max(1) as f32 * ui::H;
-                    self.cursor = (x, y);
-                    if self.screen != Screen::Playing {
-                        if let Some(i) = hud::menu_hit(self.screen, x, y) {
-                            if i != self.sel {
-                                self.sel = i;
-                                self.sfx(Sfx::Blip);
-                            }
+            WindowEvent::CursorMoved { .. } => {
+                let (x, y) = stage.cursor();
+                self.cursor = (x, y);
+                if self.screen != Screen::Playing {
+                    if let Some(i) = hud::menu_hit(self.screen, x, y) {
+                        if i != self.sel {
+                            self.sel = i;
+                            self.sfx(Sfx::Blip);
                         }
                     }
                 }
             }
             WindowEvent::MouseWheel { delta, .. } if self.screen == Screen::Playing => {
                 let y = match delta {
-                    winit::event::MouseScrollDelta::LineDelta(_, y) => y,
+                    winit::event::MouseScrollDelta::LineDelta(_, y) => *y,
                     winit::event::MouseScrollDelta::PixelDelta(p) => (p.y / 40.0) as f32,
                 };
                 self.input.wheel += y.round() as i32;
@@ -1036,21 +936,21 @@ impl ApplicationHandler for App {
             } => {
                 if self.screen == Screen::Playing && self.game.belt_window_open() {
                     // Kassenfenster: Ware anfassen
-                    if button == MouseButton::Left {
+                    if *button == MouseButton::Left {
                         self.input.ui_pressed = true;
                         self.input.ui_down = true;
                     }
                 } else if self.screen == Screen::Playing {
                     if !self.grabbed {
                         self.set_grab(true);
-                    } else if button == MouseButton::Left {
+                    } else if *button == MouseButton::Left {
                         self.input.interact = true;
                     }
                 } else if let Some(i) = hud::menu_hit(self.screen, self.cursor.0, self.cursor.1) {
                     self.sel = i;
-                    let dir = if button == MouseButton::Right { -1 } else { 1 };
-                    if button == MouseButton::Left || button == MouseButton::Right {
-                        self.activate(event_loop, dir);
+                    let dir = if *button == MouseButton::Right { -1 } else { 1 };
+                    if *button == MouseButton::Left || *button == MouseButton::Right {
+                        self.activate(dir);
                     }
                 }
             }
@@ -1064,26 +964,64 @@ impl ApplicationHandler for App {
                     },
                 ..
             } => {
-                self.key(event_loop, code, state == ElementState::Pressed, repeat);
+                self.key(*code, *state == ElementState::Pressed, *repeat);
             }
-            WindowEvent::RedrawRequested => self.frame(event_loop),
             _ => {}
         }
+        self.sync(stage);
     }
 
-    fn device_event(&mut self, _event_loop: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
-        if let DeviceEvent::MouseMotion { delta } = event {
-            if self.grabbed && self.screen == Screen::Playing {
-                self.mouse_delta.0 += delta.0 as f32;
-                self.mouse_delta.1 += delta.1 as f32;
+    fn mouse_motion(&mut self, _stage: &mut Stage, dx: f32, dy: f32) {
+        if self.screen == Screen::Playing {
+            self.mouse_delta.0 += dx;
+            self.mouse_delta.1 += dy;
+        }
+    }
+
+    fn crash_context(&self) {
+        let g = &self.game;
+        crash::context("Bildschirm", format!("{:?}", self.screen));
+        crash::context("Seed", g.seed.to_string());
+        crash::context(
+            "Markt",
+            format!(
+                "{} (Stufe: {})",
+                if g.tipped { "gekippt" } else { "normal" },
+                g.tier.name()
+            ),
+        );
+        crash::context("Spieler", format!("{:.1?}", g.player.pos));
+        crash::context(
+            "NPCs",
+            format!(
+                "{} Kunden, {} Personal",
+                g.customers.len(),
+                g.employees.len()
+            ),
+        );
+    }
+
+    /// Was der Launcher in Discord zeigt. Verraet nicht, was im Markt passiert.
+    fn status(&self) -> Option<Status> {
+        Some(match self.screen {
+            Screen::Playing | Screen::Paused | Screen::Cheats { .. } => {
+                let done = (0..self.game.list.len())
+                    .filter(|&i| self.game.list_done(self.game.list[i]))
+                    .count();
+                let what = if self.game.tutorial_run {
+                    "Im Tutorial"
+                } else {
+                    "Kauft ein"
+                };
+                let total = self.game.list.len();
+                Status::new(what, format!("Einkaufszettel: {done} von {total}"))
             }
-        }
-    }
-
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        if let Some(r) = &self.running {
-            r.window.request_redraw();
-        }
+            Screen::End if self.game.outcome == Outcome::Won => {
+                Status::new("Einkauf geschafft", "")
+            }
+            Screen::End => Status::new("Nicht mehr rausgekommen", ""),
+            _ => Status::new("Im Menü", ""),
+        })
     }
 }
 
@@ -1104,6 +1042,12 @@ fn digit_key(code: KeyCode) -> Option<u8> {
     })
 }
 
+/// Welt-Materialien (Poster, Schilder, Monitor, Spiegel) aus shaders/world.wgsl
+const WORLD: render::WorldShaders<'static> = render::WorldShaders {
+    vert: include_bytes!(concat!(env!("OUT_DIR"), "/world.vert.spv")),
+    frag: include_bytes!(concat!(env!("OUT_DIR"), "/world.frag.spv")),
+};
+
 /// Aufloesung des Ueberwachungsmonitors (zweite Kamera)
 const MONITOR_SIZE: (u32, u32) = (160, 90);
 
@@ -1111,19 +1055,9 @@ const MONITOR_SIZE: (u32, u32) = (160, 90);
 pub const VERSION: &str = env!("KASSE0_VERSION");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = std::env::args().collect();
-    // Absturzfenster: eigener Prozess nach einem Absturz
-    if let Some(c) = crash_window::parse_args(&args) {
-        crash_window::run(&c, "KASSE 0");
-        return Ok(());
-    }
-    crash::init("kasse0", "KASSE 0", VERSION);
-    let fixed_seed = args.get(1).and_then(|s| s.parse().ok());
-    let event_loop = EventLoop::new()?;
-    event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App::new(fixed_seed);
-    event_loop.run_app(&mut app)?;
-    Ok(())
+    let fixed_seed = std::env::args().nth(1).and_then(|s| s.parse().ok());
+    let config = AppConfig::new("kasse0", "KASSE 0", VERSION);
+    mettgine::app::run(config, || Ok(App::new(fixed_seed)))
 }
 
 /// Figuren abtasten: Knochen fuer die GPU sammeln, SkinDraws anlegen.

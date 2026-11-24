@@ -75,30 +75,8 @@ pub fn half_extent(id: MeshId) -> Vec3 {
     half_extent_idx(id as usize)
 }
 
-fn read_f32(b: &[u8], off: usize) -> f32 {
-    f32::from_le_bytes(b[off..off + 4].try_into().unwrap())
-}
-
 pub fn parse(bytes: &[u8]) -> MeshData {
-    assert_eq!(&bytes[0..4], b"K0M1", "kein K0M1-Mesh");
-    let count = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
-    let min = Vec3::new(read_f32(bytes, 8), read_f32(bytes, 12), read_f32(bytes, 16));
-    let max = Vec3::new(
-        read_f32(bytes, 20),
-        read_f32(bytes, 24),
-        read_f32(bytes, 28),
-    );
-    let data = &bytes[32..32 + count * 36];
-    let mut vertices = Vec::with_capacity(count);
-    for v in data.chunks_exact(36) {
-        let f = |i: usize| read_f32(v, i * 4);
-        vertices.push(MeshVertex {
-            pos: [f(0), f(1), f(2)],
-            normal: [f(3), f(4), f(5)],
-            color: [f(6), f(7), f(8)],
-        });
-    }
-    MeshData { vertices, min, max }
+    mettgine::gpu::parse_mesh(bytes).expect("eingebautes Modell defekt")
 }
 
 /// Einheitswuerfel [-0.5, 0.5]^3 fuer dynamische Boxen (Waren, Wagen-Inhalt).

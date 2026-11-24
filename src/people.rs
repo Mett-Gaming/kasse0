@@ -35,9 +35,13 @@ pub fn anims(female: bool) -> &'static AnimSet {
     static M: OnceLock<AnimSet> = OnceLock::new();
     static F: OnceLock<AnimSet> = OnceLock::new();
     if female {
-        F.get_or_init(|| mettgine::anim::parse_anim(gen::ANIM_F_BYTES))
+        F.get_or_init(|| {
+            mettgine::anim::parse_anim(gen::ANIM_F_BYTES).expect("eingebaute Animation defekt")
+        })
     } else {
-        M.get_or_init(|| mettgine::anim::parse_anim(gen::ANIM_M_BYTES))
+        M.get_or_init(|| {
+            mettgine::anim::parse_anim(gen::ANIM_M_BYTES).expect("eingebaute Animation defekt")
+        })
     }
 }
 
@@ -45,7 +49,7 @@ pub fn anims(female: bool) -> &'static AnimSet {
 pub fn load_skins() -> Vec<SkinData> {
     gen::PEOPLE_SKIN_BYTES
         .iter()
-        .map(|b| parse_skin(b))
+        .map(|b| parse_skin(b).expect("eingebaute Figur defekt"))
         .collect()
 }
 
