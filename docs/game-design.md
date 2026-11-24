@@ -104,7 +104,15 @@ Angelehnt an die Stimmung liminaler Räume, ohne etwas daraus zu übernehmen. Al
 **Gangnummern und Plakate** (`world/gen.rs`):
 - An beiden Enden jedes Gangs hängt ein Nummernschild („Gang 1“ …).
 - Ab „unruhig“ tragen alle dieselbe Nummer, im Kollaps steht überall „Gang 0“.
-- Ab „falsch“ sind alle Plakate gleich: gleiche Farbe, gleicher Verfall, Text „Sie waren schon hier“.
+- Ab „falsch“ sind alle Plakate gleich: gleiche Farbe, gleicher Verfall, Text „Sie waren schon hier“. Ausgenommen sind die HACKEPETER-Plakate (siehe unten).
+
+**Werbung für HACKEPETER** (`world/gen/ads.rs`): Das andere Spiel im Mett-Launcher wirbt im Markt. Jedes zweite Plakat an der Westwand und das Plakat an der Südwand neben dem Eingang ist ein HACKEPETER-Plakat. Drei Entwürfe wechseln sich ab, der erste hängt vom Markt ab. Alles ist aus Flächen, Boxen und Schriftzügen gebaut, dazu ein Mettbrötchen aus Boxen mit Zwiebelstücken.
+
+| Entwurf | Normaler Markt | Gekippter Markt (verblasst, verrottet) |
+|---|---|---|
+| A Fahndungsplakat | cremefarben mit dunklem Rahmen, „GESUCHT“, „HACKEPETER“, Brötchen im Bildkasten, „Wegen Mettbrötchen-Diebstahl“, „Jetzt im Mett-Launcher“ | „GEFUNDEN“, Bildkasten schwarz, „Er ist hier“, „Gib das Brötchen zurück“ |
+| B Rennplakat | dunkelblau mit gelben und rosa Tempo-Streifen, Brötchen mit Fahrtwind, „Die Mettbrötchen-Flucht“, „1 Dieb gegen 7 Cops“ | Streifen weg, „Er rennt immer noch“, „Keiner kommt an“ |
+| C Aktionsplakat | weiß mit rotem Band „AKTION“, Brötchen mit gelbem Preisschild „0,00 €“, „Gratis im Mett-Launcher“ | „ABGELAUFEN“, „Seit immer im Angebot“, „Nicht mehr verfügbar“ |
 
 **Déjà-vu-Szene** (`game/dejavu.rs`, ab „unruhig“, alle 40–70 s minus 6 s je Stufe):
 - Die Szene besteht aus einem schräg stehenden leeren Wagen, einer umgekippten Dose, einem Warnschild und meist einer reglosen Kundin, die ins Regal starrt.

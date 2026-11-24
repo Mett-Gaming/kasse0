@@ -10,7 +10,8 @@ pub use gen::generate;
 pub use gen::REGISTER_SCALE;
 pub use gen::{
     corridor_len_for, side_of, Corridor, Station, StationKind, AISLE_NUMBERS, CORRIDOR_H,
-    CORRIDOR_HALF_W, CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_SAME, POSTER_TEXTS,
+    CORRIDOR_HALF_W, CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, HACKEPETER_TEXTS, POSTER_SAME,
+    POSTER_TEXTS,
 };
 #[cfg(test)]
 pub use gen::{COUNTER_HALF, COUNTER_TOP};

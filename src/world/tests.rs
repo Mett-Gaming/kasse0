@@ -559,3 +559,52 @@ fn places_inside_the_wing_stay_in_the_wing_after_a_rebuild() {
     assert!(b.in_wing(q), "aus dem Trakt geworfen");
     assert_eq!(b.wing.as_ref().unwrap().room_of(q), Some(1));
 }
+
+#[test]
+fn hackepeter_posters_advertise_and_turn_creepy_when_tipped() {
+    let a = crate::signs::atlas();
+    let has = |w: &World, t: &str| sign_ids(w).contains(&a.id(t));
+    let cheerful = [
+        "GESUCHT",
+        "Wegen Mettbrötchen-Diebstahl",
+        "Jetzt im Mett-Launcher",
+        "Die Mettbrötchen-Flucht",
+        "1 Dieb gegen 7 Cops",
+        "Gratis im Mett-Launcher",
+    ];
+    let creepy = [
+        "GEFUNDEN",
+        "Er ist hier",
+        "Gib das Brötchen zurück",
+        "Er rennt immer noch",
+        "Keiner kommt an",
+        "Seit immer im Angebot",
+        "Nicht mehr verfügbar",
+    ];
+    // alle drei Entwuerfe kommen vor (A: GESUCHT, B: 1 Dieb gegen 7 Cops, C: Gratis)
+    let mut seen = [false; 3];
+    for seed in 0..12u64 {
+        let n = gen(seed, false);
+        assert!(has(&n, "HACKEPETER"), "{seed}: keine Werbung");
+        assert!(
+            creepy.iter().all(|t| !has(&n, t)),
+            "{seed}: unheimlich im normalen Markt"
+        );
+        for (k, t) in ["GESUCHT", "1 Dieb gegen 7 Cops", "Gratis im Mett-Launcher"]
+            .iter()
+            .enumerate()
+        {
+            seen[k] |= has(&n, t);
+        }
+        // gekippt: noch da, aber unheimlich - auch wenn alle anderen Plakate gleich sind
+        for t in [gen(seed, true), with_wing(seed, 3)] {
+            assert!(has(&t, "HACKEPETER"));
+            assert!(creepy.iter().any(|c| has(&t, c)));
+            assert!(
+                cheerful.iter().all(|c| !has(&t, c)),
+                "{seed}: froehlich im gekippten Markt"
+            );
+        }
+    }
+    assert_eq!(seen, [true; 3], "nicht alle Entwuerfe");
+}

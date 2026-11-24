@@ -1,10 +1,13 @@
 //! Generator fuer KAUF NULL: Discounter-Grundriss mit Abteilungen und echten Waren.
 
+mod ads;
 mod corridor;
 mod decay;
 mod fixtures;
 mod wing;
 
+use ads::hackepeter_poster;
+pub use ads::HACKEPETER_TEXTS;
 pub use corridor::{
     corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
     CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
@@ -1424,18 +1427,32 @@ pub fn generate(params: &WorldParams) -> World {
         );
         poster_seed += 1.0;
     };
+    // Jedes zweite Plakat an der Westwand und das letzte an der Suedwand (neben dem Eingang)
+    // wirbt fuer HACKEPETER, das andere Spiel im Mett-Launcher (hackepeter_poster)
+    // die drei Entwuerfe wechseln sich ab (Start je Markt verschieden)
+    let mut style = seed as usize % 3;
     let mut pz = aisle_z0 + 1.5;
+    let mut k = 0;
     while pz < aisle_z1 - 1.0 {
-        poster(&mut g.b, vec3(0.012, 1.75, pz), vec3(0.004, 0.7, 0.5));
+        let (c, h) = (vec3(0.012, 1.75, pz), vec3(0.004, 0.7, 0.5));
+        if k % 2 == 0 {
+            hackepeter_poster(&mut g.b, c, h, tipped, pz, style);
+            style += 1;
+        } else {
+            poster(&mut g.b, c, h);
+        }
         pz += 7.0;
+        k += 1;
     }
     let mut px = 2.0;
     while px < door_x0 - 1.5 {
-        poster(
-            &mut g.b,
-            vec3(px, 1.9, depth - 0.012),
-            vec3(0.5, 0.7, 0.004),
-        );
+        let (c, h) = (vec3(px, 1.9, depth - 0.012), vec3(0.5, 0.7, 0.004));
+        if px + 6.0 >= door_x0 - 1.5 {
+            hackepeter_poster(&mut g.b, c, h, tipped, px, style);
+            style += 1;
+        } else {
+            poster(&mut g.b, c, h);
+        }
         px += 6.0;
     }
 
