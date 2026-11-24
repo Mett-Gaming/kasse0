@@ -553,7 +553,7 @@ impl App {
         match self.screen {
             Screen::Playing => {
                 // Kassenfenster: Mauszeiger frei, Position geht ans Spiel (game/belt_window.rs)
-                let window = self.game.belt_window_open();
+                let window = self.game.pointer_window_open();
                 if window && self.grabbed {
                     self.set_grab(false);
                 } else if !window && !self.grabbed && self.window_was_open {
@@ -881,8 +881,8 @@ impl App {
             }
             match code {
                 // Esc schliesst zuerst das Kassenfenster, sonst Pause
-                KeyCode::Escape if pressed && !repeat && self.game.belt_window_open() => {
-                    self.game.close_belt_window();
+                KeyCode::Escape if pressed && !repeat && self.game.pointer_window_open() => {
+                    self.game.close_pointer_window();
                 }
                 KeyCode::Escape | KeyCode::KeyP
                     if pressed
@@ -1062,7 +1062,7 @@ impl mettgine::app::Game for App {
                 button,
                 ..
             } => {
-                if self.screen == Screen::Playing && self.game.belt_window_open() {
+                if self.screen == Screen::Playing && self.game.pointer_window_open() {
                     // Kassenfenster: Ware anfassen
                     if *button == MouseButton::Left {
                         self.input.ui_pressed = true;

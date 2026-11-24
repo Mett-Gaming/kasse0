@@ -53,22 +53,28 @@ pub const CHEATS: &[&str] = &[
     "Seitentrakt: hinein",
     "Gestalt in der Ferne",
     "Déjà-vu-Szene",
+    "Zum Pfandautomaten",
+    "Pfand: Tüte füllen",
+    "Pfandbon 2,50 €",
 ];
 
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 7;
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 10;
 /// Direkt in den laengsten Fluchtkorridor (140 m)
-pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 6;
+pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 9;
 /// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
-pub const DIE_CHEAT: usize = CHEATS.len() - 5;
+pub const DIE_CHEAT: usize = CHEATS.len() - 8;
 /// Abgelaufenen Tomatensaft trinken: 30 s Rausch, dann kotzen (trip.rs)
-pub const TRIP_CHEAT: usize = CHEATS.len() - 4;
+pub const TRIP_CHEAT: usize = CHEATS.len() - 7;
 /// In den ersten Raum des Seitentrakts (kippt den Markt vorher, world/gen/wing.rs)
-pub const WING_CHEAT: usize = CHEATS.len() - 3;
+pub const WING_CHEAT: usize = CHEATS.len() - 6;
 /// Gestalt in der Ferne aufstellen (watcher.rs)
-pub const WATCHER_CHEAT: usize = CHEATS.len() - 2;
+pub const WATCHER_CHEAT: usize = CHEATS.len() - 5;
 /// Deja-vu-Szene vor einen stellen (dejavu.rs)
-pub const DEJAVU_CHEAT: usize = CHEATS.len() - 1;
+pub const DEJAVU_CHEAT: usize = CHEATS.len() - 4;
+
+/// Vor einen laufenden Pfandautomaten, Tuete voll, Bon
+pub const PFAND_CHEATS: usize = CHEATS.len() - 3;
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
@@ -89,8 +95,11 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         ),
         (
             "Kasse & Flucht",
-            "Direkt zur Kasse, zum Bezahlen, in den Korridor",
-            vec![6, 12, 13, 16, LONG_CORRIDOR_CHEAT],
+            "Kasse, Bezahlen, Korridor, Pfand",
+            [6, 12, 13, 16, LONG_CORRIDOR_CHEAT]
+                .into_iter()
+                .chain(PFAND_CHEATS..CHEATS.len())
+                .collect(),
         ),
         (
             "Leute",
@@ -119,7 +128,7 @@ impl Game {
         }
         self.dying = None;
         self.dialog = None;
-        self.close_belt_window();
+        self.close_pointer_window();
         self.outcome = Outcome::Caught;
         self.outcome_timer = 0.0;
         self.red = 1.0;
@@ -256,6 +265,7 @@ impl Game {
                 "Langer Korridor. Lauf!".into()
             }
             WING_CHEAT => self.debug_to_wing(),
+            i if i >= PFAND_CHEATS => self.pfand_cheat(i - PFAND_CHEATS),
             WATCHER_CHEAT => {
                 self.tip();
                 self.watcher = None;

@@ -68,6 +68,12 @@ pub enum Sfx {
     Gulp,
     /// Wuergen und Kotzen nach dem Tomatensaft-Rausch
     Vomit,
+    /// Flaschen klirren
+    Clink,
+    /// Pfandautomat zieht ein
+    Machine,
+    /// Bon wird gedruckt
+    Print,
 }
 
 /// Bis zu dieser Entfernung hoert man Geraeusche mit Ort (Meter)
@@ -534,6 +540,34 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 ((TAU * ph).sin() * 0.45 + click) * env
             })
         }
+        Sfx::Clink => gen(0.32, &mut |t| {
+            // zwei Glaeser kurz hintereinander
+            let hit = |a: f32, f: f32| {
+                let x = t - a;
+                if x < 0.0 {
+                    return 0.0;
+                }
+                let ring = (TAU * f * x).sin() + 0.5 * (TAU * f * 2.71 * x).sin();
+                ring * (-x * 26.0).exp()
+            };
+            (hit(0.0, 2900.0) + hit(0.07, 3500.0)) * 0.22 + rng.next() * (-t * 300.0).exp() * 0.1
+        }),
+        Sfx::Machine => {
+            let mut lp = 0.0f32;
+            gen(0.9, &mut |t| {
+                lp += (rng.next() - lp) * 0.1;
+                let env = (t * 12.0).min(1.0) * ((0.9 - t) * 6.0).clamp(0.0, 1.0);
+                let motor = (TAU * (90.0 + 30.0 * (t * 2.0).min(1.0)) * t)
+                    .sin()
+                    .signum()
+                    * 0.1;
+                (motor + lp * 0.5) * env
+            })
+        }
+        Sfx::Print => gen(0.7, &mut |t| {
+            let tick = if (t * 38.0).fract() < 0.35 { 1.0 } else { 0.0 };
+            rng.next() * 0.22 * tick * ((0.7 - t) * 8.0).clamp(0.0, 1.0)
+        }),
         Sfx::Vomit => {
             // Wuergen: zwei kurze Kehlstoesse, dann ein langer, gurgelnder Schwall
             const DUR: f32 = 2.2;
@@ -608,6 +642,9 @@ impl Audio {
             Sfx::Rumble,
             Sfx::Gulp,
             Sfx::Vomit,
+            Sfx::Clink,
+            Sfx::Machine,
+            Sfx::Print,
         ]
         .into_iter()
         .map(|s| (s, Sound::new(synth(s))))
@@ -739,6 +776,9 @@ mod tests {
             Sfx::Rumble,
             Sfx::Gulp,
             Sfx::Vomit,
+            Sfx::Clink,
+            Sfx::Machine,
+            Sfx::Print,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

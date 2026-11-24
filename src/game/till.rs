@@ -280,6 +280,7 @@ impl ItemData {
         match self.kind {
             PickupKind::Product { product, .. } => catalog().products[product].kg,
             PickupKind::Tomato { .. } => 0.1,
+            PickupKind::Deposit(_) => 0.05,
         }
     }
 

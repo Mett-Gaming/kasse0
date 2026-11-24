@@ -445,6 +445,7 @@ impl App {
                 self.shot_request = Some(shot(&format!("35_walk_{}", step - 69)));
                 return Some(0.12);
             }
+            75 => return Some(0.1),
             76 | 78 | 80 => {
                 // Kollaps: Loecher, verdorbene Ware, Riesenwaren, Steigung im Gang
                 self.start_game(seed, false);
@@ -497,6 +498,50 @@ impl App {
                 return Some(0.8);
             }
             83 => self.shot_request = Some(shot("39_monitor")),
+            84 => {
+                // Pfand: Automat im Seitentrakt, volle Tuete am Wagen
+                self.start_game(seed, false);
+                self.game.tutorial = None;
+                self.game.tip();
+                self.game.customers.clear();
+                self.game.employees.clear();
+                let first = game::PFAND_CHEATS;
+                self.game.cheat(first + 1);
+                self.game.cheat(first);
+                self.game.message = None;
+                self.game.glitch = 0.0;
+                let p = self.game.player.pos;
+                self.game.player.pos = p + vec3(0.9, 0.0, 0.9);
+                self.game.player.yaw = -1.15;
+                self.game.trolley.pos = p + vec3(-0.1, 0.0, 1.3);
+                self.game.trolley.yaw = 2.6;
+                return Some(1.0);
+            }
+            85 => self.shot_request = Some(shot("40_pfand_raum")),
+            86 => {
+                self.game.cheat(game::PFAND_CHEATS);
+                self.game.message = None;
+                return Some(0.3);
+            }
+            87 => {
+                self.input.interact = true;
+                return Some(0.9);
+            }
+            88 => self.shot_request = Some(shot("41_pfand_automat")),
+            89 => {
+                // Flasche am Boden vor einem
+                self.game.close_pointer_window();
+                self.game.trolley.pos = self.game.world.corral;
+                if let Some(b) = self.game.pfand.bottles.first().copied() {
+                    self.game.player.pos =
+                        self.game.world.collide(b.pos + vec3(0.0, 0.0, 1.3), 0.3);
+                    let to = b.pos - self.game.player.pos;
+                    self.game.player.yaw = to.x.atan2(-to.z);
+                    self.game.player.pitch = -0.85;
+                }
+                return Some(0.5);
+            }
+            90 => self.shot_request = Some(shot("42_pfand_flasche")),
             _ => return None,
         }
         Some(0.6)

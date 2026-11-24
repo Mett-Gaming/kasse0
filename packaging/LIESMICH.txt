@@ -101,6 +101,9 @@ nur erklärt. Es erklärt auch Kunden und Mitarbeiter. Der normale Einkauf ("Neu
 Hast du das Tutorial einmal geschafft, kannst du es in den Optionen mit
 "Tutorial spielen" jederzeit wieder starten.
 
+Pfand: Leere Flaschen kommen in die Tüte am Wagen (höchstens 5). In den
+Nebenräumen stehen Automaten: A/D dreht, E legt bei Grün ein, F druckt den Bon.
+
 Controller werden unterstützt (A springen, B ducken, X benutzen, Y Wagen, LT rennen);
 alle Tasten lassen sich unter Optionen - Steuerung umbelegen.
 Die Optionen haben drei Reiter: Anzeige, Gameplay und Steuerung (Tab wechselt).

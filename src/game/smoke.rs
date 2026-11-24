@@ -54,6 +54,7 @@ impl Game {
     /// Sind die Zifferntasten gerade fuer etwas anderes da (Antwort, PIN)?
     pub(super) fn digits_busy(&self) -> bool {
         self.dialog.is_some()
+            || self.machine_window_open()
             || self.till_paying()
             || self.till.as_ref().is_some_and(|t| t.asked.is_some())
     }

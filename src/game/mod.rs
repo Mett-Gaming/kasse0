@@ -12,6 +12,7 @@ mod draws;
 pub mod escape;
 mod highlight;
 mod monitor;
+pub mod pfand;
 mod scare_cheats;
 pub mod scare_kinds;
 mod scares;
@@ -19,7 +20,7 @@ mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
-pub use cheats::{cheat_groups, CHEATS, TUTORIAL_CHEAT};
+pub use cheats::{cheat_groups, CHEATS, PFAND_CHEATS, TUTORIAL_CHEAT};
 pub mod dejavu;
 pub mod dialog;
 pub mod escalation;
@@ -119,6 +120,8 @@ pub enum PickupKind {
     Product { product: usize, fake: bool },
     /// Tomatensaft eines Kunden
     Tomato { customer: usize },
+    /// Leergut (pfand/): keine Ware
+    Deposit(pfand::Empty),
 }
 
 /// Eine konkrete Ware (in der Hand, am Boden oder im Wagen).
@@ -233,6 +236,10 @@ pub enum Focus {
     Employee(usize),
     /// Tuer im Fluchtkorridor (Index in corridor.stations)
     Door(usize),
+    /// leere Flasche am Boden (Index in pfand.bottles)
+    Bottle(usize),
+    /// Pfandautomat (Index in wing.machines)
+    Machine(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -261,6 +268,7 @@ pub struct Game {
     pub cart: Vec<CartItem>,
     pub trolley: Trolley,
     pub held: Option<ItemData>,
+    pub pfand: pfand::Pfand,
     pub loose: Vec<Loose>,
     pub tutorial: Option<tutorial::Tutorial>,
     /// Tutorial-Modus: man kann nicht verlieren, Fehler werden nur erklaert
@@ -597,6 +605,7 @@ impl Game {
             },
             calm_till: cfg!(test),
             belt_window: None,
+            pfand: pfand::Pfand::new(seed),
             scan_timer: 0.0,
             paid: false,
             outcome: Outcome::Running,
@@ -699,6 +708,7 @@ impl Game {
         self.field_timer = 0.0;
         self.world_dirty = true;
         self.statics_dirty = true;
+        self.pfand_after_rebuild(&old);
     }
 
     /// Debug/Story: Markt kippen.
@@ -943,7 +953,7 @@ impl Game {
             return;
         }
         // Im Kassenfenster ist die Maus ein Zeiger, kein Blick
-        if self.belt_window_open() {
+        if self.pointer_window_open() {
             return;
         }
         // Am Kartenterminal zieht die Maus die Karte durch, der Blick bleibt stehen
@@ -995,6 +1005,9 @@ impl Game {
         // Umbau im Dunkeln (umbau.rs) - auch nach dem Ende sauber abschliessen
         self.update_umbau(dt);
 
+        if self.outcome != Outcome::Running || self.dying.is_some() {
+            self.close_machine();
+        }
         if self.outcome != Outcome::Running {
             self.outcome_timer += dt;
             // ein Schreck im letzten Moment (z. B. umgedreht im Korridor) klingt noch aus
@@ -1046,6 +1059,9 @@ impl Game {
         } else if self.belt_window_open() {
             // Kassenfenster: Waren mit der Maus aufs Band ziehen (belt_window.rs)
             self.update_belt_window(input);
+        } else if self.machine_window_open() {
+            // Pfandautomat (pfand/machine.rs)
+            self.update_machine(dt, input);
         } else if self.till_paying() {
             // Karte durchziehen / PIN: man steht am Terminal still
             self.update_till_pay(dt, input);

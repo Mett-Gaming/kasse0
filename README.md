@@ -79,6 +79,9 @@ Beim **allerersten Einkauf** fragt das Spiel, ob du das **Tutorial** spielen wil
 - Sortiert ist logisch nach Warengruppen. Mit steigender Eskalation verschieben sich die Abteilungen: erst tauschen Unterabteilungen (Fisch ↔ Käse), dann wandern ganze Abteilungen in fremde Einrichtungen, am Ende steht Ware wild durcheinander und **die Schilder lügen**.
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
+### Pfand
+Im gekippten Markt liegen **leere Flaschen und Dosen**. Heb sie auf (E) und leg sie in die **Tüte am Wagen** (höchstens 5, sie klirren). In den Nebenräumen hinter der Westwand stehen **Pfandautomaten**: Dreh die Flasche, bis der Strichcode oben ist (A/D), leg sie bei grüner Lampe ein (E) und drucke den Bon (F). Baut sich der Markt um, ist Ungedrucktes weg. Je schlimmer der Markt, desto weniger Automaten laufen – und desto weniger solltest du ihnen trauen.
+
 ### In der Luft
 Staub schwebt im Licht der Lampen, die Zigarette raucht wirklich, und an der Kühlung sieht man deinen Atem.
 

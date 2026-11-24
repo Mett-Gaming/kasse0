@@ -184,7 +184,12 @@ impl Game {
                 self.squeak_next = self.rng.gen_range(lo..hi);
                 self.sfx.push((sfx, vol));
                 if self.tipped {
-                    self.make_noise(radius);
+                    // Flaschen in der Tuete klirren mit
+                    let n = self.pfand.bag.len();
+                    if n > 0 {
+                        self.play(Sfx::Clink, 0.06 * n as f32);
+                    }
+                    self.make_noise(radius + n as f32 * super::pfand::CLINK_RADIUS);
                     if !self.squeak_hinted {
                         self.squeak_hinted = true;
                         self.say("Das Rad quietscht. Die Mitarbeiter hören das.", 4.0);
@@ -248,6 +253,7 @@ impl Game {
         self.play(Sfx::Rattle, 1.0);
         self.play(Sfx::Thud, 0.6);
         self.make_noise(super::senses::NOISE_RUN);
+        self.spill_bag();
         let n = spill_count(self.cart.len(), self.rng.gen_range(0.0..1.0), &mut self.rng);
         if n == 0 {
             return;
@@ -380,6 +386,7 @@ impl Game {
     pub(super) fn update_focus(&mut self) {
         self.focus = None;
         self.aim_cart = false;
+        self.pfand.aim_bag = false;
         self.at_register = false;
         if self.dialog.is_some() {
             return;
@@ -428,6 +435,22 @@ impl Game {
                 self.aim_cart = true;
             }
         }
+        // Die Tuete daran (hat Vorrang, wenn man sie anschaut)
+        if self.tipped {
+            if let Some(t) = self.bag_box().ray(eye, dir, REACH + 0.4) {
+                best = best.min(t);
+                self.focus = Some(Focus::Cart);
+                self.aim_cart = true;
+                self.pfand.aim_bag = true;
+            }
+        }
+        // Pfandautomat im Seitentrakt (auch mit etwas in der Hand)
+        if let Some((i, t)) = self.machine_hit(eye, dir, best) {
+            best = t;
+            self.focus = Some(Focus::Machine(i));
+            self.aim_cart = false;
+            self.pfand.aim_bag = false;
+        }
         // Beim Schieben reicht ein Blick nach unten in den Korb
         if self.trolley.pushing && self.player.pitch < -0.35 {
             self.aim_cart = true;
@@ -464,6 +487,14 @@ impl Game {
                         best = t;
                         self.focus = Some(Focus::Pickup(i));
                     }
+                }
+            }
+            for (i, b) in self.pfand.bottles.iter().enumerate() {
+                let bx =
+                    world::Aabb::from_center(b.pos + vec3(0.0, 0.08, 0.0), vec3(0.18, 0.12, 0.18));
+                if let Some(t) = bx.ray(eye, dir, best) {
+                    best = t;
+                    self.focus = Some(Focus::Bottle(i));
                 }
             }
             for (i, l) in self.loose.iter().enumerate() {
@@ -524,6 +555,7 @@ impl Game {
             Some(Focus::Terminal) => return self.use_terminal(),
             // E an einer Tuer im Fluchtkorridor: aufdruecken (game/corridor/obstacles.rs)
             Some(Focus::Door(i)) => return self.push_door(i),
+            Some(Focus::Machine(i)) => return self.open_machine(i),
             _ => {}
         }
         if self.held.is_some() {
@@ -537,6 +569,7 @@ impl Game {
         match self.focus {
             Some(Focus::Shelf(i)) => self.grab_shelf(i),
             Some(Focus::Pickup(i)) => self.grab_pickup(i),
+            Some(Focus::Bottle(i)) => self.grab_bottle(i),
             Some(Focus::Loose(i)) => {
                 let l = self.loose.remove(i);
                 self.held = Some(l.data);
@@ -638,7 +671,9 @@ impl Game {
             self.hint("Dein Wagen ist zu weit weg.");
             return;
         }
-        if self.cart.is_empty() {
+        // Blick auf die Tuete oder leerer Korb: Flasche herausnehmen
+        if self.pfand.aim_bag || self.cart.is_empty() {
+            self.take_from_bag();
             return;
         }
         // gezielt angewaehlte Ware, sonst die zuletzt eingelegte
@@ -697,6 +732,11 @@ impl Game {
     }
 
     fn place_in_cart(&mut self) {
+        if let Some(PickupKind::Deposit(k)) = self.held.as_ref().map(|h| h.kind) {
+            // Leergut kommt nie in den Korb, sondern in die Tuete
+            self.place_in_bag(k);
+            return;
+        }
         let Some(item) = self.held.take() else { return };
         match item.kind {
             PickupKind::Product { fake: false, .. } => {
@@ -709,7 +749,7 @@ impl Game {
                 self.glitch = self.glitch.max(0.5);
                 self.say("Das stand so nicht auf dem Zettel...", 3.0);
             }
-            PickupKind::Tomato { .. } => {}
+            PickupKind::Tomato { .. } | PickupKind::Deposit(_) => {}
         }
         self.cart.push(item);
         self.play(Sfx::Pickup, 0.35);

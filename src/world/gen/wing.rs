@@ -1,5 +1,5 @@
 //! Seitentrakt des gekippten Markts: hinter Tueroeffnungen in der Westwand liegt eine Kette
-//! identischer, leerer Raeume (niedrige Decke, eine flackernde Roehre, ein einsamer Gegenstand,
+//! identischer Raeume (niedrige Decke, eine flackernde Roehre, ein einsamer Pfandautomat,
 //! eine aufgemalte Tuer, die nirgends hinfuehrt). Ab Stufe "falsch" ein Durchgang ins Nichts,
 //! im Kollaps ein langer Flur mit einer Tuer, die sich nicht oeffnet.
 //!
@@ -23,11 +23,33 @@ const HALL_HALF: f32 = 1.5;
 /// Alle Roehren im Trakt flackern im Gleichtakt (gleicher Zufallswert)
 const TUBE_SEED: f32 = 4.2;
 
+/// Ein Pfandautomat: steht mit dem Ruecken an der Westwand des Raums, vorne ist +x.
+#[derive(Clone, Copy, Debug)]
+pub struct DepositMachine {
+    /// Mitte am Boden
+    pub pos: Vec3,
+}
+
+/// Halbe Groesse eines Automaten
+const MACHINE_HALF: Vec3 = Vec3::new(0.35, 0.95, 0.45);
+
+impl DepositMachine {
+    pub fn body(&self) -> Aabb {
+        Aabb::from_center(self.pos + vec3(0.0, MACHINE_HALF.y, 0.0), MACHINE_HALF)
+    }
+    /// Wo man davorsteht
+    pub fn front(&self) -> Vec3 {
+        self.pos + vec3(1.1, 0.0, 0.0)
+    }
+}
+
 /// Was im Trakt liegt (fuer das Spiel: Klang, Gestalt, Cheat, Umbau).
 #[derive(Clone, Debug)]
 pub struct Wing {
     /// Raeume (Innenmasse), aufsteigend in z
     pub rooms: Vec<Aabb>,
+    /// Pfandautomaten, je Raum einer an derselben Stelle
+    pub machines: Vec<DepositMachine>,
     /// Mitten der Tueroeffnungen in der Westwand des Markts (x = 0)
     pub doors: Vec<Vec3>,
     /// Endlos-Flur (innen), nur im Kollaps
@@ -77,14 +99,13 @@ pub(super) fn door_slots(aisle_z0: f32, aisle_z1: f32) -> Vec<f32> {
 }
 
 impl Gen<'_> {
-    /// Trakt bauen. Liefert ihn (mit den Tueroeffnungen fuer die Westwand des Markts) und
-    /// die Warnschilder darin.
+    /// Trakt bauen. Liefert ihn mit den Tueroeffnungen fuer die Westwand des Markts.
     pub(super) fn build_wing(
         &mut self,
         aisle_z0: f32,
         aisle_z1: f32,
         wall_color: Vec3,
-    ) -> Option<(Wing, Vec<(Vec3, f32)>)> {
+    ) -> Option<Wing> {
         let want = rooms_for(self.params.wing);
         if !self.params.tipped || want == 0 {
             return None;
@@ -103,13 +124,11 @@ impl Gen<'_> {
         let floor_c = vec3(0.47, 0.45, 0.36);
         let ceil_c = vec3(0.78, 0.76, 0.62);
         let tube_c = vec3(1.0, 0.94, 0.7);
-        // Gegenstand im Raum: fest je Markt
-        let shelf_obj = self.params.seed % 2 == 0;
         let mut rooms = Vec::new();
         let mut void = None;
         let void_room = (self.params.wing >= 3 && n >= 3).then_some(1);
         let hall_room = (self.params.wing >= 4).then_some(n - 1);
-        let mut signs = Vec::new();
+        let mut machines = Vec::new();
         for (k, &zc) in zs.iter().enumerate() {
             let (z0, z1) = (zc - ROOM_D * 0.5, zc + ROOM_D * 0.5);
             let xc = (x_e + x_w) * 0.5;
@@ -192,14 +211,9 @@ impl Gen<'_> {
             if gap.is_none() {
                 self.fake_door(vec3(x_w + 0.012, 0.0, zc + 1.6), wall_c);
             }
-            // der einsame Gegenstand, immer an derselben Stelle (im letzten Raum gedreht)
-            let last = k == n - 1 && n > 1;
-            let spot = vec3(x_w + 1.2, 0.0, zc - 2.0);
-            if shelf_obj {
-                self.empty_rack(spot, if last { FRAC_PI_2 } else { 0.0 });
-            } else {
-                signs.push((vec3(xc + 0.8, 0.0, zc - 1.2), if last { PI } else { 0.4 }));
-            }
+            // der einsame Gegenstand, immer an derselben Stelle: ein Pfandautomat
+            let spot = vec3(x_w + MACHINE_HALF.x + 0.02, 0.0, zc - 2.3);
+            machines.push(self.deposit_machine(spot));
             if Some(k) == void_room {
                 // Durchgang ins Nichts: Rahmen, dahinter tiefes Schwarz; nicht begehbar
                 let c = vec3(xw - 0.6, DOOR_H * 0.5, zc);
@@ -309,17 +323,69 @@ impl Gen<'_> {
                 PLAIN,
             );
         }
-        Some((
-            Wing {
-                rooms,
-                doors,
-                hall,
-                void,
-                hall_end,
-                x_min,
-            },
-            signs,
-        ))
+        Some(Wing {
+            rooms,
+            machines,
+            doors,
+            hall,
+            void,
+            hall_end,
+            x_min,
+        })
+    }
+
+    /// Pfandautomat aus Boxen: Korpus, Oeffnung, Anzeige, Bonschlitz, Schriftzug.
+    fn deposit_machine(&mut self, pos: Vec3) -> DepositMachine {
+        let m = DepositMachine { pos };
+        let h = MACHINE_HALF;
+        let body = vec3(0.52, 0.54, 0.5);
+        let dark = vec3(0.03, 0.03, 0.03);
+        let front = pos.x + h.x;
+        self.b.add_solid(pos + vec3(0.0, h.y, 0.0), h, body);
+        // Blende und Oeffnung
+        self.b.add(
+            vec3(front + 0.005, 1.0, pos.z + 0.18),
+            vec3(0.006, 0.2, 0.2),
+            vec3(0.2, 0.33, 0.55),
+            PLAIN,
+        );
+        self.b.add(
+            vec3(front + 0.012, 1.02, pos.z + 0.18),
+            vec3(0.006, 0.12, 0.12),
+            dark,
+            PLAIN,
+        );
+        // Anzeigerahmen, Bonschlitz, Sockel
+        self.b.add(
+            vec3(front + 0.004, 1.5, pos.z - 0.14),
+            vec3(0.006, 0.13, 0.24),
+            dark,
+            PLAIN,
+        );
+        self.b.add(
+            vec3(front + 0.006, 1.12, pos.z - 0.2),
+            vec3(0.006, 0.012, 0.07),
+            dark,
+            PLAIN,
+        );
+        self.b.add(
+            vec3(front + 0.004, 0.06, pos.z),
+            vec3(0.006, 0.06, h.z),
+            dark,
+            PLAIN,
+        );
+        self.b.label(
+            vec3(front + 0.012, 1.78, pos.z),
+            FRAC_PI_2,
+            0.4,
+            0.09,
+            "Pfand",
+            vec3(0.2, 0.33, 0.55),
+            0.0,
+            0.5,
+            0.4,
+        );
+        m
     }
 
     /// Aufgemalte Tuer (flach an der Wand, nicht zu oeffnen), Vorderseite nach +x.
@@ -344,26 +410,5 @@ impl Gen<'_> {
             vec3(0.55, 0.55, 0.5),
             PLAIN,
         );
-    }
-
-    /// Leeres Regalgestell aus Boxen (zwei Seitenteile, drei Boeden), steht im Weg.
-    fn empty_rack(&mut self, c: Vec3, yaw: f32) {
-        let f = Frame::new(c, yaw);
-        let metal = vec3(0.45, 0.46, 0.44);
-        for s in [-0.45f32, 0.45] {
-            self.b
-                .add_rot(f.pos(s, 0.0, 0.9), vec3(0.2, 0.9, 0.02), yaw, metal, PLAIN);
-        }
-        for y in [0.25f32, 0.85, 1.45] {
-            self.b.add_rot(
-                f.pos(0.0, 0.0, y),
-                vec3(0.2, 0.015, 0.45),
-                yaw,
-                metal,
-                PLAIN,
-            );
-        }
-        self.b
-            .solid_rot(f.pos(0.0, 0.0, 0.9), vec3(0.22, 0.9, 0.47), yaw);
     }
 }

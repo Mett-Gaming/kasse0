@@ -72,6 +72,7 @@ pub enum Phase {
     Controls,
     Water,
     Shopping,
+    Deposit,
     ToTill,
     Belt,
     Cashier,
@@ -79,7 +80,7 @@ pub enum Phase {
     Escape,
 }
 
-pub const PHASES: usize = 8;
+pub const PHASES: usize = 9;
 
 impl Phase {
     pub fn number(self) -> usize {
@@ -91,6 +92,7 @@ impl Phase {
             Phase::Controls => "STEUERUNG",
             Phase::Water => "WASSER",
             Phase::Shopping => "EINKAUFEN",
+            Phase::Deposit => "PFAND",
             Phase::ToTill => "ZUR KASSE",
             Phase::Belt => "BAND",
             Phase::Cashier => "KASSIERERIN",
@@ -129,6 +131,26 @@ impl Phase {
                     "mit 1/2/3. Gute Antworten bringen",
                     "Abstand, falsche machen auffällig.",
                     "Im Tutorial lassen sie dich in Ruhe.",
+                ],
+            ],
+            Phase::Deposit => &[
+                &[
+                    "Leere Flaschen geben Pfand. Heb",
+                    "eine auf (E) und leg sie in die",
+                    "Tüte am Wagen. Fünf passen rein,",
+                    "und sie klirren: Man hört dich.",
+                ],
+                &[
+                    "Schieb den Wagen zum Automaten im",
+                    "Nebenraum (Pfeile), dann E. Dreh den",
+                    "Strichcode nach oben, leg bei Grün",
+                    "ein (E), drucke den Bon (F).",
+                ],
+                &[
+                    "Im echten Spiel laufen nicht alle",
+                    "Automaten. Baut sich der Markt um,",
+                    "ist alles Ungedruckte weg.",
+                    "Keine Lust? Geh gleich zur Kasse.",
                 ],
             ],
             Phase::ToTill => &[&[
@@ -192,6 +214,12 @@ pub const BELT_HINTS: &[&str] = &[
     "Falscher Preis auf dem Bon? R reklamiert.",
     "Danach: Fragen mit 1/2/3, E am Terminal.",
 ];
+pub const MACHINE_HINTS: &[&str] = &[
+    "A/D dreht die Flasche im Schacht.",
+    "Der Strichcode muss oben liegen.",
+    "E legt ein, sobald die Lampe grün ist.",
+    "F druckt den Bon, Q schließt.",
+];
 pub const CARD_HINTS: &[&str] = &[
     "Erst E: Karte aus dem Portemonnaie nehmen.",
     "Dann die Maus gleichmäßig nach rechts.",
@@ -209,6 +237,9 @@ pub const CASH_HINTS: &[&str] = &[
 pub fn ui_hints(g: &Game) -> Option<&'static [&'static str]> {
     if !g.tutorial_run {
         return None;
+    }
+    if g.machine_window_open() {
+        return Some(MACHINE_HINTS);
     }
     if g.till_paying() {
         return Some(match g.till.as_ref().map(|t| &t.pay) {
@@ -243,7 +274,9 @@ pub fn phase(g: &Game) -> Option<Phase> {
             Phase::Cashier
         }
     } else if g.tipped {
-        if g.list_complete() {
+        if g.list_complete() && !g.pfand.printed {
+            Phase::Deposit
+        } else if g.list_complete() {
             Phase::ToTill
         } else {
             Phase::Shopping
@@ -348,6 +381,8 @@ mod tests {
         assert!(g.tutorial.is_some(), "Kippen beendet das Tutorial");
         assert_eq!(g.tutorial_phase(), Some(Phase::Shopping));
         g.fill_list_cheap();
+        assert_eq!(g.tutorial_phase(), Some(Phase::Deposit));
+        g.pfand.printed = true;
         assert_eq!(g.tutorial_phase(), Some(Phase::ToTill));
         // Ware auf dem Band: Band, alles gescannt: Bezahlen, bezahlt: Flucht
         let item = g.cart.remove(0);

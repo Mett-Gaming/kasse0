@@ -684,6 +684,31 @@ impl World {
         seen
     }
 
+    /// Mitten der erreichbaren Zellen (ohne Ecken direkt an Waenden).
+    pub fn reachable_centers(&self) -> Vec<Vec3> {
+        let nav = &self.nav;
+        let seen = self.reachable_cells();
+        let mut out = Vec::new();
+        for z in 0..nav.h {
+            for x in 0..nav.w {
+                if !seen[z * nav.w + x] {
+                    continue;
+                }
+                let c = nav.center(x, z);
+                if self.collide(c, 0.25).distance(c) < 1e-3 {
+                    out.push(c);
+                }
+            }
+        }
+        out
+    }
+
+    /// Liegt der Punkt im Kassenbereich?
+    pub fn in_checkout(&self, p: Vec3) -> bool {
+        self.in_checkout_zone(p, 0.3)
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
     fn near_reachable(&self, seen: &[bool], p: Vec3, r: f32) -> bool {
         let nav = &self.nav;
         let steps = (r / nav.cell).ceil() as i32;

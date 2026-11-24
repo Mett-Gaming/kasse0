@@ -168,7 +168,7 @@ impl App {
             self.key(KeyCode::Escape, true, false);
             return;
         }
-        let window = self.game.belt_window_open();
+        let window = self.game.pointer_window_open();
         let pin = self.typing_pin();
         for (p, d) in [(Pad::Left, 1), (Pad::Up, 2), (Pad::Right, 3)] {
             if !pin && pressed(p) {
@@ -203,7 +203,7 @@ impl App {
                 self.input.ui_down = false;
             }
             if pressed(Pad::East) {
-                self.game.close_belt_window();
+                self.game.close_pointer_window();
             }
         }
         for (a, down) in edges {
@@ -211,7 +211,13 @@ impl App {
             // der Ziffer (egal, welche Aktion darauf liegt)
             let on = |p: Pad| self.keys.of(a).contains(&Bind::Pad(p));
             let taken = (window && (on(Pad::South) || on(Pad::East)))
-                || (pin && (on(Pad::South) || on(Pad::Down)));
+                || (pin && (on(Pad::South) || on(Pad::Down)))
+                // am Automaten bewegt der Stick den Zeiger, gedreht wird mit LB/RB
+                || (window
+                    && matches!(
+                        a,
+                        Action::Left | Action::Right | Action::Forward | Action::Back
+                    ));
             if !down || !taken {
                 self.action(a, down);
             }

@@ -139,6 +139,11 @@ impl Game {
 
     /// Ware aus dem Wagen (bzw. der Hand) aufs Band legen. Regeln wie beim Auflegen per E.
     pub(super) fn window_drop(&mut self, src: DragSrc) {
+        let deposit = |h: &ItemData| matches!(h.kind, PickupKind::Deposit(_));
+        if src == DragSrc::Hand && self.held.as_ref().is_some_and(deposit) {
+            self.hint("Leergut gehört in den Pfandautomaten.");
+            return;
+        }
         let item = match src {
             DragSrc::Hand => self.held.take(),
             DragSrc::Cart(i) if i < self.cart.len() => {

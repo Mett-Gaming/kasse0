@@ -207,7 +207,7 @@ pub fn generate(params: &WorldParams) -> World {
     let wing = g.build_wing(aisle_z0, aisle_z1, wall_color);
     {
         let mut z = 0.0;
-        for d in wing.iter().flat_map(|w| w.0.doors.iter()) {
+        for d in wing.iter().flat_map(|w| w.doors.iter()) {
             let (a, b) = (d.z - 1.0, d.z + 1.0);
             g.b.wall(-WALL_T, z, -WALL_T, a, 0.0, h, wall_color);
             g.b.wall(-WALL_T, a, -WALL_T, b, 2.2, h, wall_color);
@@ -215,10 +215,6 @@ pub fn generate(params: &WorldParams) -> World {
         }
         g.b.wall(-WALL_T, z, -WALL_T, depth, 0.0, h, wall_color);
     }
-    let (wing, wing_signs) = match wing {
-        Some((w, s)) => (Some(w), s),
-        None => (None, Vec::new()),
-    };
     g.b.wall(
         width + WALL_T,
         0.0,
@@ -1430,7 +1426,6 @@ pub fn generate(params: &WorldParams) -> World {
 
     // Warnschilder "Rutschgefahr"
     let mut signs = Vec::new();
-    signs.extend(wing_signs);
     let sign_count = if tipped { 4 } else { 1 };
     for _ in 0..sign_count {
         let i = g.rng.gen_range(1..=aisle_count) as f32;

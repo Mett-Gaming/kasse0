@@ -235,6 +235,26 @@ impl Game {
                 nearest(&c).or_else(|| Some(self.world.drinks_outside()))
             }
             Phase::Shopping => nearest(&self.guide_candidates(phase)),
+            Phase::Deposit => {
+                let carrying = self
+                    .held
+                    .as_ref()
+                    .is_some_and(|h| matches!(h.kind, PickupKind::Deposit(_)));
+                let near = |list: Vec<Vec3>| {
+                    list.into_iter().min_by(|a, b| {
+                        a.distance_squared(self.player.pos)
+                            .total_cmp(&b.distance_squared(self.player.pos))
+                    })
+                };
+                // etwas dabei oder schon eingelegt: zum Automaten, sonst zur naechsten Flasche
+                if carrying || !self.pfand.bag.is_empty() || self.pfand.sums.iter().any(|s| *s > 0)
+                {
+                    let m = self.world.wing.iter().flat_map(|w| w.machines.iter());
+                    near(m.map(|m| m.front()).collect())
+                } else {
+                    near(self.pfand.bottles.iter().map(|b| b.pos).collect())
+                }
+            }
             Phase::ToTill => self.open_lane().map(|l| l.scan_point),
             // erst zur Ladentuer, im Korridor zur Ausgangstuer am Ende
             Phase::Escape => Some(match &self.world.corridor {
@@ -346,6 +366,16 @@ impl Game {
     }
 
     /// Pfeile am Boden (aus Boxen) und leuchtende benoetigte Waren.
+    /// Leuchtet diese Flasche im Tutorial?
+    pub(in crate::game) fn bottle_marked(&self, i: usize) -> bool {
+        self.tutorial_phase() == Some(Phase::Deposit)
+            && self
+                .pfand
+                .bottles
+                .get(i)
+                .is_some_and(|b| b.pos.distance(self.player.pos) < MARK_RADIUS)
+    }
+
     pub(in crate::game) fn collect_guide_draws(&self, out: &mut Vec<MeshDraw>) {
         let Some(g) = self.tutorial.as_ref().map(|t| &t.guide) else {
             return;
@@ -460,6 +490,15 @@ mod tests {
                 g.take(i);
             }
         }
+        // Pfand: erst zur Flasche, mit Flasche zum Automaten
+        assert_eq!(g.tutorial_phase(), Some(Phase::Deposit));
+        arrows_lead_to_goal(&mut g);
+        g.held = None;
+        g.pfand.bag.push(super::super::super::pfand::Empty::Can);
+        let goal = g.guide_goal().unwrap();
+        assert!(g.world.in_wing(goal), "Pfeile nicht zum Automaten");
+        arrows_lead_to_goal(&mut g);
+        g.pfand.printed = true;
         assert_eq!(g.tutorial_phase(), Some(Phase::ToTill));
         arrows_lead_to_goal(&mut g);
         assert!(g.tutorial.as_ref().unwrap().guide.marked.is_empty());

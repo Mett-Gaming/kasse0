@@ -3,6 +3,7 @@
 mod belt_window;
 pub mod keys;
 pub mod options;
+mod pfand;
 mod till;
 
 use crate::game::dialog::CART_OPENER;
@@ -251,7 +252,7 @@ pub fn draw_pause(u: &mut Ui, sel: usize, time: f32, g: &Game) {
 }
 
 fn draw_list(u: &mut Ui, g: &Game, x: f32, y: f32, panel: bool) {
-    let lines = g.list.len() as f32 + 3.0;
+    let lines = g.list.len() as f32 + 3.0 + (!g.pfand.bons.is_empty()) as u8 as f32;
     if panel {
         u.rect(
             x - 6.0,
@@ -298,6 +299,19 @@ fn draw_list(u: &mut Ui, g: &Game, x: f32, y: f32, panel: bool) {
         &format!("Im Wagen: {}", euro(g.cart_value())),
         ink,
     );
+    if !g.pfand.bons.is_empty() {
+        // die zwei hoechsten, mehr passt nicht
+        let mut bons = g.pfand.bons.clone();
+        bons.sort_unstable_by(|a, b| b.cmp(a));
+        let shown: Vec<String> = bons
+            .iter()
+            .take(2)
+            .map(|b| format!("{},{:02}", b / 100, b % 100))
+            .collect();
+        let more = if bons.len() > 2 { " ..." } else { "" };
+        let s = format!("Bons: {}{more}", shown.join(" "));
+        text(u, x, yv + 11.0, &s, ink);
+    }
 }
 
 pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
@@ -341,7 +355,17 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
             WHITE,
             1.0,
         );
-        let action = if g.focus == Some(Focus::Belt) {
+        let deposit = matches!(item.kind, PickupKind::Deposit(_));
+        let bag = format!(
+            "[E] In die Tüte ({}/{})",
+            g.pfand.bag.len(),
+            crate::game::pfand::BAG_MAX
+        );
+        let action = if matches!(g.focus, Some(Focus::Machine(_))) {
+            "[E] Pfandautomat"
+        } else if deposit && g.aim_cart {
+            &bag
+        } else if g.focus == Some(Focus::Belt) {
             "[E] Kassenfenster öffnen"
         } else if g.aim_cart {
             "[E] In den Wagen legen"
@@ -351,6 +375,19 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         u.hint_center(y + 11.0, action, YELLOW, 1.0);
     } else {
         match g.focus {
+            Some(Focus::Bottle(i)) => {
+                if let Some(b) = g.pfand.bottles.get(i) {
+                    let s = format!("[E] {}   Pfand {}", b.kind.name(), euro(b.kind.cents()));
+                    u.hint_center(y, &s, WHITE, 1.0);
+                }
+            }
+            Some(Focus::Machine(i)) => {
+                if g.machine_works(i) {
+                    u.hint_center(y, "[E] Pfandautomat", YELLOW, 1.0);
+                } else {
+                    u.hint_center(y, "AUSSER BETRIEB", RED, 1.0);
+                }
+            }
             Some(Focus::Door(_)) => {
                 u.hint_center(y, "[E] Tür aufdrücken", YELLOW, 1.0);
             }
@@ -427,7 +464,14 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                     "[E/Q] Wagen schieben"
                 };
                 u.hint_center(y, s, WHITE, 1.0);
-                if let Some(i) = g.cart_selected() {
+                let n = g.pfand.bag.len();
+                if n > 0 && (g.pfand.aim_bag || g.cart.is_empty()) {
+                    let s = format!(
+                        "[F] Flasche aus der Tüte   ({n}/{})",
+                        crate::game::pfand::BAG_MAX
+                    );
+                    u.hint_center(y + 11.0, &s, DIM, 1.0);
+                } else if let Some(i) = g.cart_selected() {
                     u.hint_center(
                         y + 11.0,
                         &format!(
@@ -449,7 +493,7 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     if let (Some(t), Some(phase)) = (&g.tutorial, g.tutorial_phase()) {
         if phase == Phase::Controls {
             draw_tutorial(u, t);
-        } else if !g.belt_window_open() && !g.till_paying() && g.dialog.is_none() {
+        } else if !g.pointer_window_open() && !g.till_paying() && g.dialog.is_none() {
             draw_tutorial_phase(u, phase, g.run_time);
         }
     }
@@ -509,6 +553,10 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
 
     // Kassenfenster (Waren mit der Maus aufs Band)
     belt_window::draw(u, g, time);
+    // Pfandautomat
+    if let Some(w) = &g.pfand.window {
+        pfand::draw(u, g, w, time);
+    }
 
     // Kassen-Minispiel: Misstrauen, Leben, Fragen, Karte, PIN, Geldboerse
     till::draw(u, g, time);
