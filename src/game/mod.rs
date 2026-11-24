@@ -20,13 +20,17 @@ pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
 pub use cheats::{cheat_groups, CHEATS, TUTORIAL_CHEAT};
+pub mod dejavu;
 pub mod dialog;
 pub mod escalation;
 mod hands;
 mod mirage;
 pub mod npc;
 pub mod till;
+pub mod trip;
 pub mod tutorial;
+pub mod umbau;
+pub mod watcher;
 
 use crate::assets::{half_extent_idx, MeshId};
 use crate::audio::Sfx;
@@ -330,6 +334,17 @@ pub struct Game {
     pub corridor_run: Option<corridor::Run>,
     pub front_caught: bool,
     /// Die nutzlose Zigarette (smoke.rs), Kippen am Boden, ausgeatmeter Rauch (Sekunden)
+    /// Tomatensaft-Rausch (trip.rs) und Pfuetzen davon
+    pub trip: trip::Trip,
+    /// Umbau im Dunkeln (umbau.rs): Licht aus, Markt baut sich um, Licht wieder an
+    pub umbau: Option<umbau::Umbau>,
+    /// Gestalt in der Ferne (watcher.rs) und Zeit bis zur naechsten
+    pub watcher: Option<watcher::Watcher>,
+    watcher_timer: f32,
+    /// Deja-vu-Szene (dejavu.rs) und Zeit bis zur naechsten
+    pub dejavu: Option<dejavu::Dejavu>,
+    dejavu_timer: f32,
+    pub puddles: Vec<trip::Puddle>,
     pub cig: smoke::Cigarette,
     pub butts: Vec<smoke::Butt>,
     pub exhale: f32,
@@ -359,6 +374,9 @@ pub struct Game {
     pub fov_deg: f32,
     pub aspect: f32,
     rng: Pcg64,
+    /// eigener Zufall fuer Gestalt und Deja-vu (watcher.rs, dejavu.rs), damit sie den Ablauf
+    /// von NPCs und Schrecken nicht verschieben
+    eerie_rng: Pcg64,
 
     player_field: Vec<u16>,
     /// Geraeusche dieses Bilds: (Ort, Hoerweite)
@@ -553,6 +571,13 @@ impl Game {
             turned_back: false,
             corridor_run: None,
             front_caught: false,
+            trip: trip::Trip::None,
+            umbau: None,
+            watcher: None,
+            watcher_timer: 40.0,
+            dejavu: None,
+            dejavu_timer: 25.0,
+            puddles: Vec::new(),
             cig: smoke::Cigarette::None,
             butts: Vec::new(),
             exhale: 0.0,
@@ -584,6 +609,7 @@ impl Game {
             fov_deg: 70.0,
             aspect: 16.0 / 9.0,
             rng,
+            eerie_rng: Pcg64::seed_from_u64(seed ^ 0xEE21_E000_D00D),
             player_field: Vec::new(),
             noises: Vec::new(),
             highlight: None,
@@ -722,6 +748,7 @@ impl Game {
         self.params.ceiling_holes = self.tier.ceiling_holes();
         self.params.rot = self.tier.rot();
         self.params.giants = self.tier.giants();
+        self.params.wing = self.tier.wing();
         self.params.decay = self.tier.level();
     }
 
@@ -764,14 +791,18 @@ impl Game {
         let new = tier_for_value(self.cart_value() as u32)
             .max(tier_for_progress(done, self.list.len()))
             .max(tier_for_time(self.tipped_time));
+        self.raise_tier(new);
+    }
+
+    /// Stufe live erhoehen: Der Markt baut sich im Dunkeln um (umbau.rs), der Text zur
+    /// neuen Stufe erscheint, wenn das Licht wieder da ist.
+    pub(super) fn raise_tier(&mut self, new: Tier) {
         if new <= self.tier {
             return;
         }
         let old = self.tier;
         self.tier = new;
         self.apply_tier_params();
-        self.rebuild_world();
-        self.glitch = 0.8;
         self.play(Sfx::Sting, 0.35);
         let extra_c = new.customers().saturating_sub(old.customers());
         let extra_e = new.employees().saturating_sub(old.employees());
@@ -784,7 +815,7 @@ impl Game {
             Tier::Collapse => "Der Markt hält das nicht mehr aus.",
             Tier::Calm => "",
         };
-        self.say(msg, 4.0);
+        self.start_umbau(Some(msg).filter(|m| !m.is_empty()));
         let (a, b) = new.announce_interval();
         self.next_announce = self.next_announce.min(self.rng.gen_range(a..b) * 0.3);
     }
@@ -845,11 +876,14 @@ impl Game {
 
     /// Parameter fuer das Live-Verbiegen der Gaenge (Shader und Spiel).
     pub fn sway_params(&self) -> Vec4 {
-        if !self.tipped {
-            return Vec4::ZERO;
-        }
-        let (lat, up) = self.tier.sway();
-        Vec4::new(lat, up, self.world.aisle_z1, self.world.aisle_x1)
+        let base = if self.tipped {
+            let (lat, up) = self.tier.sway();
+            Vec4::new(lat, up, self.world.aisle_z1, self.world.aisle_x1)
+        } else {
+            Vec4::ZERO
+        };
+        // im Tomatensaft-Rausch wogen die Gaenge zusaetzlich (trip.rs)
+        self.trip_sway(base)
     }
 
     /// Wie weit der Boden an dieser Stelle gerade verschoben ist.
@@ -859,10 +893,12 @@ impl Game {
 
     pub fn view_dir(&self) -> Vec3 {
         let p = &self.player;
+        // beim Kotzen kippt der Blick nach unten (trip.rs)
+        let pitch = (p.pitch + self.vomit_pitch()).clamp(-1.5, 1.5);
         vec3(
-            p.pitch.cos() * p.yaw.sin(),
-            p.pitch.sin(),
-            -p.pitch.cos() * p.yaw.cos(),
+            pitch.cos() * p.yaw.sin(),
+            pitch.sin(),
+            -pitch.cos() * p.yaw.cos(),
         )
     }
 
@@ -917,9 +953,10 @@ impl Game {
 
     pub fn view_proj(&self, aspect: f32) -> Mat4 {
         let view = Mat4::look_to_rh(self.eye(), self.view_dir(), Vec3::Y);
-        let fov = self.fov_deg * self.scare_zoom();
+        // Rausch (trip.rs): Sichtfeld atmet, Bild schwankt um die Blickachse
+        let fov = self.fov_deg * self.scare_zoom() * self.trip_fov();
         let proj = Mat4::perspective_rh(fov.to_radians(), aspect, 0.05, 140.0);
-        proj * view
+        Mat4::from_rotation_z(self.trip_roll()) * proj * view
     }
 
     // --------------------------------------------------------------- Update
@@ -942,6 +979,9 @@ impl Game {
                 self.announcement = None;
             }
         }
+
+        // Umbau im Dunkeln (umbau.rs) - auch nach dem Ende sauber abschliessen
+        self.update_umbau(dt);
 
         if self.outcome != Outcome::Running {
             self.outcome_timer += dt;
@@ -1016,6 +1056,7 @@ impl Game {
         // Kassen-Minispiel: Fragen, Weggehen, Misstrauen, Leben
         self.update_till(dt, input);
         self.update_cigarette(dt, cig_key);
+        self.update_trip(dt);
         input.interact = false;
         input.cart_toggle = false;
         input.take_out = false;
@@ -1032,6 +1073,8 @@ impl Game {
 
         self.update_loose(dt);
         self.update_mirages(dt);
+        self.update_watcher(dt);
+        self.update_dejavu(dt);
         self.update_spark_sounds();
         self.update_scares(dt, input);
         // Zeit im gekippten Markt kann die Stufe auch ohne Einkauf anheben

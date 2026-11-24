@@ -60,7 +60,8 @@ Jeder Zettelartikel gibt es in einer billigen und einer teuren Variante. Die bil
 - [x] Discounter-Umbau: Warenkatalog, echte Modelle für jede Ware, Abteilungen und Unterabteilungen, Verschiebung nach Eskalation, Schilder und Werbung, Kasse mit Band und Kassiererin, Fensterfront
 
 ## Der Wagen als Risiko
-- **Ware im Korb** (`Game::cart_item_local`): liegt wie hineingelegt auf dem Korbboden (0,57 m, 3 × 4 Plätze von z = −0,4 bis +0,13), hohe Waren (Flaschen, Kartons) umgekippt, jede leicht verdreht und schief; weitere Ware stapelt sich auf der darunter.
+- **Drahtkorb-Wagen** (`assets::cart_basket`, `assets::cart_chassis`): Das Wagenmodell ist nur ein Rahmen aus Stangen ohne Korb. Beim Laden fliegt der Rahmen (Rand, untere Ablage) raus, Räder, Radgabeln, Pfosten und Schiebegriff bleiben. Dazu kommen ein Gestell aus Stäben (Längsholme über den Radgabeln, Stützen vorn, Verbinder hinten zu den Pfosten) und ein Gitterkorb aus dünnen Stäben (12 Bodendrähte mit Oberkante 0,57 m, 4 Querstreben, Wände mit Stäben alle 5 cm bis 0,80 m, Mittel- und Randstrebe). Alle Wagen im Spiel haben ihn.
+- **Ware im Korb** (`Game::cart_item_local`): liegt wie hineingelegt auf dem Gitterboden (0,57 m, 3 × 4 Plätze von z = −0,4 bis +0,13), hohe Waren (Flaschen, Kartons) umgekippt, jede leicht verdreht und schief; weitere Ware stapelt sich auf der darunter.
 - **Quietschen:** Wer den Wagen schiebt, macht Lärm. Mitarbeiter im Umkreis von 14 m (20 m beim Rennen) kommen nachsehen.
 - **Zu breit:** Kollisionsradius 0,42 m gegen Durchgänge von 0,75 m. Ein Mensch (0,3 m) kommt durch, der Wagen nicht.
 - **Aufräumende Mitarbeiter:** Ein Wagen, der weiter als 6 m vom Spieler entfernt steht, wird zur Wagenbox geschoben (Durchsage). Ansprechen mit E: "Hey, das ist mein Wagen!" Danach folgt ein Dialog mit den üblichen Folgen, und er lässt den Wagen los. Danach hat er 40 s Pause vom Aufräumen.
@@ -73,6 +74,50 @@ Jeder Zettelartikel gibt es in einer billigen und einer teuren Variante. Die bil
 | unruhig | 2× länger, leicht gebogen | Durchgänge | alle 45 s (beim Wegsehen) |
 | falsch | stark gebogen (S-Kurven) | Durchgänge + 2 Wände | alle 35 s |
 | Kollaps | stark gebogen (S-Kurven) | Durchgänge + 3 Wände | alle 20 s, die Kasse wandert |
+
+**Umbau im Dunkeln** (`game/umbau.rs`): Jeder Live-Umbau, also eine neue Stufe oder das Neu-Mischen, läuft so ab:
+- 0,55 s flackert das Licht immer unruhiger (Knacken).
+- 0,4 s ist es ganz dunkel. Bei 0,65 s wird die Welt ausgetauscht (tiefes Grollen), dabei werden Spieler, NPCs und Waren mitversetzt.
+- 0,45 s flackert das Licht wieder an, erst dann erscheint der Text („Die Gänge sind länger geworden.“, „Etwas hat sich verschoben.“).
+
+Vorher sprang die Welt in einem Bild um und es wirkte wie ein Teleport. Kommt während des Ablaufs ein weiterer Umbau dazu, startet kein zweiter. Endet der Run, wird sofort fertig umgebaut. Das erste Kippen, das Bezahlen und der Korridor bauen weiter sofort um.
+
+### Unheimliches im gekippten Markt (Wiederholung, leere Räume, Gestalt)
+Angelehnt an die Stimmung liminaler Räume, ohne etwas daraus zu übernehmen. Alles aus Boxen und vorhandenen Modellen.
+
+**Seitentrakt** (`world/gen/wing.rs`, `WorldParams::wing` = `Tier::wing()`):
+- Hinter 1–2 Türöffnungen in der Westwand (2 m breit, mittig zwischen den Plakaten) liegt eine Kette **identischer** leerer Räume (6 × 7 m, Decke 2,6 m, vergilbte Wände).
+- Jeder Raum hat eine Röhre (alle flackern im Gleichtakt), eine aufgemalte Tür, die nirgends hinführt, und denselben einsamen Gegenstand: ein leeres Regalgestell oder ein Warnschild. Im letzten Raum ist er gedreht.
+- Keine Waren, keine Schilder. Die Musik ist dort fast weg, das Brummen nah (`audio::Mood::muffle`).
+
+| Stufe | Räume | Türen in den Markt | Extra |
+|---|---|---|---|
+| ruhig | 2 | 1 | – |
+| unruhig | 3 | 2 (man kommt woanders wieder heraus) | – |
+| falsch | 4 | 2 | Durchgang ins Nichts (schwarz, nicht begehbar) |
+| Kollaps | 4 | 2 | dazu ein 18 m langer Flur, Lichter werden nach hinten schwächer, am Ende eine Tür, die sich nicht öffnet |
+
+- Das Navigationsraster wächst nach links mit (Ursprung auf das Raster gerundet), Verfolger folgen einem hinein.
+- Neue Kunden, Streifen der Mitarbeiter und Fata Morganen entstehen nur im Markt.
+- Beim Umbau bleibt man im selben Raum an derselben Stelle (`World::remap_in_wing`).
+
+**Gangnummern und Plakate** (`world/gen.rs`):
+- An beiden Enden jedes Gangs hängt ein Nummernschild („Gang 1“ …).
+- Ab „unruhig“ tragen alle dieselbe Nummer, im Kollaps steht überall „Gang 0“.
+- Ab „falsch“ sind alle Plakate gleich: gleiche Farbe, gleicher Verfall, Text „Sie waren schon hier“.
+
+**Déjà-vu-Szene** (`game/dejavu.rs`, ab „unruhig“, alle 40–70 s minus 6 s je Stufe):
+- Die Szene besteht aus einem schräg stehenden leeren Wagen, einer umgekippten Dose, einem Warnschild und meist einer reglosen Kundin, die ins Regal starrt.
+- Sie wird 7–10 m vor einem im Gang aufgestellt, nur wo man gerade nicht hinsieht.
+- Hat man sie gesehen und wechselt in einen anderen Gang, steht genau dieselbe Szene wieder vor einem, die alte ist weg. Das passiert höchstens dreimal, beim dritten Mal hat sich die Kundin zu einem umgedreht.
+- Gegen den Wagen läuft man wie gegen einen echten, sonst ist alles nur Bild.
+
+**Gestalt in der Ferne** (`game/watcher.rs`, alle 30–60 s, im Kollaps 18–35 s):
+- Eine reglose, fast schwarze, leicht gestreckte Figur steht 14–25 m entfernt am Ende einer freien Sichtlinie. Im Seitentrakt steht sie am Ende des Flurs.
+- Sie verschwindet, wenn man näher als 10 m kommt, wenn man wegsieht und wieder hinschaut, oder nach 15 s. Dabei rauscht es leise.
+- Im Kollaps rückt sie nach dem Wegsehen manchmal näher (höchstens dreimal, nie unter 8 m).
+- Sie ist kein NPC und fängt nie.
+- Gestalt und Déjà-vu benutzen einen eigenen Zufall (`eerie_rng`), damit sie den Ablauf von NPCs und Schrecken nicht verschieben.
 
 Neue Wände werden nur gebaut, wenn danach Getränkeraum, Kassen, Wagenbox und alle Waren erreichbar bleiben. Röhren wechseln alle paar Sekunden zufällig ihr Flacker-Muster. Die Werbeposter (ein Maskottchen-Gesicht, prozedural im Shader) verrotten mit Stufe und Zeit: Augen werden zu Löchern, es fließen blutige Tränen, das Lächeln kippt in einen aufgerissenen Mund. Fata Morganen erscheinen alle 14–28 s in 9–20 m Entfernung und verschwinden, wenn man auf 5 m herankommt.
 
@@ -134,7 +179,7 @@ Nur im gekippten Markt nach dem Bezahlen. Seit v0.25 ein Overhaul:
 - **Rohbau** (`build.rs`): Wände je Stück plus Eckstücke, Boden, Decke, rote Röhren alle 6 m (jede dritte tot, nur lebende werfen Licht), Blutspuren, Poster (NICHT UMDREHEN …) nicht an Ecken, Spiegel am Ende, Ausgangsraum links (+x).
 - **Stationen** (`stations.rs`) alle 6–9,5 m, nie an Ecken (lange Stücke wie Decke/Wände/Engstellen mit größerem Abstand): Kisten-Slalom (Lücke 1,25–1,7 m), **Ducken** (Rohre mit Kabeln oder Rollgitter, Unterkante 1,05–1,2 m), **Springen** (Palette, Absperrung, Getränkekisten, 0,45 m), **Schwingtür** (E, 30 % klemmen: 3×), **Kipp-Regal** (kippt 5 m davor in 0,7 s quer, liegt dann als Spring-Hürde; darunter: stolpern), **Einkaufswagen** (rollt ab 12 m mit 3 m/s entgegen, Treffer: stolpern), **Engstelle** (0,8 m, 3 m lang, dort höchstens 1,3 m/s). Ereignisse: 1–3 **Gestalten** (erscheinen 9 m voraus, verschwinden bei 4 m oder nach 2,5 s mit Rauschen), je Lauf eine **Decke, die sich senkt** (6 m, auf 1,2 m: ducken) oder **Wände, die zusammenrücken** (auf 1,2 m; dazwischen kann man weiter sprinten). Stolpern: 1 s nur 40 % Tempo.
 - **Ducken und Springen** (`hands.rs`): C/Strg gehalten = ducken (Augen 45 % tiefer, 1,4 m/s, kein Rennen), Leertaste = Sprung (3,4 m/s, Schwerkraft 9,8: gut 0,6 m, 0,7 s). Leertaste ist nicht mehr „Benutzen“. **Mit geschobenem Wagen** springt man nur knapp 0,3 m (2,4 m/s), der Wagen hopst mit (`Game::cart_lift`), und beim Aufsetzen fliegt zufällig Ware heraus (`spill_count`: 25 % keine, 40 % eine, sonst 2 bis alle) und liegt dann am Boden (`spill_cart`, laut). Beim Betreten des Korridors bleibt der Wagen im Markt. Hürden sind keine Solids, sondern eigene Kästen (`Game::corridor_collide`): Duck-Hürden blockieren, wer nicht tief genug ist, Spring-Hürden, wer nicht hoch genug ist.
-- **Allein im Gang, aber verfolgt** (`front.rs`): Beim Betreten knallt die Ladentür zu, alle NPCs verschwinden. Eine unsichtbare **Front** rückt mit 2,0 m/s nach (Start 5 m hinter einem, fällt nie mehr als 8 m zurück). Man hört sie (Schritte im Abstand der Front, Herzschlag), unter 5 m roter Rand und „SCHNELLER“. Holt sie einen ein: Schreck-Gesicht, „Sie haben dich eingeholt“. Ausdauer ist im Gang unendlich. Ein Test-Läufer schafft 40 m und 140 m auf mehreren Seeds mit 3–8 m Abstand.
+- **Allein im Gang, aber verfolgt** (`front.rs`): Beim Betreten knallt die Ladentür zu, alle NPCs verschwinden. Eine unsichtbare **Front** rückt mit 2,0 m/s nach (Start 5 m hinter einem, fällt nie mehr als 8 m zurück). Man hört sie (Schritte im Abstand der Front, Herzschlag), unter 5 m roter Rand und „SCHNELLER“. Holt sie einen ein: Schreck-Gesicht, „Sie haben dich eingeholt“. Ausdauer ist im Gang unendlich (Ausdauer- und Auffälligkeits-Balken sind dort ausgeblendet). Ein Test-Läufer schafft 40 m und 140 m auf mehreren Seeds mit 3–8 m Abstand.
 - **Nicht umdrehen:** zählt relativ zur Richtung des Gangs an der Stelle (in Ecken die bessere der beiden, an der Ausgangstür auch der Blick zur Tür). Ab Kosinus 0,2 rot und „NICHT UMDREHEN“, ab −0,35 tot (Schreck wie bisher).
 - **Ende** (`ending.rs`): Im letzten Stück steht eine Gestalt 1,3 m hinter einem (die Front), sichtbar nur im **Spiegel** (zweite Kamera wie bisher). Bleibt man stehen, kriecht sie in 6 s heran. Die **Ausgangstür** seitlich vor dem Spiegel klemmt immer (3× E). Dahinter ein letzter, stummer Schreck (nur Bild, kein Ton, nicht tödlich), dann ist man draußen.
 - **Tutorial:** Die Front bleibt 3 m hinter einem, Umdrehen warnt nur, Pfeile laufen entlang der Mittellinie bis zur Ausgangstür, Erklärleiste mit den Tasten.
@@ -150,6 +195,7 @@ Direkt nach dem Bezahlen: Durchsage „ACHTUNG: Kunde 0 hat ein Gesicht. Schnapp
 | Nicht hinsehen | Sichtkegel und Sichtlinie (Strahl gegen Regale). Unbeobachtete Kunden laufen über ein Distanzfeld (Breitensuche) zum Spieler. |
 | Erwischt | Ein Kunde unter 0,8 m beendet den Run. Der Endbildschirm zeigt dann einen von zwölf gruseligen Schriftzügen (zufällig je Tod, zittert und flackert): DU BLEIBST JETZT HIER, WILLKOMMEN IM SORTIMENT, DEIN GESICHT GEHÖRT UNS, MINDESTHALTBAR BIS: JETZT … (`hud::DEATH_TITLES`). Darunter steht weiter, woran es lag. Durchsagen: 26 im Markt, 10 an der Kasse, 11 im Fluchtkorridor, alle verstörend. |
 | Nicht stören | Anrempeln: +0,15. Ihren Tomatensaft nehmen: +0,35, und dieser Kunde wird schneller. |
+| Tomatensaft-Rausch | Genommener Saft landet nicht in der Hand: Die Dose geht automatisch zum Mund (1,8 s, drei Schlucke). Dann 30 s Rausch (kommt und geht je 4 s): dichter Nebel in schnell wechselnden, voll gesättigten Regenbogenfarben, Boden und Gänge wogen stark (auch im ungekippten Markt), Sichtfeld atmet, Bild schwankt, Farben laufen auseinander, Bild pulsiert hell und blitzt alle 2,7 s kurz ins Negativ, Figuren und bewegliche Dinge schillern und leuchten, 45 leuchtende Würfel kreisen in drei Ringen um einen. Danach Kotzen (2,6 s, Blick nach unten): nach zweimal Würgen schießt ein giftgrüner Strahl aus dem Mund im Bogen auf den Boden, laut wie Rennen über 12 m. Dort bleibt eine grüne Pfütze 2 min liegen, dann ist alles normal. Erneutes Trinken im Rausch startet ihn von vorn (`src/game/trip.rs`, Cheat „Tomatensaft trinken“). |
 | Nicht auffallen | Rennen in Sichtweite: +0,15/s. Anstarren (über 1,5 s): +0,12/s. Falsche Ware: +0,25. Unbekannter Artikel an der Kasse: zählt zum Misstrauen der Kassiererin (siehe Kassen-Minispiel). |
 | Auffälligkeit 100 % | Die Kunden bewegen sich auch unter Beobachtung (langsam). |
 | Gesprächs-Schutz | Während eines Gesprächs bewegt sich kein Kunde (Pose eingefroren, nur langsames Herüberdrehen), der Geisterwagen pausiert; danach 2,5 s Schonfrist, in der niemand fangen kann. |
@@ -174,7 +220,7 @@ Die Engine kann Boxen um die Hochachse drehen. Im Shader steht der Winkel in `ce
 - **Kunden wieder gefährlich:** Kunden 4/6/8/10, davon Verfolger 2/3/5/7, Grundtempo 0,45/0,6/0,8/1,05 m/s, beim Rennen des Spielers ×2,2. Unbeobachtete normale Kunden bleiben stehen und starren herüber (bis 16 m).
 - **Durchgänge für NPCs:** Navigationsraster 0,25 m mit 0,18 m Abstand; Kollisionskörper neben Durchgängen um 3,5 cm gekürzt (Menschen passen durch, der Wagen nicht).
 - **Auffälligkeits-Meter** unten links (nur gekippt).
-- **Kasse abgesperrt** (Flatterband, beide Seiten der Gassen), bis der Zettel komplett ist (Wagen, Band, Gescanntes zählen).
+- **Kasse abgesperrt** (Flatterband, beide Seiten der Gassen), bis der Zettel komplett ist (Wagen, Band, Gescanntes zählen). Die Sperre prüft, wo Spieler und geschobener Wagen wirklich sind (Wagen 0,85 m in Blickrichtung, Radius 0,42 m): Mit Wagen passt man seitlich zwischen Gangenden und Band hindurch und gleitet am Band entlang, kommt aber nie tiefer hinein (`checkout.rs`, `keep_out_of_checkout`).
 - **Verfall in Reihenfolge:** Stufe 1 fehlende/gesprungene Fliesen und Ameisenstraßen; Stufe 2 dazu Fliesenstapel, Bodenlöcher, Ratten, Deckenlöcher mit Kabeln; Stufe 3 Blut tropft von der Decke in Lachen. Bodennahes trägt die Markierung `seed = -1` und folgt beim Verbiegen nur der Höhenwelle.
 
 ## Feinschliff v0.4
@@ -210,7 +256,7 @@ Kein eigener Menüpunkt: Beim allerersten „Neuer Einkauf“ fragt ein Fenster 
 - **Entschärft:** Erwischt werden (nur noch über den Schreck-Cheat), Kassenfehler (kein Kassen-Leben weg, Misstrauen zurück auf 0) und Umdrehen im Korridor beenden nichts. Es gibt eine Erklärung, einen roten Blitz und 4 s Schonfrist. Jumpscares bleiben. Gewinnt man, wird `tutorial_done` gespeichert (das Lob kommt nicht unter den Bon, sondern als Fenster beim Gang ins Hauptmenü): Ab dann gibt es in den Optionen (Hauptmenü und Pause) die Zeile „Tutorial spielen“ vor „Zurück“.
 
 ## Cheat-Menü (F1, `src/game/cheats.rs`, Anzeige in `src/hud.rs`)
-Zwei Ebenen. Zuerst die Kategorien mit Anzahl und einer kurzen Beschreibung der gewählten: **Spieler** (Unverwundbar, Leben auffüllen, Tutorial starten (neuer Einkauf im Tutorial-Modus, auch wenn man beim ersten Mal „Nein“ gesagt hat), Tutorial überspringen (beendet Anleitung und Entschärfung im Tutorial-Modus), Auffälligkeit 0/100 %, Sofort sterben), **Markt & Einkauf** (kippen, Zettel füllen, +10 €, zur Getränkeabteilung, umbauen, Durchsage), **Kasse & Flucht** (zur Kasse, Karten-/Barzahlung, Flucht: Korridor), **Leute** (Mitarbeiter rufen, alle entfernen, Wagen wird mitgenommen), **Schrecken** (jeder Jumpscare einzeln). Enter oder Rechts öffnet eine Kategorie, Enter löst einen Cheat aus (und es geht weiter im Spiel), Esc oder Links geht eine Ebene zurück. Jeder Cheat steht in genau einer Kategorie (Test).
+Zwei Ebenen. Zuerst die Kategorien mit Anzahl und einer kurzen Beschreibung der gewählten: **Spieler** (Unverwundbar, Leben auffüllen, Tutorial starten (neuer Einkauf im Tutorial-Modus, auch wenn man beim ersten Mal „Nein“ gesagt hat), Tutorial überspringen (beendet Anleitung und Entschärfung im Tutorial-Modus), Auffälligkeit 0/100 %, Sofort sterben), **Markt & Einkauf** (kippen, Zettel füllen, +10 €, zur Getränkeabteilung, umbauen, Durchsage, Seitentrakt: hinein, Gestalt in der Ferne, Déjà-vu-Szene), **Kasse & Flucht** (zur Kasse, Karten-/Barzahlung, Flucht: Korridor), **Leute** (Mitarbeiter rufen, alle entfernen, Wagen wird mitgenommen), **Schrecken** (jeder Jumpscare einzeln). Enter oder Rechts öffnet eine Kategorie, Enter löst einen Cheat aus (und es geht weiter im Spiel), Esc oder Links geht eine Ebene zurück. Jeder Cheat steht in genau einer Kategorie (Test).
 Aus den Spielregeln heraus, nie zwei direkt hintereinander: nach einem Schreck 25–45 s Ruhe (Start: 15 s nach dem Kippen). Kleine Schrecken sobald der Markt gekippt ist, große ab „unruhig“ (v0.8: deutlich häufiger als in v0.7). Vor angekündigten Schrecken wird es kurz still (Musik `hush`).
 - **Tod:** das leere Gesicht des Fängers kurz in Großaufnahme, dann kippt das Bild weg.
 - **Umdrehen:** Wer abgelenkt ist (Zettel offen, Blick ins Regal: 60 %/s, sonst 4 %/s), hat bald einen Verfolger 1,6 m hinter sich, der wartet, bis man sich umdreht.
@@ -240,7 +286,7 @@ Ziel: Die Figuren selbst sollen unheimlich sein, nicht nur die Scares. Erst unca
 Eigenes Modell, ausdrücklich gewünschte Ausnahme von der Regel „keine selbst gebauten Modelle“: Quelle `tools/models/kartenterminal.blend`, umgewandelt mit `tools/prepare_assets.py` (`KASSE0_ONLY=terminal`). Durchzieh-Rille mit Pfeilen nach rechts (wie im Minispiel), Display, Tastenfeld mit Sichtschutz, Chip-Schlitz, Spiralkabel, 3532 Dreiecke.
 
 ## Passende Ware leuchtet (v0.21)
-`game/highlight.rs`: Die nächste Ware im Umkreis von 1 m (in der Ebene), die zu einem offenen Zettel-Eintrag gehört, pulsiert hell und wird 6–10 % größer gezeichnet. Immer nur eine, entschieden nach Abstand zum Auge; eine andere muss 5 cm näher sein, damit es nicht flackert. Teure, verdorbene und falsch beschriftete Ausgaben zählen mit, die Hervorhebung verrät die Fälschung nicht. Auch fallen gelassene Ware leuchtet. Nicht durch Wände oder auf die andere Regalseite (Sichtlinie bis 40 cm vor die Ware). Aus mit Ware in der Hand, im Gespräch, beim Kassieren und beim Sterben.
+`game/highlight.rs`: Die nächste Ware im Umkreis von 4 m (in der Ebene), die zu einem offenen Zettel-Eintrag gehört, pulsiert kräftig hell (Leuchtkraft 1,0–2,4, zu warmem Gelbweiß gezogen) und wird 12–22 % größer gezeichnet. Immer nur eine, entschieden nach Abstand zum Auge; eine andere muss 5 cm näher sein, damit es nicht flackert. Teure, verdorbene und falsch beschriftete Ausgaben zählen mit, die Hervorhebung verrät die Fälschung nicht. Auch fallen gelassene Ware leuchtet. Nicht durch Wände oder auf die andere Regalseite (Sichtlinie bis 40 cm vor die Ware). Aus mit Ware in der Hand, im Gespräch, beim Kassieren und beim Sterben.
 
 ## Randloses Vollbild
 Das Spiel startet im randlosen Vollbild (`Settings::fullscreen`, Standard an). Das Fenster entsteht direkt so, ohne kurz klein aufzublitzen. In den Optionen abschaltbar, die Wahl wird gespeichert. Autoshot bleibt im Fenster.

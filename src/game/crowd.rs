@@ -35,7 +35,8 @@ impl Game {
                 continue;
             }
             let p = nav.center(x, z);
-            if self.world.drinks_zone.contains_xz(p) || p.z > self.world.size.z - 0.5 {
+            // nicht im Getraenkeraum, nicht draussen, nicht im Seitentrakt (der bleibt leer)
+            if self.world.drinks_zone.contains_xz(p) || p.z > self.world.size.z - 0.5 || p.x < 0.0 {
                 continue;
             }
             if (p - self.player.pos).length() >= min_dist && !self.sees(p + vec3(0.0, 1.2, 0.0)) {
@@ -945,7 +946,8 @@ impl Game {
                             let nav = &self.world.nav;
                             let x = self.rng.gen_range(0..nav.w);
                             let z = self.rng.gen_range(0..nav.h);
-                            if nav.npc_walkable(x, z) {
+                            // Streife nur im Markt, der Seitentrakt bleibt leer
+                            if nav.npc_walkable(x, z) && nav.center(x, z).x >= 0.0 {
                                 target = nav.center(x, z);
                                 break;
                             }

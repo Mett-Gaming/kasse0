@@ -18,7 +18,7 @@ cargo run --release -- 1994    # "Neuer Einkauf" nutzt beim ersten Mal Band #199
 2. Wenn du sie verlässt, ist der Markt **gekippt**. Arbeite den Einkaufszettel ab (**TAB**).
 3. Jeder Artikel existiert **billig** (schwer erreichbar, unten oder oben, tief im Gang) und **teuer** (gut sichtbar). Wie schlimm es wird, bestimmt das Schlimmste aus drei Dingen: **Warenwert** im Wagen (ab 10 €, 25 €, 50 €), **Fortschritt auf dem Zettel** (ab 40 %, 70 %, komplett) und **Zeit** im gekippten Markt (ab 3, 6, 9 Minuten). Wer billig einkauft, kommt also auch ans Ende, nur langsamer.
 4. Falsch beschriftete Ware ("Mlich", unsinnige Preise) gehört nicht auf den Zettel.
-5. Die **Kunden** kaufen ganz normal ein, solange du hinsiehst. Siehst du weg, starren sie herüber, und einige verfolgen dich: Sie schleichen sich an und holen deutlich auf, wenn du rennst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg, renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
+5. Die **Kunden** kaufen ganz normal ein, solange du hinsiehst. Siehst du weg, starren sie herüber, und einige verfolgen dich: Sie schleichen sich an und holen deutlich auf, wenn du rennst. Je teurer dein Einkauf, desto mehr Verfolger. Nimm ihnen nicht ihren Tomatensaft weg (wer es doch tut, trinkt ihn sofort: 30 Sekunden bunter Rausch mit wogendem Boden und schwebenden Würfeln, danach musst du dich laut übergeben), renn nicht, starr sie nicht an und remple sie nicht an. Wenn einer dich erreicht, ist der Run vorbei.
 6. Die **gesichtslosen Mitarbeiter** sprechen dich an. Antworte unauffällig (1, 2 oder 3). Schlechte Antworten machen dich verdächtig, und sie folgen dir.
 7. Geh zur **geöffneten Kasse** (abgesperrt, bis dein Zettel komplett ist) (beleuchtetes grünes Schild, dort sitzt die Kassiererin). Zieh den Wagen heran und drück **E am Band**: Es öffnet sich das **Kassenfenster** mit deinem Wagen links, dem Band in der Mitte und dem Bon rechts. Zieh die Waren **mit gedrückter Maustaste** aufs Band. E oder Esc schließt das Fenster. Dann beginnt das **Kassen-Minispiel** (siehe unten). Bezahlt ist, wenn die Karte durchgezogen und die PIN eingetippt ist (oder du bar und passend gezahlt hast).
 8. **Flucht:** Kaum hast du bezahlt, kommt die Durchsage *"Kunde 0 hat ein Gesicht. Schnappt ihn!"*. Der Alarm geht los, und alle Kunden und Mitarbeiter rennen auf dich zu. Du hörst ihre Schritte immer näher kommen und dein Herz immer schneller schlagen. Lauf zur Tür! Wer dich jetzt erwischt, beendet den Einkauf sofort.
@@ -80,7 +80,7 @@ Beim **allerersten Einkauf** fragt das Spiel, ob du das **Tutorial** spielen wil
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
 ### Passende Ware leuchtet
-Stehst du höchstens **1 m** neben einer Ware, die zu einem offenen Zettel-Eintrag passt, pulsiert sie hell. Es leuchtet immer nur **eine**, die nächste. Auch **falsch beschriftete** und teure Ware leuchtet: Hinsehen musst du selbst. Mit Ware in der Hand, in Gesprächen und an der Kasse leuchtet nichts.
+Stehst du höchstens **4 m** von einer Ware entfernt, die zu einem offenen Zettel-Eintrag passt, pulsiert sie kräftig gelblich hell und wirkt etwas größer. Es leuchtet immer nur **eine**, die nächste. Auch **falsch beschriftete** und teure Ware leuchtet: Hinsehen musst du selbst. Mit Ware in der Hand, in Gesprächen und an der Kasse leuchtet nichts.
 
 ### Was die NPCs wahrnehmen
 - **Verfolger** sehen dich rundum bis 22 m (ganz nah spüren sie dich immer) und hören deine Schritte: Rennen hört man 15 m weit, Gehen kaum, ein quietschender Wagen oder herunterfallende Ware locken sie an. Sie jagen die Stelle, an der sie dich zuletzt bemerkt haben. Hängst du sie ab, suchen sie dort und geben nach einer Weile auf.
@@ -109,13 +109,16 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Werbeposter verrotten immer weiter.
 - Auf den hohen Stufen biegen sich die Gänge live: Regale schwanken, der Boden hebt und senkt sich (Steigung). Bereiche wandern beim Umbau: Kühlabschnitte tauschen die Plätze, die Tiefkühlreihe steht in einem anderen Gang, die Obst-Insel rückt.
 - Kunden flüstern miteinander, wenn sie sich begegnen.
+- Hinter Türöffnungen in der linken Wand liegen leere, völlig gleiche Räume mit einer flackernden Röhre. Je schlimmer es wird, desto mehr Räume, irgendwann ein Durchgang ins Nichts und ein Flur, der zu lang ist.
+- Dinge wiederholen sich: Alle Gänge tragen plötzlich dieselbe Nummer, alle Plakate sind gleich, und eine Szene, die du schon gesehen hast, steht im nächsten Gang wieder vor dir.
+- Manchmal steht ganz hinten im Gang jemand und sieht dich an. Wenn du näher kommst oder wegsiehst, ist er weg.
 - Der Boden verfällt: erst fehlende und gesprungene Fliesen und Ameisenstraßen, dann Fliesenstapel, Löcher (Hindernisse, hineinfallen kann man nicht) und Ratten. In der Decke klaffen Löcher mit Kabeln, am Ende tropft Blut von der Decke und sammelt sich am Boden.
 - Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
 - Mitarbeiter tragen kräftig blaue Dienstkleidung und leuchten im Dunkeln leicht, damit man sie von der Kundschaft unterscheiden kann.
 - Fata Morganen tauchen auf: eine Kundin, ein Mitarbeiter, ein voller Wagen, ein Ausgangsschild. Sie wirken echt, bis du auf etwa 3 m heran bist, dann flackern sie als Hologramm auf und sind weg.
 - Jumpscares, mit kurzen Ruhepausen dazwischen. Das Licht fällt aus und danach steht jemand vor dir, ein Verfolger steht plötzlich hinter dir, die Kassiererin beugt sich ruckartig zu dir vor, dein abgestellter Wagen verschwindet und rollt von selbst heran, aus Deckenlöchern stürzen Kabel, und auf dem Überwachungsmonitor an der Kasse steht jemand hinter dir, der nicht da ist, wenn du dich umdrehst. Dazu: jemand liegt in der Kühltruhe und richtet sich auf, eine Gestalt rennt kopfüber über die Decke, alle Kunden drehen sich gleichzeitig zu dir, im Dunkeln rennt jemand von hinten heran, ein Gesicht schiebt sich zwischen die Ware, in deinem Wagen hockt jemand, die Durchsage kreischt, ein Regal kracht auf dich. Jeder Schreck klingt und wirkt anders, und dieselbe Art kommt nicht direkt wieder.
 
-Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen).
+Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umdrehen, Boden oder Decke anschauen). Bei jedem Umbau und jeder neuen Stufe flackert das Licht, geht kurz ganz aus, und wenn es wieder angeht, ist der Markt ein anderer.
 
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 

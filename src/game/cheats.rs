@@ -49,14 +49,26 @@ pub const CHEATS: &[&str] = &[
     "Tutorial starten",
     "Flucht: langer Korridor",
     "Sofort sterben",
+    "Tomatensaft trinken",
+    "Seitentrakt: hinein",
+    "Gestalt in der Ferne",
+    "Déjà-vu-Szene",
 ];
 
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 3;
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 7;
 /// Direkt in den laengsten Fluchtkorridor (140 m)
-pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 2;
+pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 6;
 /// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
-pub const DIE_CHEAT: usize = CHEATS.len() - 1;
+pub const DIE_CHEAT: usize = CHEATS.len() - 5;
+/// Abgelaufenen Tomatensaft trinken: 30 s Rausch, dann kotzen (trip.rs)
+pub const TRIP_CHEAT: usize = CHEATS.len() - 4;
+/// In den ersten Raum des Seitentrakts (kippt den Markt vorher, world/gen/wing.rs)
+pub const WING_CHEAT: usize = CHEATS.len() - 3;
+/// Gestalt in der Ferne aufstellen (watcher.rs)
+pub const WATCHER_CHEAT: usize = CHEATS.len() - 2;
+/// Deja-vu-Szene vor einen stellen (dejavu.rs)
+pub const DEJAVU_CHEAT: usize = CHEATS.len() - 1;
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
@@ -67,13 +79,13 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
     vec![
         (
             "Spieler",
-            "Unverwundbar, Leben, Tutorial, Auffälligkeit",
-            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5, DIE_CHEAT],
+            "Unverwundbar, Leben, Tutorial, Auffälligkeit, Rausch",
+            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5, DIE_CHEAT, TRIP_CHEAT],
         ),
         (
             "Markt & Einkauf",
-            "Kippen, Zettel, Warenwert, Umbau, Durchsage",
-            vec![1, 2, 3, 7, 11, 10],
+            "Kippen, Zettel, Umbau, Seitentrakt, Gestalt, Déjà-vu",
+            vec![1, 2, 3, 7, 11, 10, WING_CHEAT, WATCHER_CHEAT, DEJAVU_CHEAT],
         ),
         (
             "Kasse & Flucht",
@@ -242,6 +254,32 @@ impl Game {
             LONG_CORRIDOR_CHEAT => {
                 self.debug_jump_to_corridor(Some(crate::world::CORRIDOR_LEN_MAX));
                 "Langer Korridor. Lauf!".into()
+            }
+            WING_CHEAT => self.debug_to_wing(),
+            WATCHER_CHEAT => {
+                self.tip();
+                self.watcher = None;
+                if self.spawn_watcher() {
+                    "Da hinten steht jemand.".into()
+                } else {
+                    "Keine freie Sicht. In einen langen Gang schauen.".into()
+                }
+            }
+            DEJAVU_CHEAT => {
+                self.tip();
+                if self.tier < Tier::Uneasy {
+                    self.force_tier(Tier::Uneasy);
+                }
+                self.dejavu = None;
+                if self.place_dejavu(None) {
+                    "Dreh dich um. Und dann in einen anderen Gang.".into()
+                } else {
+                    "Kein Platz. Im Gang stehen und zur Seite schauen.".into()
+                }
+            }
+            TRIP_CHEAT => {
+                self.drink_tomato();
+                "Prost.".into()
             }
             DIE_CHEAT => {
                 self.debug_die();

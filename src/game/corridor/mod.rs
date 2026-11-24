@@ -322,7 +322,7 @@ impl Game {
     }
 
     /// Im Gang: Ausdauer unendlich.
-    pub(super) fn corridor_endless_stamina(&self) -> bool {
+    pub fn corridor_endless_stamina(&self) -> bool {
         self.corridor_entered() && self.in_corridor()
     }
 

@@ -26,6 +26,10 @@ impl Game {
         self.collect_guide_draws(out);
         // Fluchtkorridor: Tueren, Regale, Wagen, Decke, Waende (game/corridor/)
         self.collect_obstacle_draws(out);
+        // Tomatensaft: Dose am Mund, schwebende Wuerfel im Rausch, Pfuetzen
+        self.collect_trip_draws(out);
+        // Deja-vu-Szene: Wagen, Dose, Warnschild (dejavu.rs)
+        self.collect_dejavu_draws(out);
         // Zigarette vor der Kamera und weggeschnippte Kippen
         self.collect_cigarette_draws(out);
         // Fliegen um verdorbene Ware in der Naehe
@@ -77,6 +81,7 @@ impl Game {
     /// Animierte Figuren: welcher Clip, welche Zeit, wo.
     pub fn collect_people(&self, out: &mut Vec<PersonDraw>) {
         let t = self.time;
+        let first = out.len();
         let person = |variant, clip, time, pos, yaw, tint| PersonDraw {
             variant,
             clip,
@@ -214,6 +219,15 @@ impl Game {
                 look_at: None,
                 fx: Default::default(),
             });
+        }
+        // Gestalt in der Ferne und Deja-vu-Szene (watcher.rs, dejavu.rs)
+        self.collect_watcher(out);
+        self.collect_dejavu_people(out);
+        // Tomatensaft-Rausch: alle Figuren schillern in Regenbogenfarben (trip.rs)
+        if self.trip_level() > 0.0 {
+            for (k, d) in out.iter_mut().enumerate().skip(first) {
+                d.tint = self.trip_tint(d.tint, k as f32);
+            }
         }
     }
 }

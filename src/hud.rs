@@ -344,13 +344,11 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         1.0,
     );
 
-    // Auffaelligkeit (nur im gekippten Markt): Balken unten links, gruen -> gelb -> rot
-    // Leisten nur, wenn etwas fehlt bzw. anliegt
-    // An der Kasse zaehlt stattdessen das Misstrauen der Kassiererin (till::draw)
-    if g.tipped && g.suspicion > 0.01 && !g.till_active() {
+    let (show_sus, show_stamina) = meters_visible(g);
+    if show_sus {
         suspicion_meter(u, g.suspicion, time);
     }
-    if g.player.stamina < 0.999 {
+    if show_stamina {
         stamina_meter(u, g.player.stamina, g.player.exhausted);
     }
 
@@ -980,6 +978,19 @@ mod tests {
     }
 }
 
+/// Welche Balken unten links zu sehen sind: (Auffaelligkeit, Ausdauer).
+/// - Auffaelligkeit nur im gekippten Markt und nur, wenn etwas anliegt; an der Kasse zaehlt
+///   stattdessen das Misstrauen der Kassiererin (till::draw)
+/// - Ausdauer nur, wenn sie nicht voll ist
+/// - im Fluchtkorridor keiner von beiden: dort ist man allein (Auffaelligkeit zaehlt nicht
+///   mehr) und die Ausdauer ist unendlich
+pub fn meters_visible(g: &Game) -> (bool, bool) {
+    let corridor = g.corridor_entered();
+    let sus = g.tipped && g.suspicion > 0.01 && !g.till_active() && !corridor;
+    let stamina = g.player.stamina < 0.999 && !corridor && !g.corridor_endless_stamina();
+    (sus, stamina)
+}
+
 /// Auffaelligkeits-Meter: schmaler Balken unten links, blinkt bei 100 %.
 fn suspicion_meter(u: &mut Ui, s: f32, time: f32) {
     meter(u, "AUFFÄLLIG", s, time);
@@ -1136,5 +1147,27 @@ mod controls_tests {
         let mut u = Ui::default();
         draw_controls(&mut u);
         assert!(!u.verts.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod meter_tests {
+    use super::*;
+
+    #[test]
+    fn no_meters_in_the_corridor() {
+        // im gekippten Markt: auffaellig und ausser Atem -> beide Balken
+        let mut g = Game::new(64);
+        g.tip();
+        g.suspicion = 0.6;
+        g.player.stamina = 0.4;
+        assert_eq!(meters_visible(&g), (true, true));
+        // im Fluchtkorridor (Tuer zu): keiner von beiden, auch wenn die Werte gleich bleiben
+        g.debug_jump_to_corridor(None);
+        g.update(1.0 / 60.0, &mut crate::game::Input::default());
+        assert!(g.corridor_entered());
+        g.suspicion = 0.6;
+        g.player.stamina = 0.4;
+        assert_eq!(meters_visible(&g), (false, false));
     }
 }

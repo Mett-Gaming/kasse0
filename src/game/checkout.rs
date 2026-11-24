@@ -333,36 +333,49 @@ impl Game {
     }
 
     /// Haelt Spieler (und geschobenen Wagen) aus dem abgesperrten Kassenbereich heraus.
-    pub(super) fn keep_out_of_checkout(&mut self, old: Vec3, mut pos: Vec3) -> Vec3 {
+    /// Geprueft wird, wo Spieler und Wagen wirklich sind (der Wagen steht in Blickrichtung
+    /// vor einem): Laeuft man mit dem Wagen seitlich am Band entlang, passt man zwischen
+    /// Gangende und Band durch und gleitet am Band entlang, statt haengen zu bleiben.
+    pub(super) fn keep_out_of_checkout(&mut self, old: Vec3, pos: Vec3) -> Vec3 {
         let Some((x0, x1, z0, z1)) = self.checkout_barrier() else {
             return pos;
         };
-        // mit Wagen ragt man weiter nach vorn
-        let r = PLAYER_RADIUS
-            + if self.trolley.pushing {
-                super::hands::CART_OFFSET + 0.42
+        let (s, c) = self.player.yaw.sin_cos();
+        let forward = vec3(s, 0.0, -c);
+        let pushing = self.trolley.pushing;
+        // wie tief ein Kreis im gesperrten Bereich steckt (0 = draussen)
+        let depth = |p: Vec3, r: f32| {
+            let d = (p.x - (x0 - r))
+                .min(x1 + r - p.x)
+                .min(p.z - (z0 - r))
+                .min(z1 + r - p.z);
+            d.max(0.0)
+        };
+        let worst = |p: Vec3| {
+            let cart = if pushing {
+                depth(
+                    p + forward * super::hands::CART_OFFSET,
+                    super::hands::CART_PUSH_RADIUS,
+                )
             } else {
                 0.0
             };
-        let in_x = |x: f32| x > x0 - r && x < x1 + r;
-        let in_z = |z: f32| z > z0 - r && z < z1 + r;
-        let mut blocked = false;
-        if in_x(pos.x) && in_z(pos.z) && !(in_x(old.x) && in_z(old.z)) {
-            if old.z <= z0 - r {
-                pos.z = z0 - r;
-            } else if old.z >= z1 + r {
-                pos.z = z1 + r;
-            } else if old.x >= x1 + r {
-                pos.x = x1 + r;
-            } else {
-                pos.x = x0 - r;
+            depth(p, PLAYER_RADIUS).max(cart)
+        };
+        // erlaubt ist, was nicht tiefer hineinfuehrt (wer schon drin steckt, z. B. nach dem
+        // Umdrehen mit dem Wagen, kommt so wieder heraus, aber nicht weiter hinein)
+        let limit = worst(old) + 1e-4;
+        if worst(pos) <= limit {
+            return pos;
+        }
+        // am Band entlanggleiten: erst nur seitlich, dann nur vor/zurueck, sonst stehen bleiben
+        self.hint("Kasse abgesperrt: erst den ganzen Zettel einpacken.");
+        for p in [vec3(pos.x, pos.y, old.z), vec3(old.x, pos.y, pos.z)] {
+            if worst(p) <= limit {
+                return p;
             }
-            blocked = true;
         }
-        if blocked {
-            self.hint("Kasse abgesperrt: erst den ganzen Zettel einpacken.");
-        }
-        pos
+        old
     }
 
     /// Absperrband zeichnen: Pfosten und rot-weisses Flatterband auf beiden Seiten.

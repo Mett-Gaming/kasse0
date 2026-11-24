@@ -83,6 +83,8 @@ impl SignAtlas {
 fn all_texts() -> Vec<String> {
     let mut v: Vec<String> = FIXED.iter().map(|s| s.to_string()).collect();
     v.extend(crate::world::POSTER_TEXTS.iter().map(|s| s.to_string()));
+    v.extend(crate::world::AISLE_NUMBERS.iter().map(|s| s.to_string()));
+    v.push(crate::world::POSTER_SAME.to_string());
     for (a, b) in SLOGANS {
         v.push(a.into());
         v.push(b.into());
