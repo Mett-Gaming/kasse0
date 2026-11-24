@@ -44,7 +44,7 @@ struct Wishes {
     grab: Option<bool>,
     fullscreen: Option<bool>,
     title: Option<String>,
-    /// Verzoegerung und Bildrate neu einstellen
+    /// Verzoegerung, Bildrate und Schatten neu einstellen
     pace: bool,
     quit: bool,
 }
@@ -94,6 +94,8 @@ struct App {
     menu_scare: f32,
     /// Frame-Zeit-Log (KASSE0_PERF=1 oder im Autoshot): (Frames, Summe, schlechtester Frame)
     perf: Option<(u32, f32, f32)>,
+    /// dazu: Durchgang der Grafikkarte und seine kleinste Zeit (ms)
+    perf_passes: Vec<(&'static str, f32)>,
 }
 
 fn random_seed() -> u64 {
@@ -148,6 +150,7 @@ impl App {
             perf: (std::env::var_os("KASSE0_PERF").is_some()
                 || std::env::var_os("KASSE0_AUTOSHOT").is_some())
             .then_some((0, 0.0, 0.0)),
+            perf_passes: Vec::new(),
         }
     }
 
@@ -201,6 +204,10 @@ impl App {
                     render::LowLatency::Off
                 });
             stage.renderer.set_fps_limit(self.settings.fps_limit as f32);
+            let shadows = self.settings.lamp_shadows();
+            if let Err(e) = stage.renderer.set_lamp_shadows(shadows) {
+                crash::log(&format!("Lampenschatten nicht verfuegbar: {e}"));
+            }
         }
         if let Some(t) = w.title {
             stage.window.set_title(&t);
@@ -477,6 +484,13 @@ impl App {
 
     fn run_frame(&mut self, stage: &mut Stage, dt: f32) {
         if let Some((n, sum, worst)) = &mut self.perf {
+            // kleinste Zeit je Durchgang: unabhaengig davon, was die Grafikkarte sonst noch tut
+            for p in stage.renderer.stats().passes.iter().filter(|p| p.ms > 0.0) {
+                match self.perf_passes.iter_mut().find(|q| q.0 == p.name) {
+                    Some(q) => q.1 = q.1.min(p.ms),
+                    None => self.perf_passes.push((p.name, p.ms)),
+                }
+            }
             let raw = dt;
             *n += 1;
             *sum += raw;
@@ -488,6 +502,15 @@ impl App {
                     *n as f32 / *sum,
                     *worst * 1000.0,
                     self.game.world.items.len()
+                ));
+                let passes: Vec<String> = self
+                    .perf_passes
+                    .drain(..)
+                    .map(|(name, ms)| format!("{name} {ms:.2}"))
+                    .collect();
+                crash::log(&format!(
+                    "PERF Grafikkarte, kleinste ms: {}",
+                    passes.join(", ")
                 ));
                 *n = 0;
                 *sum = 0.0;
@@ -697,6 +720,9 @@ impl App {
         if self.game.take_statics_dirty() {
             let mut statics = Vec::new();
             self.game.world.item_draws(&mut statics);
+            // nach Ort geordnet: Die Engine sortiert Unsichtbares in Stuecken benachbarter
+            // Instanzen aus, die sollen auch im Markt beieinander liegen
+            statics.sort_by_key(|m| place_key(m.model.w_axis.truncate()));
             if let Err(e) = stage.renderer.upload_statics(&statics) {
                 crash::fatal(
                     "Grafikspeicher",
@@ -817,7 +843,7 @@ impl App {
             ui: &self.ui.verts,
             ..Default::default()
         };
-        self.air.instances(g.eye(), &mut self.air_draws);
+        self.air.instances(g, &mut self.air_draws);
         stage.renderer.queue_particles(&self.air_draws);
         stage.draw(&input);
     }
@@ -1166,6 +1192,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fixed_seed = std::env::args().nth(1).and_then(|s| s.parse().ok());
     let config = AppConfig::new("kasse0", "KASSE 0", VERSION);
     mettgine::app::run(config, || Ok(App::new(fixed_seed)))
+}
+
+/// Ordnet Orte so, dass Nachbarn (2 m) hintereinander stehen.
+fn place_key(p: glam::Vec3) -> (i32, i32) {
+    ((p.x / 2.0).floor() as i32, (p.z / 2.0).floor() as i32)
 }
 
 /// Figuren abtasten: Knochen fuer die GPU sammeln, SkinDraws anlegen.

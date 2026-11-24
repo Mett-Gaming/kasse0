@@ -14,6 +14,8 @@ const MAX: usize = 260;
 const MAX_DUST: usize = 140;
 /// Staub entsteht so weit um den Spieler (m)
 const DUST_RADIUS: f32 = 5.0;
+/// So hell sind Partikel im dunklen Markt (Anteil)
+const DARK: f32 = 0.22;
 /// Sekunden zwischen zwei Atemzuegen
 const BREATH: f32 = 3.2;
 
@@ -165,10 +167,19 @@ impl Air {
     }
 
     /// Zeichen-Daten, von hinten nach vorn.
-    pub fn instances(&mut self, eye: Vec3, out: &mut Vec<ParticleInst>) {
+    pub fn instances(&mut self, g: &Game, out: &mut Vec<ParticleInst>) {
+        let eye = g.eye();
         out.clear();
         out.extend_from_slice(self.dust.instances(eye));
         out.extend_from_slice(self.parts.instances(eye));
+        if g.tipped {
+            // Partikel werden nicht beleuchtet: im dunklen Markt von Hand dunkler
+            for p in out.iter_mut() {
+                for c in &mut p.color[..3] {
+                    *c *= DARK;
+                }
+            }
+        }
     }
 }
 
@@ -222,7 +233,7 @@ mod tests {
         let mut air = Air::new();
         run(&g, &mut air, 20.0);
         let mut out = Vec::new();
-        air.instances(g.eye(), &mut out);
+        air.instances(&g, &mut out);
         assert!(!out.is_empty(), "kein Staub");
         assert!(out.len() <= MAX_DUST);
         for p in &out {
@@ -246,6 +257,22 @@ mod tests {
         let other = Game::new(5);
         air.update(&other, 1.0 / 60.0);
         assert!(air.parts.is_empty());
+    }
+
+    #[test]
+    fn particles_do_not_glow_in_the_dark_market() {
+        let mut g = Game::new(4);
+        let mut air = Air::new();
+        g.exhale = 2.2;
+        air.update(&g, 1.0 / 60.0);
+        let brightest = |air: &mut Air, g: &Game| {
+            let mut out = Vec::new();
+            air.instances(g, &mut out);
+            out.iter().map(|p| p.color[0]).fold(0.0, f32::max)
+        };
+        let bright = brightest(&mut air, &g);
+        g.tipped = true;
+        assert!(brightest(&mut air, &g) < bright * 0.3);
     }
 
     #[test]

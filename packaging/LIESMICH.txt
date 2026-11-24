@@ -104,6 +104,7 @@ Hast du das Tutorial einmal geschafft, kannst du es in den Optionen mit
 Controller werden unterstützt (A springen, B ducken, X benutzen, Y Wagen, LT rennen);
 alle Tasten lassen sich unter Optionen - Steuerung umbelegen.
 Die Optionen haben drei Reiter: Anzeige, Gameplay und Steuerung (Tab wechselt).
+Ruckelt es, stell unter Optionen - Anzeige die Schatten auf Niedrig oder Aus.
 Das Spiel startet im randlosen Vollbild; in den Optionen lässt es sich abschalten.
 Jumpscares lassen sich in den Optionen nicht abschalten. Probier es ruhig.
 

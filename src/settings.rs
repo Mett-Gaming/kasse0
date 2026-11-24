@@ -14,6 +14,8 @@ pub struct Settings {
     pub music: f32,
     pub vhs: f32,
     pub fov: f32,
+    /// Lampenschatten: 0 aus, 1 niedrig, 2 hoch
+    pub shadows: u32,
     pub fullscreen: bool,
     /// Bilder pro Sekunde hoechstens, 0 = unbegrenzt (einer aus FPS_LIMITS)
     pub fps_limit: u32,
@@ -35,6 +37,7 @@ impl Default for Settings {
             music: 1.0,
             vhs: 1.0,
             fov: 70.0,
+            shadows: 2,
             fullscreen: true,
             fps_limit: 0,
             low_latency: true,
@@ -62,6 +65,7 @@ impl Settings {
             music: kv.f32("music", d.music, 0.0, 1.0),
             vhs: kv.f32("vhs", d.vhs, 0.0, 1.5),
             fov: kv.f32("fov", d.fov, 55.0, 100.0),
+            shadows: kv.u32("shadows", d.shadows, 0, 2),
             fullscreen: kv.str("fullscreen") != Some("false"),
             fps_limit: Some(kv.u32("fps_limit", d.fps_limit, 0, 1000))
                 .filter(|v| FPS_LIMITS.contains(v))
@@ -82,12 +86,32 @@ impl Settings {
         kv.set("music", self.music);
         kv.set("vhs", self.vhs);
         kv.set("fov", self.fov);
+        kv.set("shadows", self.shadows);
         kv.set("fullscreen", self.fullscreen);
         kv.set("fps_limit", self.fps_limit);
         kv.set("low_latency", self.low_latency);
         kv.set("tutorial_asked", self.tutorial_asked);
         kv.set("tutorial_done", self.tutorial_done);
         kv
+    }
+
+    /// Lampenschatten fuer die Engine.
+    pub fn lamp_shadows(&self) -> mettgine::render::LampShadows {
+        let off = mettgine::render::LampShadows::default();
+        match self.shadows {
+            0 => off,
+            1 => mettgine::render::LampShadows {
+                count: 4,
+                resolution: 384,
+                ..off
+            },
+            _ => mettgine::render::LampShadows {
+                count: 10,
+                resolution: 512,
+                contact: 0.6,
+                ..off
+            },
+        }
     }
 
     /// Zahl hinter einer Zeile mit Schieberegler.
@@ -137,6 +161,7 @@ impl Settings {
                 };
                 self.set_number(row, self.number(row) + step * dir as f32);
             }
+            Row::Shadows => self.shadows = (self.shadows as i32 + dir).rem_euclid(3) as u32,
             Row::Fullscreen => self.fullscreen = !self.fullscreen,
             Row::FpsLimit => {
                 let n = FPS_LIMITS.len() as i32;
@@ -204,6 +229,7 @@ mod tests {
             music: 0.4,
             vhs: 0.5,
             fov: 80.0,
+            shadows: 1,
             fullscreen: true,
             fps_limit: 144,
             low_latency: false,
