@@ -826,7 +826,7 @@ fn tomato_juice_is_drunk_then_trip_then_vomit() {
     g.customers.clear();
     g.employees.clear();
     let dt = 1.0 / 60.0;
-    let mut run = |g: &mut Game, secs: f32| {
+    let run = |g: &mut Game, secs: f32| {
         for _ in 0..(secs / dt) as usize {
             g.update(dt, &mut Input::default());
         }
