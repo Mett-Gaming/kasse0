@@ -1573,8 +1573,10 @@ fn customers_freeze_during_dialog() {
     g.customers[c].stalker = true;
     let start = g.customers[c].pos;
     let anim = g.customers[c].gait.t;
+    // solange die Frage offen ist (das Gespraech ist seit dem Overhaul kuerzer: danach laufen
+    // die Kunden wieder, deshalb nur bis zur Antwort)
     for _ in 0..(9 * 60) {
-        if g.dialog.is_none() {
+        if g.dialog.as_ref().is_none_or(|d| d.reply.is_some()) {
             break;
         }
         g.update(1.0 / 60.0, &mut Input::default());
@@ -2337,4 +2339,226 @@ fn walking_into_a_wet_floor_sign_knocks_it_over_loudly() {
             assert!(g.suspicion < 0.01, "Auffaelligkeit im normalen Markt");
         }
     }
+}
+
+/// Gekippter Markt ohne Kunden, unverwundbar, mit Mitarbeitern (fuer Gang-Sperren).
+fn closure_game(seed: u64) -> Game {
+    let mut g = Game::new(seed);
+    g.tip();
+    g.customers.clear();
+    g.god = true;
+    g.scare_cd = 1e6;
+    g
+}
+
+#[test]
+fn closures_only_in_the_tipped_market_and_never_in_the_tutorial() {
+    let mut g = Game::new(3);
+    g.closure_timer = 0.0;
+    step(&mut g, 2.0, Input::default());
+    assert!(g.closure.is_none(), "Sperre im normalen Markt");
+    let mut t = Game::new_tutorial(3);
+    t.tip();
+    t.closure_timer = 0.0;
+    step(&mut t, 2.0, Input::default());
+    assert!(t.closure.is_none(), "Sperre im Tutorial");
+}
+
+#[test]
+fn a_mettarbeiter_closes_an_aisle_that_blocks_player_and_cart_then_opens_it() {
+    use super::closures::Phase;
+    let mut done = false;
+    for seed in 0..12u64 {
+        let mut g = closure_game(seed);
+        g.player.pos = g.world.spawn;
+        g.closure_timer = 0.0;
+        // hingehen und aufbauen
+        for _ in 0..(40 * 30) {
+            g.update(1.0 / 30.0, &mut Input::default());
+            if g.closure.as_ref().is_some_and(|c| c.taped()) {
+                break;
+            }
+            g.dialog = None;
+        }
+        let Some(c) = g.closure.clone().filter(|c| c.taped()) else {
+            continue;
+        };
+        // Wache steht am Gangende
+        let guard = g.employees[c.guard.unwrap()].pos;
+        let near = c.gate.ends.iter().any(|e| (guard - *e).length() < 1.5);
+        assert!(near, "Wache nicht am Band");
+        // NPCs kommen nicht durch: Zelle am Band gesperrt
+        let nav = &g.world.nav;
+        let (x, z) = nav.cell_of(c.gate.ends[0]).unwrap();
+        assert!(!nav.npc_walkable(x, z), "NPC-Zelle frei");
+        // Spieler mit Wagen laeuft von Norden auf das Band zu: kommt nicht durch
+        let end = c.gate.ends[0];
+        for e in g.employees.iter_mut() {
+            e.ignore = 1e6;
+        }
+        g.player.pos = g.world.collide(end - vec3(0.0, 0.0, 2.2), 0.3);
+        g.player.yaw = std::f32::consts::PI;
+        g.player.pitch = 0.0;
+        g.trolley.pushing = true;
+        g.trolley.yaw = g.player.yaw;
+        g.trolley.pos = g.player.pos + vec3(0.0, 0.0, hands::CART_OFFSET);
+        step(
+            &mut g,
+            2.0,
+            Input {
+                forward: true,
+                ..Default::default()
+            },
+        );
+        if g.closure.as_ref().is_none_or(|c| !c.taped()) {
+            continue;
+        }
+        let cart_front = g.player.pos.z + hands::CART_OFFSET + hands::CART_PUSH_RADIUS;
+        assert!(
+            cart_front < end.z + 0.1,
+            "Wagen durch das Band: {cart_front} / {}",
+            end.z
+        );
+        // nach Ablauf: abgebaut, Zellen wieder frei
+        g.trolley.pushing = false;
+        let life = c.life;
+        if let Some(c) = &mut g.closure {
+            c.phase = Phase::Active(life - 0.1);
+        }
+        step(&mut g, 3.0, Input::default());
+        assert!(g.closure.is_none(), "nicht abgebaut");
+        let nav = &g.world.nav;
+        assert!(
+            nav.npc_walkable(x, z) || !nav.is_walkable(x, z),
+            "Zelle bleibt gesperrt"
+        );
+        done = true;
+        break;
+    }
+    assert!(done, "nie eine Sperre aufgebaut");
+}
+
+#[test]
+fn never_closes_the_players_aisle_and_later_the_one_you_need() {
+    let mut g = closure_game(9);
+    for gate in g.world.aisle_gates.clone() {
+        g.player.pos = (gate.ends[0] + gate.ends[1]) * 0.5;
+        for _ in 0..20 {
+            let picked = g.pick_closure_gate(false).unwrap();
+            assert_ne!(picked.aisle, gate.aisle, "Gang des Spielers gesperrt");
+        }
+    }
+    // ab "falsch": der Gang mit der naechsten fehlenden Ware
+    g.force_tier(Tier::Wrong);
+    g.player.pos = g.world.spawn;
+    let cat = catalog();
+    let picked = g.pick_closure_gate(false).unwrap();
+    let needed_there = g.world.items.iter().any(|it| {
+        !it.taken
+            && !it.fake
+            && cat.products[it.product as usize]
+                .list
+                .is_some_and(|l| g.list.contains(&l) && !g.list_done(l))
+            && Game::in_gate(&picked, it.pos, 0.8)
+    });
+    assert!(needed_there, "falscher Gang gesperrt");
+}
+
+#[test]
+fn answers_have_consequences_for_the_aisles() {
+    let mut g = closure_game(8);
+    while g.employees.len() < 2 {
+        g.spawn_employees(1);
+    }
+    g.player.pos = g.world.spawn;
+    g.employees[0].pos = g.world.collide(g.player.pos + vec3(0.0, 0.0, -1.3), 0.25);
+    g.open_dialog(0, 0, false);
+    let bad = g
+        .dialog
+        .as_ref()
+        .unwrap()
+        .order
+        .iter()
+        .position(|&a| a == 2)
+        .unwrap();
+    g.update(
+        1.0 / 60.0,
+        &mut Input {
+            choice: Some(bad),
+            ..Default::default()
+        },
+    );
+    step(&mut g, 1.5, Input::default());
+    let c = g
+        .closure
+        .as_ref()
+        .expect("schlechte Antwort sperrt keinen Gang");
+    assert_ne!(
+        c.guard,
+        Some(0),
+        "der Fragende sperrt selbst statt zu folgen"
+    );
+    assert!(g.employees[0].follow > 0.0);
+    // gute Antwort: Gang wird gleich wieder frei
+    g.dialog = None;
+    g.employees[1].state = EmpState::Patrol;
+    let life = g.closure.as_ref().unwrap().life;
+    if let Some(c) = &mut g.closure {
+        c.phase = super::closures::Phase::Active(1.0);
+    }
+    g.open_dialog(1, 0, false);
+    let good = g
+        .dialog
+        .as_ref()
+        .unwrap()
+        .order
+        .iter()
+        .position(|&a| a == 0)
+        .unwrap();
+    g.update(
+        1.0 / 60.0,
+        &mut Input {
+            choice: Some(good),
+            ..Default::default()
+        },
+    );
+    step(&mut g, 1.2, Input::default());
+    let now = g.closure.as_ref().map_or(0.0, |c| c.life);
+    assert!(now < life, "gute Antwort oeffnet nicht");
+}
+
+#[test]
+fn employees_come_to_you_only_about_seven_times_in_ten() {
+    let mut g = closure_game(4);
+    g.employees.truncate(1);
+    g.closure_timer = 1e6;
+    let (mut came, n) = (0, 300);
+    for _ in 0..n {
+        g.dialog = None;
+        let p = g.player.pos;
+        let e = &mut g.employees[0];
+        e.pos = g.world.collide(p + vec3(0.0, 0.0, -2.0), 0.25);
+        e.ignore = 0.0;
+        e.follow = 0.0;
+        e.approach_rolled = false;
+        e.state = EmpState::Patrol;
+        e.brain.sees_player = true;
+        g.update(1.0 / 60.0, &mut Input::default());
+        if g.employees[0].ignore <= 0.0 {
+            came += 1;
+        }
+    }
+    let share = came as f32 / n as f32;
+    assert!((0.6..=0.8).contains(&share), "kommt in {share} der Faelle");
+    // nach einer schlechten Antwort (follow) immer
+    let e = &mut g.employees[0];
+    e.follow = 10.0;
+    e.ignore = 0.0;
+    e.approach_rolled = false;
+    g.update(1.0 / 60.0, &mut Input::default());
+    assert!(
+        g.employees[0].ignore <= 0.0,
+        "folgt trotz schlechter Antwort nicht"
+    );
+    assert_eq!(super::dialog::ANSWER_TIME, 6.0);
 }

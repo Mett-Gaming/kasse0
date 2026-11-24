@@ -10,6 +10,7 @@ mod audio;
 mod autoshot;
 mod catalog;
 mod controls;
+mod decal_text;
 // Engine-Teile aus Mettgine unter den gewohnten Namen
 use mettgine::app::{AppConfig, Stage};
 use mettgine::presence::Status;

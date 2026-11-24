@@ -5,7 +5,7 @@
 //! 0 "VORSICHT / Frisch / gewischt", 1 "VORSICHT / Nicht / hinsehen", 2 "LAUF / Frisch /
 //! geblutet" (rot).
 
-use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
+use crate::decal_text::{raster, runs};
 use glam::{vec3, Vec3};
 use mettgine::gpu::MeshVertex;
 
@@ -65,43 +65,12 @@ pub fn bitmap(variant: usize) -> Vec<bool> {
     // Text: grosse Zeile, zwei kleine Zeilen, je auf die Breite eingepasst
     let [big, a, b] = TEXTS[variant.min(VARIANTS - 1)];
     let mut text = |s: &str, y_top: f32, h: f32| {
-        raster(s, y_top, h, &mut |x, y| set(x, y));
+        raster(s, W, y_top, h, &mut |x, y| set(x, y));
     };
     text(big, 33.0, 15.0);
     text(a, 54.0, 12.0);
     text(b, 68.0, 12.0);
     px
-}
-
-/// Schriftzug `s` zentriert in die Zeile ab `y_top` (Hoehe `h` Pixel) rastern.
-fn raster(s: &str, y_top: f32, h: f32, set: &mut dyn FnMut(i32, i32)) {
-    let font = FontRef::try_from_slice(crate::signs::FONT).expect("Archivo Black kaputt");
-    let width = |px: f32| {
-        let sf = font.as_scaled(PxScale::from(px));
-        s.chars().map(|c| sf.h_advance(sf.glyph_id(c))).sum::<f32>()
-    };
-    // Versalhoehe ~ 0,72 der Schriftgroesse; notfalls kleiner, damit es in die Breite passt
-    let mut size = h / 0.72;
-    let max_w = W as f32 - 2.0;
-    if width(size) > max_w {
-        size *= max_w / width(size);
-    }
-    let sf = font.as_scaled(PxScale::from(size));
-    let mut x = (W as f32 - width(size)) * 0.5;
-    let baseline = y_top + sf.ascent() * 0.72;
-    for c in s.chars() {
-        let gid = sf.glyph_id(c);
-        let g = gid.with_scale_and_position(PxScale::from(size), point(x, baseline));
-        if let Some(og) = font.outline_glyph(g) {
-            let bb = og.px_bounds();
-            og.draw(|gx, gy, cov| {
-                if cov > 0.5 {
-                    set(bb.min.x as i32 + gx as i32, bb.min.y as i32 + gy as i32);
-                }
-            });
-        }
-        x += sf.h_advance(gid);
-    }
 }
 
 /// Dreiecke der Aufschrift fuer beide Schildseiten (Modellkoordinaten des Schilds).
@@ -121,37 +90,26 @@ pub fn decal(variant: usize) -> Vec<MeshVertex> {
             let z = Z0 - SLOPE * (y - Y0);
             vec3(u * side, y, z * side) + normal * LIFT
         };
-        for row in 0..H {
-            let mut x = 0;
-            while x < W {
-                if !px[row * W + x] {
-                    x += 1;
-                    continue;
-                }
-                let start = x;
-                while x < W && px[row * W + x] {
-                    x += 1;
-                }
-                // Streifen von Pixel `start` bis `x` in Zeile `row`
-                let (u0, u1) = (
-                    (start as f32 - W as f32 * 0.5) * PIX,
-                    (x as f32 - W as f32 * 0.5) * PIX,
-                );
-                let (y0, y1) = (TOP - (row + 1) as f32 * PIX, TOP - row as f32 * PIX);
-                let quad = [
-                    at(u0, y0),
-                    at(u1, y0),
-                    at(u1, y1),
-                    at(u0, y0),
-                    at(u1, y1),
-                    at(u0, y1),
-                ];
-                out.extend(quad.iter().map(|p: &Vec3| MeshVertex {
-                    pos: p.to_array(),
-                    normal: normal.to_array(),
-                    color: ink.to_array(),
-                }));
-            }
+        // Streifen von Pixel `start` bis `x` in Zeile `row`
+        for (row, start, x) in runs(&px, W, H) {
+            let (u0, u1) = (
+                (start as f32 - W as f32 * 0.5) * PIX,
+                (x as f32 - W as f32 * 0.5) * PIX,
+            );
+            let (y0, y1) = (TOP - (row + 1) as f32 * PIX, TOP - row as f32 * PIX);
+            let quad = [
+                at(u0, y0),
+                at(u1, y0),
+                at(u1, y1),
+                at(u0, y0),
+                at(u1, y1),
+                at(u0, y1),
+            ];
+            out.extend(quad.iter().map(|p: &Vec3| MeshVertex {
+                pos: p.to_array(),
+                normal: normal.to_array(),
+                color: ink.to_array(),
+            }));
         }
     }
     out
