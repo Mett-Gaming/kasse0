@@ -867,6 +867,7 @@ impl mettgine::app::Game for App {
             second_camera: Some(MONITOR_SIZE),
             smooth: false,
             last_wins: false,
+            world: WORLD,
             ..render::Config::new(&meshes, &skins, (&font, 128, 128))
         };
         render::Renderer::new(window, &config)
@@ -1040,6 +1041,12 @@ fn digit_key(code: KeyCode) -> Option<u8> {
         _ => return None,
     })
 }
+
+/// Welt-Materialien (Poster, Schilder, Monitor, Spiegel) aus shaders/world.wgsl
+const WORLD: render::WorldShaders<'static> = render::WorldShaders {
+    vert: include_bytes!(concat!(env!("OUT_DIR"), "/world.vert.spv")),
+    frag: include_bytes!(concat!(env!("OUT_DIR"), "/world.frag.spv")),
+};
 
 /// Aufloesung des Ueberwachungsmonitors (zweite Kamera)
 const MONITOR_SIZE: (u32, u32) = (160, 90);

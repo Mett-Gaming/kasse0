@@ -1088,6 +1088,7 @@ dependencies = [
  "bytemuck",
  "glam 0.29.3",
  "mettgine",
+ "naga",
  "rand",
  "rand_pcg",
  "rodio",
@@ -1237,7 +1238,7 @@ dependencies = [
 
 [[package]]
 name = "mettgine"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "ab_glyph",
  "ash",

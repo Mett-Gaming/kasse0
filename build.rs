@@ -1,9 +1,10 @@
 //! Bettet Waren und Figuren ein, setzt die Version (Git-Tag) und das Windows-Manifest.
-//! Die Shader baut Mettgine selbst (mettgine/build.rs).
+//! Die Welt-Materialien liegen in shaders/, alle anderen Shader baut Mettgine selbst.
 
 use std::{env, fs, path::PathBuf};
 
 include!("mettgine/game_build.rs");
+include!("mettgine/game_shaders.rs");
 
 /// Erzeugt OUT_DIR/products_gen.rs: Katalog-JSON + alle Waren-Modelle eingebettet.
 fn gen_products(out: &std::path::Path) {
@@ -81,6 +82,7 @@ fn gen_people(out: &std::path::Path) {
 
 fn main() {
     mettgine_game("KASSE0_VERSION");
+    mettgine_shader("shaders/world.wgsl", &["shaders", "mettgine/shaders"]);
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     gen_products(&out);
     gen_people(&out);
