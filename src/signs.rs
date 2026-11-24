@@ -86,6 +86,11 @@ fn all_texts() -> Vec<String> {
     v.extend(crate::world::AISLE_NUMBERS.iter().map(|s| s.to_string()));
     v.push(crate::world::POSTER_SAME.to_string());
     v.extend(crate::world::HACKEPETER_TEXTS.iter().map(|s| s.to_string()));
+    v.extend(
+        crate::world::sortiment_texts()
+            .iter()
+            .map(|s| s.to_string()),
+    );
     for (a, b) in SLOGANS {
         v.push(a.into());
         v.push(b.into());

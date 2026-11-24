@@ -106,11 +106,11 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Die Gänge werden länger.
 - Röhren wechseln zufällig ihr Flacker-Muster: Stroboskop, Pulsieren, fast aus, Unterspannung.
 - Die Gänge biegen sich zu echten S-Kurven, die Regale folgen dem Bogen. Mittendrin öffnen sich Durchgänge, wo vorher keine waren, und es stehen Wände, wo vorher keine standen.
-- Werbeposter verrotten immer weiter. Auch die Plakate für HACKEPETER, das andere Spiel im Mett-Launcher, bleiben nicht, wie sie waren.
+- An den Wänden hängt ein wechselndes Plakat-Sortiment, bei jedem Start neu gemischt: Werbung für die Fandubs STEIN-HART und OVERCOCK der Gruppe Synchro, Lotto, Rubbellose und Zigaretten, und Aufklärungsplakate über Leons Cannabis-Sucht. Je schlimmer es im Markt wird, desto mehr verändern sich die Plakate: Farben verblassen, die Texte kippen, es kommen Flecken, Aufkleber und Blut dazu. Auch die Plakate für HACKEPETER, das andere Spiel im Mett-Launcher, bleiben nicht, wie sie waren.
 - Auf den hohen Stufen biegen sich die Gänge live: Regale schwanken, der Boden hebt und senkt sich (Steigung). Bereiche wandern beim Umbau: Kühlabschnitte tauschen die Plätze, die Tiefkühlreihe steht in einem anderen Gang, die Obst-Insel rückt.
 - Kunden flüstern miteinander, wenn sie sich begegnen.
 - Hinter Türöffnungen in der linken Wand liegen leere, völlig gleiche Räume mit einer flackernden Röhre. Je schlimmer es wird, desto mehr Räume, irgendwann ein Durchgang ins Nichts und ein Flur, der zu lang ist.
-- Dinge wiederholen sich: Alle Gänge tragen plötzlich dieselbe Nummer, alle Plakate sind gleich, und eine Szene, die du schon gesehen hast, steht im nächsten Gang wieder vor dir.
+- Dinge wiederholen sich: Alle Gänge tragen plötzlich dieselbe Nummer, auf allen Plakaten klebt derselbe Satz, und eine Szene, die du schon gesehen hast, steht im nächsten Gang wieder vor dir.
 - Manchmal steht ganz hinten im Gang jemand und sieht dich an. Wenn du näher kommst oder wegsiehst, ist er weg.
 - Der Boden verfällt: erst fehlende und gesprungene Fliesen und Ameisenstraßen, dann Fliesenstapel, Löcher (Hindernisse, hineinfallen kann man nicht) und Ratten. In der Decke klaffen Löcher mit Kabeln, am Ende tropft Blut von der Decke und sammelt sich am Boden.
 - Ware verdirbt: verfärbt, mit Maden und Fliegen; manche schwebt, kippt oder steht kopfüber. Riesige Waren stehen im Weg.
