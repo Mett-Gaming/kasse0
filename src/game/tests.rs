@@ -762,6 +762,84 @@ fn taking_tomato_juice_angers_its_customer() {
 }
 
 #[test]
+fn tomato_juice_is_drunk_then_trip_then_vomit() {
+    use super::trip::{Trip, DRINK_TIME, TRIP_TIME, VOMIT_TIME};
+    let mut g = Game::new(17);
+    g.tip();
+    g.god = true;
+    let i = g
+        .pickups
+        .iter()
+        .position(|p| matches!(p.data.kind, PickupKind::Tomato { .. }))
+        .expect("kein Tomatensaft");
+    let normal_fog = g.trip_fog(g.world.fog_color);
+    let normal_sway = g.sway_params();
+    g.take_pickup(i);
+    // nicht in der Hand, sondern sofort am Mund
+    assert!(g.held.is_none(), "Saft landet in der Hand");
+    assert!(matches!(g.trip, Trip::Drinking { .. }));
+    g.customers.clear();
+    g.employees.clear();
+    let dt = 1.0 / 60.0;
+    let mut run = |g: &mut Game, secs: f32| {
+        for _ in 0..(secs / dt) as usize {
+            g.update(dt, &mut Input::default());
+        }
+    };
+    run(&mut g, DRINK_TIME + 0.1);
+    assert!(matches!(g.trip, Trip::Tripping { .. }), "{:?}", g.trip);
+    // mitten im Rausch: volle Staerke, Nebel bunt, Gaenge wogen
+    run(&mut g, TRIP_TIME / 2.0);
+    assert!((g.trip_level() - 1.0).abs() < 1e-3);
+    assert!(g.trip_fog(g.world.fog_color).distance(normal_fog) > 0.05);
+    assert!(g.sway_params() != normal_sway, "nichts wogt");
+    let mut draws = Vec::new();
+    g.collect_trip_draws(&mut draws);
+    assert!(draws.len() >= 10, "keine schwebenden Wuerfel");
+    // nach 30 s: kotzen, Pfuetze am Boden
+    run(&mut g, TRIP_TIME / 2.0);
+    assert!(matches!(g.trip, Trip::Vomiting { .. }), "{:?}", g.trip);
+    // mitten im Kotzen: gruener Strahl aus dem Mund, Richtung Boden
+    run(&mut g, 1.2);
+    let mut draws = Vec::new();
+    g.collect_trip_draws(&mut draws);
+    let green = draws
+        .iter()
+        .filter(|d| d.tint.y > d.tint.x && d.tint.y > d.tint.z * 2.0)
+        .count();
+    assert!(green >= 20, "kein gruener Strahl ({green})");
+    run(&mut g, VOMIT_TIME - 1.2 + 0.1);
+    assert_eq!(g.trip, Trip::None);
+    assert_eq!(g.puddles.len(), 1, "keine Pfuetze");
+    // alles wieder normal
+    assert_eq!(g.trip_level(), 0.0);
+    assert_eq!(g.trip_fog(g.world.fog_color), normal_fog);
+    assert_eq!(g.sway_params(), normal_sway);
+    assert_eq!(g.trip_fov(), 1.0);
+    assert_eq!(g.trip_roll(), 0.0);
+    assert_eq!(g.vomit_pitch(), 0.0);
+    assert_eq!(g.trip_glitch(), 0.0);
+    assert_eq!(g.trip_invert(), 0.0);
+    assert_eq!(g.trip_flash(), 0.0);
+    assert_eq!(g.trip_fog_density(1.0), 1.0);
+    // die Pfuetze bleibt, und sie ist gruen
+    let mut draws = Vec::new();
+    g.collect_trip_draws(&mut draws);
+    assert!(!draws.is_empty() && draws.iter().all(|d| d.tint.y > d.tint.x));
+}
+
+#[test]
+fn tomato_cheat_starts_the_trip() {
+    use super::cheats::TRIP_CHEAT;
+    use super::trip::Trip;
+    assert_eq!(CHEATS[TRIP_CHEAT], "Tomatensaft trinken");
+    assert!(cheat_groups()[0].2.contains(&TRIP_CHEAT));
+    let mut g = Game::new(3);
+    g.cheat(TRIP_CHEAT);
+    assert!(matches!(g.trip, Trip::Drinking { .. }));
+}
+
+#[test]
 fn chosen_item_comes_out_of_the_cart() {
     let mut g = Game::new(31);
     g.customers.clear();
@@ -1801,6 +1879,15 @@ fn goods_lie_in_the_cart_basket_instead_of_floating() {
         assert!(
             c.x.abs() < 0.27 && c.z > -0.52 && c.z < 0.26,
             "Ware {i} neben dem Korb: {c}"
+        );
+        // ganz innerhalb der Gitterwaende (etwas Spiel fuer die Schraeglage)
+        let tol = 0.03;
+        assert!(
+            lo.x > -crate::assets::CART_BASKET_X - tol
+                && hi.x < crate::assets::CART_BASKET_X + tol
+                && lo.z > crate::assets::CART_BASKET_Z0 - tol
+                && hi.z < crate::assets::CART_BASKET_Z1 + tol,
+            "Ware {i} steht durch die Korbwand: {lo} .. {hi}"
         );
         if h.y > h.x.max(h.z) * 1.15 {
             lying += 1;

@@ -49,14 +49,17 @@ pub const CHEATS: &[&str] = &[
     "Tutorial starten",
     "Flucht: langer Korridor",
     "Sofort sterben",
+    "Tomatensaft trinken",
 ];
 
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 3;
+pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 4;
 /// Direkt in den laengsten Fluchtkorridor (140 m)
-pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 2;
+pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 3;
 /// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
-pub const DIE_CHEAT: usize = CHEATS.len() - 1;
+pub const DIE_CHEAT: usize = CHEATS.len() - 2;
+/// Abgelaufenen Tomatensaft trinken: 30 s Rausch, dann kotzen (trip.rs)
+pub const TRIP_CHEAT: usize = CHEATS.len() - 1;
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
@@ -67,8 +70,8 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
     vec![
         (
             "Spieler",
-            "Unverwundbar, Leben, Tutorial, Auffälligkeit",
-            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5, DIE_CHEAT],
+            "Unverwundbar, Leben, Tutorial, Auffälligkeit, Rausch",
+            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5, DIE_CHEAT, TRIP_CHEAT],
         ),
         (
             "Markt & Einkauf",
@@ -242,6 +245,10 @@ impl Game {
             LONG_CORRIDOR_CHEAT => {
                 self.debug_jump_to_corridor(Some(crate::world::CORRIDOR_LEN_MAX));
                 "Langer Korridor. Lauf!".into()
+            }
+            TRIP_CHEAT => {
+                self.drink_tomato();
+                "Prost.".into()
             }
             DIE_CHEAT => {
                 self.debug_die();

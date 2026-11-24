@@ -26,6 +26,7 @@ mod hands;
 mod mirage;
 pub mod npc;
 pub mod till;
+pub mod trip;
 pub mod tutorial;
 
 use crate::assets::{half_extent_idx, MeshId};
@@ -330,6 +331,9 @@ pub struct Game {
     pub corridor_run: Option<corridor::Run>,
     pub front_caught: bool,
     /// Die nutzlose Zigarette (smoke.rs), Kippen am Boden, ausgeatmeter Rauch (Sekunden)
+    /// Tomatensaft-Rausch (trip.rs) und Pfuetzen davon
+    pub trip: trip::Trip,
+    pub puddles: Vec<trip::Puddle>,
     pub cig: smoke::Cigarette,
     pub butts: Vec<smoke::Butt>,
     pub exhale: f32,
@@ -553,6 +557,8 @@ impl Game {
             turned_back: false,
             corridor_run: None,
             front_caught: false,
+            trip: trip::Trip::None,
+            puddles: Vec::new(),
             cig: smoke::Cigarette::None,
             butts: Vec::new(),
             exhale: 0.0,
@@ -845,11 +851,14 @@ impl Game {
 
     /// Parameter fuer das Live-Verbiegen der Gaenge (Shader und Spiel).
     pub fn sway_params(&self) -> Vec4 {
-        if !self.tipped {
-            return Vec4::ZERO;
-        }
-        let (lat, up) = self.tier.sway();
-        Vec4::new(lat, up, self.world.aisle_z1, self.world.aisle_x1)
+        let base = if self.tipped {
+            let (lat, up) = self.tier.sway();
+            Vec4::new(lat, up, self.world.aisle_z1, self.world.aisle_x1)
+        } else {
+            Vec4::ZERO
+        };
+        // im Tomatensaft-Rausch wogen die Gaenge zusaetzlich (trip.rs)
+        self.trip_sway(base)
     }
 
     /// Wie weit der Boden an dieser Stelle gerade verschoben ist.
@@ -859,10 +868,12 @@ impl Game {
 
     pub fn view_dir(&self) -> Vec3 {
         let p = &self.player;
+        // beim Kotzen kippt der Blick nach unten (trip.rs)
+        let pitch = (p.pitch + self.vomit_pitch()).clamp(-1.5, 1.5);
         vec3(
-            p.pitch.cos() * p.yaw.sin(),
-            p.pitch.sin(),
-            -p.pitch.cos() * p.yaw.cos(),
+            pitch.cos() * p.yaw.sin(),
+            pitch.sin(),
+            -pitch.cos() * p.yaw.cos(),
         )
     }
 
@@ -917,9 +928,10 @@ impl Game {
 
     pub fn view_proj(&self, aspect: f32) -> Mat4 {
         let view = Mat4::look_to_rh(self.eye(), self.view_dir(), Vec3::Y);
-        let fov = self.fov_deg * self.scare_zoom();
+        // Rausch (trip.rs): Sichtfeld atmet, Bild schwankt um die Blickachse
+        let fov = self.fov_deg * self.scare_zoom() * self.trip_fov();
         let proj = Mat4::perspective_rh(fov.to_radians(), aspect, 0.05, 140.0);
-        proj * view
+        Mat4::from_rotation_z(self.trip_roll()) * proj * view
     }
 
     // --------------------------------------------------------------- Update
@@ -1016,6 +1028,7 @@ impl Game {
         // Kassen-Minispiel: Fragen, Weggehen, Misstrauen, Leben
         self.update_till(dt, input);
         self.update_cigarette(dt, cig_key);
+        self.update_trip(dt);
         input.interact = false;
         input.cart_toggle = false;
         input.take_out = false;

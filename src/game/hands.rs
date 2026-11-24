@@ -4,8 +4,10 @@
 use super::*;
 
 pub(super) const CART_OFFSET: f32 = 0.85;
-/// Hoehe des Korbbodens im Wagenmodell (gemessen am Modell)
-pub(super) const CART_FLOOR: f32 = 0.57;
+/// Hoehe des Korbbodens im Wagenmodell (Gitterboden aus assets.rs)
+pub(super) const CART_FLOOR: f32 = crate::assets::CART_BASKET_FLOOR;
+/// Abstand der Waren zur Gitterwand (Meter)
+const BASKET_GAP: f32 = 0.006;
 /// Korbboden laengs (Wagenmodell): von z = -0,5 bis +0,24. Plaetze: 3 quer, 4 laengs
 pub(super) const CART_CELLS: usize = 12;
 const CART_ROW0: f32 = -0.4;
@@ -296,6 +298,23 @@ impl Game {
             let j = |s: f32| ((k as f32 * 12.9898 + s * 78.233).sin() * 43_758.547).fract();
             let x = col * 0.135 + (j(1.0) - 0.5) * 0.03;
             let z = CART_ROW0 + row * CART_ROW + (j(2.0) - 0.5) * 0.03;
+            // Grundflaeche (beliebig gedreht: Umkreis) bleibt innerhalb der Korbwaende
+            let foot = if lying {
+                h.x.hypot(h.y)
+            } else {
+                h.x.hypot(h.z)
+            } + BASKET_GAP;
+            let xr = (crate::assets::CART_BASKET_X - foot).max(0.0);
+            let x = x.clamp(-xr, xr);
+            let (z0, z1) = (
+                crate::assets::CART_BASKET_Z0 + foot,
+                crate::assets::CART_BASKET_Z1 - foot,
+            );
+            let z = if z0 < z1 {
+                z.clamp(z0, z1)
+            } else {
+                (z0 + z1) * 0.5
+            };
             let y = tops[cell] - CART_SINK;
             // naechste Ware liegt obenauf (etwas ineinander gerutscht)
             tops[cell] += height * 0.9;
@@ -661,9 +680,12 @@ impl Game {
             }
             self.say("Das war IHR Tomatensaft. Sie hat es gesehen.", 3.5);
             self.play(Sfx::Sting, 0.3);
-        } else {
-            self.play(Sfx::Pickup, 0.5);
+            // abgelaufener Tomatensaft landet nicht in der Hand: er wird sofort getrunken
+            // (trip.rs: Dose zum Mund, Rausch, Kotzen)
+            self.drink_tomato();
+            return;
         }
+        self.play(Sfx::Pickup, 0.5);
         self.held = Some(data);
     }
 

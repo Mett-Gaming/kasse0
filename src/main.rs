@@ -626,6 +626,7 @@ impl App {
         }
         self.draws.clear();
         self.game.collect_draws(&mut self.draws);
+        self.game.trip_colorize(&mut self.draws);
         self.ghosts.clear();
         self.game.collect_ghosts(&mut self.ghosts);
         // Figuren: Animation abtasten, Knochen fuer die GPU sammeln
@@ -679,7 +680,7 @@ impl App {
             glitch: if self.menu_scare > 0.0 {
                 1.0
             } else if self.screen == Screen::Playing {
-                g.glitch.max(g.suspicion * 0.2)
+                g.glitch.max(g.suspicion * 0.2).max(g.trip_glitch())
             } else {
                 0.0
             },
@@ -688,17 +689,22 @@ impl App {
                 .red
                 .max(g.death_vignette())
                 .max(if troll.is_some() { 1.0 } else { 0.0 }),
-            invert: if troll_inv { 1.0 } else { g.scare_invert() },
+            invert: if troll_inv {
+                1.0
+            } else {
+                g.scare_invert().max(g.trip_invert())
+            },
             flash: if troll.is_some_and(|e| e < 0.3) {
                 1.0
             } else {
-                g.scare_flash()
+                g.scare_flash().max(g.trip_flash())
             },
         };
         let rooms = render::Rooms {
             dark: g.tipped,
-            fog_color: g.world.fog_color,
-            fog_density: g.world.fog_density,
+            // im Tomatensaft-Rausch: Regenbogen-Nebel (game/trip.rs)
+            fog_color: g.trip_fog(g.world.fog_color),
+            fog_density: g.trip_fog_density(g.world.fog_density),
             decay: g.poster_decay(),
             sway: g.sway_params(),
         };

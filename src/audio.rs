@@ -60,6 +60,10 @@ pub enum Sfx {
     Rumble,
     /// Schluesselbund des Personals
     Keys,
+    /// ein Schluck (Tomatensaft)
+    Gulp,
+    /// Wuergen und Kotzen nach dem Tomatensaft-Rausch
+    Vomit,
 }
 
 /// Bis zu dieser Entfernung hoert man Geraeusche mit Ort (Meter)
@@ -496,6 +500,45 @@ fn synth(sfx: Sfx) -> Vec<f32> {
                 ((tone * 0.5 + lp * 0.8) * 1.8).tanh() * 0.45 * (1.0 - t / 1.6)
             })
         }
+        Sfx::Gulp => {
+            // Schluck: tiefer Sinus, der schnell nach oben rutscht, mit feuchtem Klick am Anfang
+            let mut ph = 0.0f32;
+            gen(0.22, &mut |t| {
+                let f = 140.0 + 900.0 * (t / 0.22).powi(2);
+                ph = (ph + f / RATE as f32).fract();
+                let env = (t * 120.0).min(1.0) * (1.0 - t / 0.22).powf(1.5);
+                let click = rng.next() * (-t * 200.0).exp() * 0.3;
+                ((TAU * ph).sin() * 0.45 + click) * env
+            })
+        }
+        Sfx::Vomit => {
+            // Wuergen: zwei kurze Kehlstoesse, dann ein langer, gurgelnder Schwall
+            const DUR: f32 = 2.2;
+            let (mut ph, mut lp) = (0.0f32, 0.0f32);
+            gen(DUR, &mut |t| {
+                let retch = |a: f32| {
+                    let x = t - a;
+                    if (0.0..0.25).contains(&x) {
+                        (x * 40.0).min(1.0) * (1.0 - x / 0.25)
+                    } else {
+                        0.0
+                    }
+                };
+                let gag = retch(0.0) + retch(0.4);
+                let gush = if t > 0.85 {
+                    (((t - 0.85) * 8.0).min(1.0)) * (1.0 - (t - 0.85) / (DUR - 0.85)).powf(0.8)
+                } else {
+                    0.0
+                };
+                let f = 95.0 + 40.0 * (TAU * 17.0 * t).sin() + 30.0 * rng.next();
+                ph = (ph + f / RATE as f32).fract();
+                lp += (rng.next() - lp) * 0.15;
+                let throat = ph * 2.0 - 1.0;
+                let gurgle = 0.6 + 0.4 * (TAU * 11.0 * t).sin();
+                let mix = throat * (gag * 0.8 + gush * 0.5) + lp * gush * gurgle * 1.6;
+                (mix * 2.0).tanh() * 0.7
+            })
+        }
     }
 }
 
@@ -539,6 +582,8 @@ impl Audio {
             Sfx::Thud,
             Sfx::Static,
             Sfx::Rumble,
+            Sfx::Gulp,
+            Sfx::Vomit,
         ]
         .into_iter()
         .map(|s| (s, synth(s)))
@@ -659,6 +704,8 @@ mod tests {
             Sfx::Thud,
             Sfx::Static,
             Sfx::Rumble,
+            Sfx::Gulp,
+            Sfx::Vomit,
         ] {
             let d = synth(s);
             assert!(!d.is_empty());

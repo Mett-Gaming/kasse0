@@ -1,11 +1,17 @@
-//! Passende Ware in Griffnaehe leuchtet auf: immer nur eine, die naechste im Umkreis von 1 m.
+//! Passende Ware in der Naehe leuchtet auf: immer nur eine, die naechste im Umkreis von 4 m.
 //! Passend ist, was zu einem offenen Zettel-Eintrag gehoert, billig oder teuer, und auch die
 //! falsch beschriftete Ausgabe davon: Die Hervorhebung verraet nicht, ob die Ware echt ist.
 
 use super::*;
 
 /// Umkreis um den Spieler (Meter, in der Ebene)
-pub const HIGHLIGHT_RADIUS: f32 = 1.0;
+pub const HIGHLIGHT_RADIUS: f32 = 4.0;
+/// Leuchtende Ware ist so viel groesser (Faktor), dazu pulsierend
+const GLOW_SCALE: f32 = 1.12;
+const GLOW_SCALE_PULSE: f32 = 0.1;
+/// Leuchtkraft: mindestens, dazu pulsierend
+const GLOW_MIN: f32 = 1.0;
+const GLOW_PULSE: f32 = 1.4;
 /// Eine andere Ware muss um so viel naeher sein, damit die Hervorhebung wechselt
 const SWITCH_MARGIN: f32 = 0.05;
 /// So tief im Regal darf die Ware stehen (weiter hinten ist die andere Regalseite)
@@ -121,13 +127,16 @@ impl Game {
 
     /// Ware noch einmal darueberzeichnen: etwas groesser, pulsierend hell.
     fn glow(&self, mut d: MeshDraw, half_y: f32) -> MeshDraw {
-        let pulse = 0.5 + 0.5 * (self.time * 5.0).sin();
+        let pulse = 0.5 + 0.5 * (self.time * 6.0).sin();
         let up = vec3(0.0, half_y, 0.0);
         d.model = d.model
             * Mat4::from_translation(up)
-            * Mat4::from_scale(Vec3::splat(1.06 + 0.04 * pulse))
+            * Mat4::from_scale(Vec3::splat(GLOW_SCALE + GLOW_SCALE_PULSE * pulse))
             * Mat4::from_translation(-up);
-        d.tint = (d.tint.truncate() * 1.15).extend(0.45 + 0.45 * pulse);
+        // kraeftig hell, zu warmem Gelbweiss gezogen, damit es auch von weitem auffaellt
+        let warm = vec3(1.0, 0.92, 0.55);
+        let col = (d.tint.truncate() * 1.4).lerp(warm, 0.35 + 0.25 * pulse);
+        d.tint = col.extend(GLOW_MIN + GLOW_PULSE * pulse);
         d
     }
 }
@@ -193,6 +202,23 @@ mod tests {
         g.collect_highlight_draw(&mut out);
         assert_eq!(out.len(), 1, "genau eine Ware");
         assert!(out[0].tint.w > 0.3, "leuchtet nicht");
+    }
+
+    #[test]
+    fn matching_items_light_up_from_three_meters_and_glow_strongly() {
+        let mut g = Game::new(12);
+        g.tip();
+        g.customers.clear();
+        g.employees.clear();
+        let found = g.list.clone().into_iter().any(|e| {
+            [false, true]
+                .into_iter()
+                .any(|pricey| shelf_item(&g, e, pricey).is_some_and(|i| stand_at(&mut g, i, 3.0)))
+        });
+        assert!(found, "nichts leuchtet aus 3 m");
+        let mut out = Vec::new();
+        g.collect_highlight_draw(&mut out);
+        assert!(out[0].tint.w >= GLOW_MIN, "zu schwach");
     }
 
     #[test]
