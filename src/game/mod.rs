@@ -31,6 +31,7 @@ pub mod trip;
 pub mod tutorial;
 pub mod umbau;
 pub mod watcher;
+pub mod wet_signs;
 
 use crate::assets::{half_extent_idx, MeshId};
 use crate::audio::Sfx;
@@ -346,6 +347,8 @@ pub struct Game {
     /// Deja-vu-Szene (dejavu.rs) und Zeit bis zur naechsten
     pub dejavu: Option<dejavu::Dejavu>,
     dejavu_timer: f32,
+    /// umgeworfene Warnschilder (wet_signs.rs), Index wie `world.signs`
+    pub sign_falls: Vec<Option<wet_signs::SignFall>>,
     pub puddles: Vec<trip::Puddle>,
     pub cig: smoke::Cigarette,
     pub butts: Vec<smoke::Butt>,
@@ -579,6 +582,7 @@ impl Game {
             watcher_timer: 40.0,
             dejavu: None,
             dejavu_timer: 25.0,
+            sign_falls: Vec::new(),
             puddles: Vec::new(),
             cig: smoke::Cigarette::None,
             butts: Vec::new(),
@@ -1083,6 +1087,7 @@ impl Game {
         self.update_mirages(dt);
         self.update_watcher(dt);
         self.update_dejavu(dt);
+        self.update_wet_signs(dt);
         self.update_spark_sounds();
         self.update_scares(dt, input);
         // Zeit im gekippten Markt kann die Stufe auch ohne Einkauf anheben

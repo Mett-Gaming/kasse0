@@ -14,8 +14,6 @@ fn phase(i: usize, salt: f32) -> f32 {
 
 impl Game {
     pub fn collect_draws(&self, out: &mut Vec<MeshDraw>) {
-        let rot = |yaw: f32| Quat::from_rotation_y(yaw);
-
         self.collect_hand_draws(out);
         self.collect_highlight_draw(out);
 
@@ -67,12 +65,71 @@ impl Game {
         self.collect_vermin_draws(out);
         self.collect_mirage_draws(out);
         self.collect_scare_draws(out);
-        // Warnschilder
-        for &(pos, yaw) in &self.world.signs {
+        self.collect_wet_sign_draws(out);
+    }
+
+    /// Gruselstufe der Warnschilder: 0 normaler Markt, 1 ruhig ... 4 Kollaps.
+    pub fn wet_sign_level(&self) -> u8 {
+        if self.tipped {
+            1 + self.tier.level()
+        } else {
+            0
+        }
+    }
+
+    /// Warnschilder "Rutschgefahr" mit Aufschrift (wet_sign.rs), je Stufe gruseliger:
+    /// Text kippt (ab unruhig, ab falsch rot), das Schild wird schmutzig und roetlich, ab
+    /// falsch liegt eine Blutlache darunter, im Kollaps liegt jedes zweite umgekippt und die
+    /// anderen drehen sich zum Spieler.
+    pub(super) fn collect_wet_sign_draws(&self, out: &mut Vec<MeshDraw>) {
+        let level = self.wet_sign_level();
+        let variant = match level {
+            0 | 1 => 0,
+            2 => 1,
+            _ => 2,
+        };
+        let mesh = crate::assets::wet_sign_mesh(variant);
+        let dim = [1.0, 0.85, 0.7, 0.55, 0.45][level.min(4) as usize];
+        let red = if level >= 3 {
+            vec3(1.0, 0.8, 0.78)
+        } else {
+            Vec3::ONE
+        };
+        let tint = (red * dim).extend(0.0);
+        for (k, &(pos, yaw)) in self.world.signs.iter().enumerate() {
+            let pos = pos + vec3(0.0, self.sway_at(pos).y, 0.0);
+            if level >= 3 {
+                out.push(MeshDraw {
+                    mesh: MeshId::Cube as usize,
+                    model: Mat4::from_scale_rotation_translation(
+                        vec3(0.55, 0.006, 0.42),
+                        Quat::from_rotation_y(yaw + 0.4),
+                        pos + vec3(0.05, 0.004, 0.0),
+                    ),
+                    tint: Vec4::new(0.3, 0.02, 0.02, 0.0),
+                    ..Default::default()
+                });
+            }
+            let model = if let Some(m) = self.sign_fall_model(k, pos, yaw) {
+                // vom Spieler umgeworfen (wet_signs.rs)
+                m
+            } else if self.sign_lying_anyway(k) {
+                // umgekippt: liegt flach auf dem Boden
+                Mat4::from_rotation_translation(
+                    Quat::from_rotation_y(yaw) * Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+                    pos + vec3(0.0, 0.177, 0.0),
+                )
+            } else if level >= 4 {
+                // dreht sich zum Spieler
+                let to = self.player.pos - pos;
+                Mat4::from_rotation_translation(Quat::from_rotation_y(to.x.atan2(to.z)), pos)
+            } else {
+                Mat4::from_rotation_translation(Quat::from_rotation_y(yaw), pos)
+            };
             out.push(MeshDraw {
-                mesh: MeshId::WetFloorSign as usize,
-                model: Mat4::from_rotation_translation(rot(yaw), pos),
-                tint: Vec4::new(1.0, 1.0, 1.0, 0.0),
+                mesh,
+                model,
+                tint,
                 ..Default::default()
             });
         }

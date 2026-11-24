@@ -2222,3 +2222,119 @@ fn the_pad_turns_the_view_the_same_at_any_mouse_sensitivity() {
         assert!((g.player.yaw - yaw - 0.4).abs() < 1e-3);
     }
 }
+
+#[test]
+fn wet_floor_signs_are_labelled_and_get_creepier_with_the_market() {
+    use crate::assets::wet_sign_mesh;
+    let draws = |g: &Game| {
+        let mut out = Vec::new();
+        g.collect_wet_sign_draws(&mut out);
+        out
+    };
+    let signs = |g: &Game, variant: usize| {
+        draws(g)
+            .iter()
+            .filter(|d| d.mesh == wet_sign_mesh(variant))
+            .count()
+    };
+    let puddles = |g: &Game| {
+        draws(g)
+            .iter()
+            .filter(|d| d.mesh == MeshId::Cube as usize)
+            .count()
+    };
+    let mut g = Game::new(5);
+    let n = g.world.signs.len();
+    assert!(n >= 1);
+    // normaler Markt: "VORSICHT / Frisch gewischt", hell, keine Lachen
+    assert_eq!(signs(&g, 0), n);
+    assert_eq!(puddles(&g), 0);
+    assert_eq!(draws(&g)[0].tint.x, 1.0);
+    g.tip();
+    let n = g.world.signs.len();
+    assert_eq!(signs(&g, 0), n, "ruhig: noch normaler Text");
+    assert!(draws(&g)[0].tint.x < 1.0, "nicht schmutziger");
+    g.force_tier(Tier::Uneasy);
+    assert_eq!(signs(&g, 1), g.world.signs.len(), "unruhig: anderer Text");
+    assert_eq!(puddles(&g), 0);
+    g.force_tier(Tier::Wrong);
+    let n = g.world.signs.len();
+    assert_eq!(signs(&g, 2), n, "falsch: grauenhafter Text");
+    assert_eq!(puddles(&g), n, "keine Blutlachen");
+    // Kollaps: jedes zweite liegt (gekippt), die anderen drehen sich zum Spieler
+    g.force_tier(Tier::Collapse);
+    let d = draws(&g);
+    let lying = d
+        .iter()
+        .filter(|d| d.mesh == wet_sign_mesh(2))
+        .filter(|d| d.model.y_axis.y.abs() < 0.5)
+        .count();
+    assert_eq!(lying, g.world.signs.len() / 2, "keine umgekippten Schilder");
+}
+
+#[test]
+fn walking_into_a_wet_floor_sign_knocks_it_over_loudly() {
+    for tipped in [false, true] {
+        let mut g = Game::new(5);
+        if tipped {
+            g.tip();
+        }
+        g.customers.clear();
+        g.employees.clear();
+        g.god = true;
+        g.trolley.pushing = false;
+        g.trolley.pos = g.world.corral;
+        g.suspicion = 0.0;
+        // erstes Schild mit freiem Anlauf (1,2 m davor)
+        let (k, start) = g
+            .world
+            .signs
+            .iter()
+            .enumerate()
+            .find_map(|(k, &(p, _))| {
+                [0.0f32, 1.57, 3.14, 4.71].iter().find_map(|a| {
+                    let s = p + vec3(a.sin(), 0.0, a.cos()) * 1.2;
+                    (g.world.collide(s, 0.3).distance(s) < 1e-3
+                        && g.world.line_of_sight(s + Vec3::Y, p + Vec3::Y))
+                    .then_some((k, s))
+                })
+            })
+            .expect("kein freies Schild");
+        let sign = g.world.signs[k].0;
+        g.player.pos = start;
+        let to = sign - start;
+        g.player.yaw = to.x.atan2(-to.z);
+        g.player.pitch = 0.0;
+        g.sfx.clear();
+        let mut thud = false;
+        for _ in 0..90 {
+            g.update(
+                1.0 / 60.0,
+                &mut Input {
+                    forward: true,
+                    ..Default::default()
+                },
+            );
+            thud |= g.sfx.iter().any(|s| matches!(s.0, Sfx::Thud));
+            g.sfx.clear();
+        }
+        let fall = g.sign_falls[k].expect("Schild steht noch");
+        assert!(thud, "kein Scheppern");
+        // faellt vom Spieler weg und liegt am Ende flach
+        assert!(fall.dir.dot(to.normalize()) > 0.5);
+        let m = g.sign_fall_model(k, sign, 0.0).unwrap();
+        assert!(m.y_axis.y.abs() < 0.1, "liegt nicht");
+        if tipped {
+            assert!(
+                g.suspicion >= wet_signs::FALL_SUSPICION - 0.03,
+                "nicht auffaellig"
+            );
+            assert!(
+                g.suspicion < wet_signs::FALL_SUSPICION * 1.5,
+                "mehrfach gezaehlt"
+            );
+        } else {
+            assert!(g.suspicion < 0.01, "Auffaelligkeit im normalen Markt");
+        }
+    }
+}

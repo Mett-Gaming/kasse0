@@ -12,7 +12,8 @@ pub const ROW_H: u32 = 32;
 /// Breite des Atlas in Pixeln
 pub const ATLAS_W: u32 = 512;
 
-const FONT: &[u8] = include_bytes!("../assets/fonts/ArchivoBlack-Regular.ttf");
+/// Archivo Black (OFL), auch fuer die Aufschrift der Warnschilder (wet_sign.rs)
+pub(crate) const FONT: &[u8] = include_bytes!("../assets/fonts/ArchivoBlack-Regular.ttf");
 
 /// Ladenname (eigene Marke, keine echte Kette)
 pub const BRAND: &str = "KAUF NULL";

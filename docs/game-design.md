@@ -131,6 +131,16 @@ Die Smiley-Plakate sind weg. Auf den festen Plakatplätzen (Westwand alle 7 m, S
 - Ab 3: Aufkleber „Sie waren schon hier“. Gesichter bekommen schwarze Augenhöhlen und einen offenen Mund. Die Mikrowelle glüht rot, die Uhr verliert ihre Zeiger und bekommt ein Auge, im Gilden-Wappen öffnen sich Augen, Leon „heute“ ist nur noch ein schwarzer Umriss, die Lottokugeln werden dunkelrot.
 - 4: Blut läuft von oben herab, die Augen sind rot, und der Zigarettenrauch bekommt ein Gesicht.
 
+**Warnschilder „Rutschgefahr“** (`wet_sign.rs`, `Game::collect_wet_sign_draws`): Das gelbe Schild-Modell bekommt beim Laden auf beiden schrägen Seiten ein Warndreieck mit „!“ und einen Text. Dafür wird ein kleines Pixelbild (52 × 84, 5 mm je Pixel, Text mit Archivo Black gerastert) als flache Streifen genau auf die Schildflächen gelegt. Die Rückseite ist gespiegelt, damit sie von hinten lesbar ist. Drei Fassungen als eigene Modelle (`assets::wet_sign_mesh`), dazu je Stufe mehr Grusel:
+
+| Stufe | Aufschrift | Schild |
+|---|---|---|
+| normal, ruhig | VORSICHT / Frisch / gewischt | gelb (ruhig: etwas schmutziger) |
+| unruhig | VORSICHT / Nicht / hinsehen | dunkler |
+| falsch | LAUF / Frisch / geblutet (rot) | rötlich, Blutlache darunter |
+| Kollaps | wie falsch | jedes zweite liegt umgekippt, die anderen drehen sich zum Spieler |
+**Umwerfen** (`game/wet_signs.rs`): Stehende Schilder haben eine Kollision (Radius 0,2 m). Läuft man dagegen oder schiebt den Wagen dagegen, kippen sie in 0,35 s vom Spieler weg um und bleiben liegen, bis der Markt sich umbaut; liegend sind sie kein Hindernis. Das scheppert (Aufprall und Klappern), NPCs hören es bis 10 m, und im gekippten Markt steigt die Auffälligkeit um 0,12. Im Kollaps ohnehin liegende Schilder kippen nicht noch einmal.
+
 **Déjà-vu-Szene** (`game/dejavu.rs`, ab „unruhig“, alle 40–70 s minus 6 s je Stufe):
 - Die Szene besteht aus einem schräg stehenden leeren Wagen, einer umgekippten Dose, einem Warnschild und meist einer reglosen Kundin, die ins Regal starrt.
 - Sie wird 7–10 m vor einem im Gang aufgestellt, nur wo man gerade nicht hinsieht.
@@ -219,7 +229,7 @@ Direkt nach dem Bezahlen: Durchsage „ACHTUNG: Kunde 0 hat ein Gesicht. Schnapp
 |---|---|
 | Nicht hinsehen | Sichtkegel und Sichtlinie (Strahl gegen Regale). Unbeobachtete Kunden laufen über ein Distanzfeld (Breitensuche) zum Spieler. |
 | Erwischt | Ein Kunde unter 0,8 m beendet den Run. Der Endbildschirm zeigt dann einen von zwölf gruseligen Schriftzügen (zufällig je Tod, zittert und flackert): DU BLEIBST JETZT HIER, WILLKOMMEN IM SORTIMENT, DEIN GESICHT GEHÖRT UNS, MINDESTHALTBAR BIS: JETZT … (`hud::DEATH_TITLES`). Darunter steht weiter, woran es lag. Durchsagen: 26 im Markt, 10 an der Kasse, 11 im Fluchtkorridor, alle verstörend. |
-| Nicht stören | Anrempeln: +0,15. Ihren Tomatensaft nehmen: +0,35, und dieser Kunde wird schneller. |
+| Nicht stören | Anrempeln: +0,15. Ihren Tomatensaft nehmen: +0,35, und dieser Kunde wird schneller. Warnschild umwerfen: +0,12 (siehe Warnschilder). |
 | Tomatensaft-Rausch | Genommener Saft landet nicht in der Hand: Die Dose geht automatisch zum Mund (1,8 s, drei Schlucke). Dann 30 s Rausch (kommt und geht je 4 s): dichter Nebel in schnell wechselnden, voll gesättigten Regenbogenfarben, Boden und Gänge wogen stark (auch im ungekippten Markt), Sichtfeld atmet, Bild schwankt, Farben laufen auseinander, Bild pulsiert hell und blitzt alle 2,7 s kurz ins Negativ, Figuren und bewegliche Dinge schillern und leuchten, 45 leuchtende Würfel kreisen in drei Ringen um einen. Danach Kotzen (2,6 s, Blick nach unten): nach zweimal Würgen schießt ein giftgrüner Strahl aus dem Mund im Bogen auf den Boden, laut wie Rennen über 12 m. Dort bleibt eine grüne Pfütze 2 min liegen, dann ist alles normal. Erneutes Trinken im Rausch startet ihn von vorn (`src/game/trip.rs`, Cheat „Tomatensaft trinken“). |
 | Nicht auffallen | Rennen in Sichtweite: +0,15/s. Anstarren (über 1,5 s): +0,12/s. Falsche Ware: +0,25. Unbekannter Artikel an der Kasse: zählt zum Misstrauen der Kassiererin (siehe Kassen-Minispiel). |
 | Auffälligkeit 100 % | Die Kunden bewegen sich auch unter Beobachtung (langsam). |

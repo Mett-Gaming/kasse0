@@ -56,8 +56,32 @@ pub fn load_all() -> Vec<MeshData> {
     let mut v = vec![cube()];
     v.extend(SOURCES.iter().map(|b| parse(b)));
     add_cart_basket(&mut v[MeshId::Cart as usize]);
+    // Warnschild: Rohmodell fuer die gruseligen Fassungen merken, dann Aufschrift drauf
+    let s = &v[MeshId::WetFloorSign as usize];
+    let (raw_verts, raw_min, raw_max) = (s.vertices.clone(), s.min, s.max);
+    v[MeshId::WetFloorSign as usize]
+        .vertices
+        .extend(crate::wet_sign::decal(0));
     v.extend(gen::PRODUCT_MESH_BYTES.iter().map(|b| parse(b)));
+    // nach den Waren: die Warnschild-Fassungen 1 und 2 (siehe `wet_sign_mesh`)
+    for variant in 1..crate::wet_sign::VARIANTS {
+        let mut m = MeshData {
+            vertices: raw_verts.clone(),
+            min: raw_min,
+            max: raw_max,
+        };
+        m.vertices.extend(crate::wet_sign::decal(variant));
+        v.push(m);
+    }
     v
+}
+
+/// Modell des Warnschilds in der Fassung `variant` (0 normal, 1 unheimlich, 2 grauenhaft).
+pub fn wet_sign_mesh(variant: usize) -> usize {
+    match variant.min(crate::wet_sign::VARIANTS - 1) {
+        0 => MeshId::WetFloorSign as usize,
+        v => FIXED_COUNT + gen::PRODUCT_MESH_BYTES.len() + v - 1,
+    }
 }
 
 // Einkaufswagen aus Drahtkorb. Das Modell (Poly by Google) ist nur ein Rahmen aus Stangen:
@@ -241,7 +265,7 @@ fn push_box(vertices: &mut Vec<MeshVertex>, center: Vec3, half: Vec3, color: Vec
 }
 
 pub fn mesh_count() -> usize {
-    FIXED_COUNT + gen::PRODUCT_MESH_BYTES.len()
+    FIXED_COUNT + gen::PRODUCT_MESH_BYTES.len() + crate::wet_sign::VARIANTS - 1
 }
 
 /// Halbe Groesse (Bounding Box) eines Modells; Modelle stehen auf y = 0, Mitte x/z = 0.
@@ -280,7 +304,9 @@ mod tests {
         let meshes = load_all();
         assert_eq!(meshes.len(), mesh_count());
         let products = FIXED_COUNT..FIXED_COUNT + PRODUCT_MESH_IDS.len();
-        assert_eq!(mesh_count(), products.end);
+        // nach den Waren kommen die Warnschild-Fassungen (wet_sign.rs)
+        assert_eq!(mesh_count(), products.end + crate::wet_sign::VARIANTS - 1);
+        assert_eq!(wet_sign_mesh(2), mesh_count() - 1);
         // Waren passen in die Regalfaecher (Bodenabstand 0,43 m)
         for i in products {
             assert!(

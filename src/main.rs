@@ -20,6 +20,7 @@ mod pad;
 mod people;
 mod settings;
 mod signs;
+mod wet_sign;
 mod world;
 
 use audio::{Audio, Mood, Sfx};
