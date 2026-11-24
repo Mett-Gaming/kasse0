@@ -608,3 +608,236 @@ fn hackepeter_posters_advertise_and_turn_creepy_when_tipped() {
     }
     assert_eq!(seen, [true; 3], "nicht alle Entwuerfe");
 }
+
+#[test]
+fn posters_never_hang_on_top_of_each_other_or_the_wing_doors() {
+    // Plakatflaechen: Smiley-Plakate (Material POSTER) und HACKEPETER (gleiche Groesse, PLAIN)
+    let boards = |w: &World| -> Vec<(bool, Vec3, Vec3)> {
+        w.instances
+            .iter()
+            .filter_map(|i| {
+                let h = Vec3::new(i.half[0], i.half[1], i.half[2]);
+                let c = Vec3::new(i.center[0], i.center[1], i.center[2]);
+                let board = (h - vec3(0.004, 0.7, 0.5)).length() < 1e-4
+                    || (h - vec3(0.5, 0.7, 0.004)).length() < 1e-4;
+                let smile = i.extra[0] == material::POSTER;
+                (board && c.z <= w.size.z + 0.1).then_some((smile, c, h))
+            })
+            .collect()
+    };
+    for seed in [2u64, 5, 9, 14] {
+        for w in [gen(seed, false), with_wing(seed, 2), with_wing(seed, 4)] {
+            let b = boards(&w);
+            // keine Smiley-Plakate mehr (Plakat-Sortiment), aber genug Tafeln
+            assert!(!b.iter().any(|x| x.0), "{seed}: Smiley-Plakat im Markt");
+            assert!(b.len() >= 8, "{seed}: Plakate fehlen");
+            for (i, a) in b.iter().enumerate() {
+                for c in &b[i + 1..] {
+                    let d = (a.1 - c.1).abs();
+                    let overlap = d.x < a.2.x + c.2.x && d.y < a.2.y + c.2.y && d.z < a.2.z + c.2.z;
+                    assert!(
+                        !overlap,
+                        "{seed}: Plakate uebereinander bei {} / {}",
+                        a.1, c.1
+                    );
+                }
+            }
+            // nicht in den Tueroeffnungen zum Seitentrakt
+            for d in w.wing.iter().flat_map(|t| t.doors.iter()) {
+                for p in b.iter().filter(|p| p.1.x < 0.1) {
+                    assert!(
+                        (p.1.z - d.z).abs() > 1.1 + p.2.z,
+                        "{seed}: Plakat in der Tuer"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn hackepeter_posters_hang_at_random_free_spots_on_all_outer_walls() {
+    // HACKEPETER-Flaechen: Plakatgroesse, aber nicht Material POSTER (kein Maskottchen)
+    let ads = |w: &World| -> Vec<Vec3> {
+        w.instances
+            .iter()
+            .filter(|i| {
+                let h = Vec3::new(i.half[0], i.half[1], i.half[2]);
+                i.extra[0] != material::POSTER
+                    && (i.center[1] - 1.75).abs() > 1e-3
+                    && (i.center[1] - 1.9).abs() > 1e-3
+                    && ((h - vec3(0.004, 0.7, 0.5)).length() < 1e-4
+                        || (h - vec3(0.5, 0.7, 0.004)).length() < 1e-4)
+            })
+            .map(|i| Vec3::new(i.center[0], i.center[1], i.center[2]))
+            .collect()
+    };
+    let mut walls_used = [false; 4];
+    for seed in 0..10u64 {
+        for w in [gen(seed, false), with_wing(seed, 4)] {
+            let p = ads(&w);
+            assert!(p.len() >= 5, "{seed}: nur {} Plakate", p.len());
+            // jedes an einer Aussenwand
+            for c in &p {
+                let wall = [
+                    c.x < 0.05,
+                    c.x > w.size.x - 0.05,
+                    c.z < 0.05,
+                    c.z > w.size.z - 0.05,
+                ];
+                assert!(wall.iter().any(|&b| b), "{seed}: Plakat mitten im Raum {c}");
+                for k in 0..4 {
+                    walls_used[k] |= wall[k];
+                }
+            }
+            // Obstabteilung (Ostwand hinter dem Stufenregal, z 8,4 .. Gangende + 1,2): dort
+            // haengen Plakate hoch ueber dem Regal
+            let produce = p
+                .iter()
+                .filter(|c| c.x > w.size.x - 0.05 && c.z > 8.4 && c.z < w.aisle_z1 + 1.2);
+            assert!(
+                produce.clone().count() >= 1 && produce.clone().all(|c| c.y >= 2.3),
+                "{seed}: kein Plakat ueber dem Obstregal"
+            );
+            // ungleiche Abstaende und Hoehen: nicht alle gleich
+            let mut ys: Vec<f32> = p.iter().map(|c| c.y).collect();
+            ys.dedup_by(|a, b| (*a - *b).abs() < 1e-3);
+            assert!(ys.len() > 1, "{seed}: alle gleich hoch");
+        }
+    }
+    assert!(
+        walls_used.iter().filter(|&&b| b).count() >= 3,
+        "nur an {walls_used:?}"
+    );
+}
+
+/// Je Entwurf ein Satz, der nur in der normalen bzw. nur in der grauenhaften Fassung steht
+/// (Reihenfolge wie `sortiment::DESIGNS`).
+const SORT_NORMAL: [&str; 12] = [
+    "Zeitreise per Mikrowelle",
+    "Alles nach Plan.",
+    "Neue Folge jeden Freitag",
+    "Staffel 1 jetzt online",
+    "Die Gilde sucht Mitglieder",
+    "Der Hahn erwacht",
+    "Ihr Glück wartet an Kasse 0",
+    "Rubbeln & gewinnen!",
+    "Der Geschmack von Freiheit",
+    "Leon kifft jeden Tag.",
+    "Leon dachte, er hat es im Griff.",
+    "Kiffen verändert dich.",
+];
+const SORT_HORROR: [&str; 12] = [
+    "Du bist in der falschen Zeitlinie",
+    "Es gibt keinen Plan.",
+    "Diese Folge endet nie.",
+    "Knie nieder, Kunde 0",
+    "Du bist jetzt Untertan",
+    "Er kräht nach dir",
+    "Sie haben schon verloren",
+    "Unter dem Feld ist ein Gesicht",
+    "Der Rauch hat ein Gesicht",
+    "Leon ist noch hier.",
+    "Es hat Leon im Griff.",
+    "Leon ist nicht mehr Leon.",
+];
+
+fn at_level(seed: u64, decay: u8) -> World {
+    let mut p = WorldParams::normal(seed);
+    p.tipped = decay > 0;
+    p.stretch = 2.0;
+    p.decay = decay.saturating_sub(1);
+    generate(&p)
+}
+
+#[test]
+fn the_poster_assortment_is_shuffled_per_start_and_has_all_designs() {
+    use gen::sortiment::{shuffled, DESIGNS};
+    assert_eq!(DESIGNS.len(), 4);
+    let key = |d: &gen::sortiment::Design| *d as usize;
+    let mut all: Vec<usize> = DESIGNS
+        .iter()
+        .flat_map(|(_, d)| d.iter().map(key))
+        .collect();
+    all.sort();
+    let mut orders = std::collections::HashSet::new();
+    for seed in 0..8u64 {
+        let mut o: Vec<usize> = shuffled(seed).iter().map(key).collect();
+        orders.insert(o.clone());
+        o.sort();
+        assert_eq!(o, all, "jeder Entwurf genau einmal");
+        assert_eq!(
+            shuffled(seed).iter().map(key).collect::<Vec<_>>(),
+            shuffled(seed).iter().map(key).collect::<Vec<_>>(),
+            "gleicher Start, gleiche Mischung"
+        );
+    }
+    assert!(orders.len() >= 7, "Mischung wechselt nicht");
+    // jeder Entwurf haengt in irgendeinem Markt
+    let a = crate::signs::atlas();
+    let mut seen = [false; 12];
+    for seed in 0..30u64 {
+        let ids = sign_ids(&gen(seed, false));
+        for (k, t) in SORT_NORMAL.iter().enumerate() {
+            seen[k] |= ids.contains(&a.id(t));
+        }
+    }
+    assert!(seen.iter().all(|&s| s), "nie aufgehaengt: {seen:?}");
+}
+
+#[test]
+fn posters_get_creepier_with_the_market_level() {
+    let a = crate::signs::atlas();
+    let count = |w: &World, list: &[&str]| {
+        let ids = sign_ids(w);
+        list.iter().filter(|t| ids.contains(&a.id(t))).count()
+    };
+    let same = a.id(POSTER_SAME);
+    for seed in [3u64, 8, 21] {
+        let normal = at_level(seed, 0);
+        assert!(
+            count(&normal, &SORT_NORMAL) >= 4,
+            "{seed}: zu wenig Plakate"
+        );
+        assert_eq!(
+            count(&normal, &SORT_HORROR),
+            0,
+            "{seed}: Grauen im normalen Markt"
+        );
+        assert!(!sign_ids(&normal).contains(&same));
+        // unruhig: schon anders, noch kein Aufkleber
+        let eerie = at_level(seed, 2);
+        assert_eq!(
+            count(&eerie, &SORT_NORMAL),
+            0,
+            "{seed}: unruhig noch normal"
+        );
+        assert!(!sign_ids(&eerie).contains(&same));
+        // Kollaps: grauenhaft, mit Aufkleber
+        let horror = at_level(seed, 4);
+        assert!(
+            count(&horror, &SORT_HORROR) >= 4,
+            "{seed}: nicht grauenhaft"
+        );
+        assert_eq!(count(&horror, &SORT_NORMAL), 0);
+        assert!(sign_ids(&horror).contains(&same), "{seed}: kein Aufkleber");
+        // gekippt: mehr dunkle Flaechen (Flecken, Blut) als im normalen Markt
+        let marks = |w: &World| w.instances.len();
+        assert!(marks(&horror) > marks(&normal));
+    }
+}
+
+#[test]
+fn every_poster_text_is_in_the_sign_atlas() {
+    let a = crate::signs::atlas();
+    for t in gen::sortiment::texts()
+        .into_iter()
+        .chain(HACKEPETER_TEXTS.iter().copied())
+    {
+        // unbekannte Texte landen auf Zeile 0 (Ladenname)
+        assert!(
+            a.id(t) != 0 || t == crate::signs::BRAND,
+            "fehlt im Atlas: {t}"
+        );
+    }
+}

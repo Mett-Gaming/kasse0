@@ -32,7 +32,8 @@ pub struct Wing {
     pub doors: Vec<Vec3>,
     /// Endlos-Flur (innen), nur im Kollaps
     pub hall: Option<Aabb>,
-    /// Durchgang ins Nichts (Mitte der Oeffnung), ab "falsch"
+    /// Durchgang ins Nichts (Mitte der Oeffnung), ab "falsch" (nur von Tests gelesen)
+    #[cfg_attr(not(test), allow(dead_code))]
     pub void: Option<Vec3>,
     /// Tuer am Ende des Flurs (Mitte)
     pub hall_end: Option<Vec3>,

@@ -1,17 +1,19 @@
 //! Generator fuer KAUF NULL: Discounter-Grundriss mit Abteilungen und echten Waren.
 
 mod ads;
+mod canvas;
 mod corridor;
 mod decay;
 mod fixtures;
+pub(super) mod sortiment;
 mod wing;
 
-use ads::hackepeter_poster;
 pub use ads::HACKEPETER_TEXTS;
 pub use corridor::{
     corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
     CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
 };
+pub use sortiment::texts as sortiment_texts;
 pub use wing::Wing;
 
 use super::layout::{self, Layout};
@@ -1386,74 +1388,22 @@ pub fn generate(params: &WorldParams) -> World {
         if tipped { 0.4 } else { 0.0 },
     );
 
-    // --- Werbeposter (verrotten im gekippten Markt, siehe Shader) ---
-    let mut poster_seed = 0.0f32;
-    let mut poster = |b: &mut Builder, c: Vec3, h: Vec3| {
-        // ab Stufe "falsch" sind alle Plakate gleich: Farbe, Verfall, Text
-        let same = tipped && params.mix >= 2;
-        let pseed = if same { 0.0 } else { poster_seed };
-        let col = PALETTE[(pseed as usize * 3 + seed as usize) % PALETTE.len()];
-        b.add_ex(c, h, col, POSTER, pseed, 0.0, 0.0);
-        // Schriftzug oben auf dem Plakat
-        let texts: [&str; 2] = if tipped {
-            ["Seit immer frisch", "Wir sehen Sie"]
-        } else {
-            ["Heute frisch", "AKTION"]
-        };
-        let text = if same {
-            POSTER_SAME
-        } else {
-            texts[poster_seed as usize % 2]
-        };
-        let (lc, yaw, hw) = if h.x < h.z {
-            (
-                vec3(c.x + 0.008, c.y + h.y * 0.72, c.z),
-                FRAC_PI_2,
-                h.z * 0.85,
-            )
-        } else {
-            (vec3(c.x, c.y + h.y * 0.72, c.z - 0.008), 0.0, h.x * 0.85)
-        };
-        b.label(
-            lc,
-            yaw,
-            hw,
-            0.09,
-            text,
-            vec3(0.96, 0.94, 0.88),
-            4.0,
-            0.0,
-            0.0,
-        );
-        poster_seed += 1.0;
-    };
-    // Jedes zweite Plakat an der Westwand und das letzte an der Suedwand (neben dem Eingang)
-    // wirbt fuer HACKEPETER, das andere Spiel im Mett-Launcher (hackepeter_poster)
-    // die drei Entwuerfe wechseln sich ab (Start je Markt verschieden)
-    let mut style = seed as usize % 3;
-    let mut pz = aisle_z0 + 1.5;
-    let mut k = 0;
-    while pz < aisle_z1 - 1.0 {
-        let (c, h) = (vec3(0.012, 1.75, pz), vec3(0.004, 0.7, 0.5));
-        if k % 2 == 0 {
-            hackepeter_poster(&mut g.b, c, h, tipped, pz, style);
-            style += 1;
-        } else {
-            poster(&mut g.b, c, h);
+    // --- Plakat-Sortiment (gen/sortiment/): feste Plaetze an der Westwand (alle 7 m) und an
+    // der Suedwand (alle 6 m), bei jedem Spielstart neu gemischt, gruseliger mit der Stufe.
+    // Die HACKEPETER-Plakate kommen ganz am Ende an zufaellige freie Stellen (gen/ads.rs).
+    {
+        let mut spots = Vec::new();
+        let mut pz = aisle_z0 + 1.5;
+        while pz < aisle_z1 - 1.0 {
+            spots.push((vec3(0.0, 1.75, pz), vec3(1.0, 0.0, 0.0)));
+            pz += 7.0;
         }
-        pz += 7.0;
-        k += 1;
-    }
-    let mut px = 2.0;
-    while px < door_x0 - 1.5 {
-        let (c, h) = (vec3(px, 1.9, depth - 0.012), vec3(0.5, 0.7, 0.004));
-        if px + 6.0 >= door_x0 - 1.5 {
-            hackepeter_poster(&mut g.b, c, h, tipped, px, style);
-            style += 1;
-        } else {
-            poster(&mut g.b, c, h);
+        let mut px = 2.0;
+        while px < door_x0 - 1.5 {
+            spots.push((vec3(px, 1.9, depth), vec3(0.0, 0.0, -1.0)));
+            px += 6.0;
         }
-        px += 6.0;
+        g.place_sortiment(&spots);
     }
 
     // --- Verfall: Loecher, verdorbene Ware, Riesenwaren (nur gekippt, je nach Stufe) ---
@@ -1491,6 +1441,10 @@ pub fn generate(params: &WorldParams) -> World {
             g.rng.gen_range(0.0..std::f32::consts::TAU),
         ));
     }
+
+    // HACKEPETER-Werbung: zufaellige freie Stellen an allen Aussenwaenden (gen/ads.rs)
+    let produce = (pz1 - pz0 > 3.0).then_some((pz0, pz1));
+    g.place_hackepeter_posters(width, depth, produce);
 
     let (fog_color, fog_density) = if tipped {
         (vec3(0.03, 0.035, 0.03), 0.045 + params.darkness * 0.03)

@@ -104,15 +104,32 @@ Angelehnt an die Stimmung liminaler Räume, ohne etwas daraus zu übernehmen. Al
 **Gangnummern und Plakate** (`world/gen.rs`):
 - An beiden Enden jedes Gangs hängt ein Nummernschild („Gang 1“ …).
 - Ab „unruhig“ tragen alle dieselbe Nummer, im Kollaps steht überall „Gang 0“.
-- Ab „falsch“ sind alle Plakate gleich: gleiche Farbe, gleicher Verfall, Text „Sie waren schon hier“. Ausgenommen sind die HACKEPETER-Plakate (siehe unten).
+- Ab „falsch“ klebt auf jedem Plakat des Sortiments ein roter Aufkleber „Sie waren schon hier“ (siehe **Plakat-Sortiment**).
 
-**Werbung für HACKEPETER** (`world/gen/ads.rs`): Das andere Spiel im Mett-Launcher wirbt im Markt. Jedes zweite Plakat an der Westwand und das Plakat an der Südwand neben dem Eingang ist ein HACKEPETER-Plakat. Drei Entwürfe wechseln sich ab, der erste hängt vom Markt ab. Alles ist aus Flächen, Boxen und Schriftzügen gebaut, dazu ein Mettbrötchen aus Boxen mit Zwiebelstücken.
+**Werbung für HACKEPETER** (`world/gen/ads.rs`): Das andere Spiel im Mett-Launcher wirbt im Markt. Bis zu 8 HACKEPETER-Plakate hängen an zufälligen Stellen aller vier Außenwände, in ungleichen Abständen und auf leicht verschiedener Höhe (Mitte 1,55–1,95 m; ist dort ein Regal an der Wand, hoch darüber bei 2,4–2,65 m). Zuerst kommen bis zu 2 an die Wand der Obstabteilung, hoch über dem Stufenregal; flache Zierleisten auf der Wand darf ein Plakat überdecken (es steht 3 cm vor der Wand), Hängeschilder bis 1,2 m davor nicht. Fester Zufall je Markt (`place_hackepeter_posters`), ganz am Ende des Aufbaus. Jede Stelle wird geprüft: Hinter dem ganzen Plakat muss Wand sein (keine Tür, kein Fenster, keine Öffnung zum Seitentrakt), davor darf bis 0,3 m mit 0,25 m Rand nichts hängen oder stehen (Regale, Kühlwand, Schilder, Smiley-Plakate, andere HACKEPETER-Plakate). Eigene Fläche ohne Maskottchen-Gesicht. Drei Entwürfe wechseln sich ab, der erste hängt vom Markt ab. Alles ist aus Flächen, Boxen und Schriftzügen gebaut, dazu ein Mettbrötchen aus Boxen mit Zwiebelstücken.
 
-| Entwurf | Normaler Markt | Gekippter Markt (verblasst, verrottet) |
+| Entwurf | Normaler Markt | Gekippter Markt (verblasst) |
 |---|---|---|
 | A Fahndungsplakat | cremefarben mit dunklem Rahmen, „GESUCHT“, „HACKEPETER“, Brötchen im Bildkasten, „Wegen Mettbrötchen-Diebstahl“, „Jetzt im Mett-Launcher“ | „GEFUNDEN“, Bildkasten schwarz, „Er ist hier“, „Gib das Brötchen zurück“ |
 | B Rennplakat | dunkelblau mit gelben und rosa Tempo-Streifen, Brötchen mit Fahrtwind, „Die Mettbrötchen-Flucht“, „1 Dieb gegen 7 Cops“ | Streifen weg, „Er rennt immer noch“, „Keiner kommt an“ |
 | C Aktionsplakat | weiß mit rotem Band „AKTION“, Brötchen mit gelbem Preisschild „0,00 €“, „Gratis im Mett-Launcher“ | „ABGELAUFEN“, „Seit immer im Angebot“, „Nicht mehr verfügbar“ |
+
+**Plakat-Sortiment** (`world/gen/sortiment/`):
+Die Smiley-Plakate sind weg. Auf den festen Plakatplätzen (Westwand alle 7 m, Südwand alle 6 m) hängt ein Sortiment aus 12 Plakaten in 4 Kategorien, je 3 Entwürfe. Bei jedem Spielstart wird neu gemischt (`sortiment::shuffled`, Seed des Runs). Beim Umbau des Markts bleibt die Verteilung gleich, nur die Gruselstufe ändert sich. Alles ist aus Flächen, Boxen und Schriftzügen gebaut (`gen/canvas.rs`). Synchro ist die eigene Fandub-Gruppe, auf den Plakaten stehen nur die Parodie-Titel (keine echten Serientitel oder Figuren). Tabakmarke und Leon sind erfunden.
+
+| Kategorie | Entwürfe |
+|---|---|
+| Synchro STEIN-HART (Fandub-Satire der Gruppe Synchro, Zeitreise) | Mikrowelle als Zeitmaschine („Zeitreise per Mikrowelle“), Laborkittel-Porträt mit Sprechblase („Alles nach Plan.“), Uhr („Neue Folge jeden Freitag“) |
+| Synchro OVERCOCK (Fandub-Satire, untoter Herrscher) | Skelettkönig mit Krone und roten Augen („Staffel 1 jetzt online“), Gilden-Wappen („Die Gilde sucht Mitglieder“), Vorschau mit Stab und Augen im Dunkeln („Nächste Folge: Der Hahn erwacht“) |
+| Glücksspiel und Tabak | LOTTO NULL (sechs Kugeln mit Null), Rubbellos GOLDENE NULL, Zigaretten NEBELBANK mit Warnhinweis |
+| Aufklärung: Leons Cannabis-Sucht (erfundene Figur) | Porträt „Das ist Leon.“, Verbotsschild mit Pflanze, Vorher/Nachher „Leon vor 1 Jahr / heute“; alle mit erfundenem Sucht-Telefon „000 / 000 000“ |
+
+**Gruselstufe** (`sortiment::level_of`: 0 normaler Markt, 1 ruhig, 2 unruhig, 3 falsch, 4 Kollaps):
+- Farben verblassen und dunkeln mit jeder Stufe nach.
+- Jeder Text hat drei Fassungen: normal (0–1), unheimlich (2), grauenhaft (3–4), z. B. „Zeitreise per Mikrowelle“ → „Die Mikrowelle läuft noch“ → „Du bist in der falschen Zeitlinie“ oder „Leon kifft jeden Tag.“ → „Leon kifft seit immer.“ → „Leon ist noch hier.“
+- Ab 2: braune Flecken und eine abgerissene Ecke.
+- Ab 3: Aufkleber „Sie waren schon hier“. Gesichter bekommen schwarze Augenhöhlen und einen offenen Mund. Die Mikrowelle glüht rot, die Uhr verliert ihre Zeiger und bekommt ein Auge, im Gilden-Wappen öffnen sich Augen, Leon „heute“ ist nur noch ein schwarzer Umriss, die Lottokugeln werden dunkelrot.
+- 4: Blut läuft von oben herab, die Augen sind rot, und der Zigarettenrauch bekommt ein Gesicht.
 
 **Déjà-vu-Szene** (`game/dejavu.rs`, ab „unruhig“, alle 40–70 s minus 6 s je Stufe):
 - Die Szene besteht aus einem schräg stehenden leeren Wagen, einer umgekippten Dose, einem Warnschild und meist einer reglosen Kundin, die ins Regal starrt.
@@ -127,7 +144,7 @@ Angelehnt an die Stimmung liminaler Räume, ohne etwas daraus zu übernehmen. Al
 - Sie ist kein NPC und fängt nie.
 - Gestalt und Déjà-vu benutzen einen eigenen Zufall (`eerie_rng`), damit sie den Ablauf von NPCs und Schrecken nicht verschieben.
 
-Neue Wände werden nur gebaut, wenn danach Getränkeraum, Kassen, Wagenbox und alle Waren erreichbar bleiben. Röhren wechseln alle paar Sekunden zufällig ihr Flacker-Muster. Die Werbeposter (ein Maskottchen-Gesicht, prozedural im Shader) verrotten mit Stufe und Zeit: Augen werden zu Löchern, es fließen blutige Tränen, das Lächeln kippt in einen aufgerissenen Mund. Fata Morganen erscheinen alle 14–28 s in 9–20 m Entfernung und verschwinden, wenn man auf 5 m herankommt.
+Neue Wände werden nur gebaut, wenn danach Getränkeraum, Kassen, Wagenbox und alle Waren erreichbar bleiben. Röhren wechseln alle paar Sekunden zufällig ihr Flacker-Muster. Im Markt hängt das Plakat-Sortiment (siehe **Plakat-Sortiment** oben); die Maskottchen-Plakate des Shaders gibt es nur noch im Fluchtkorridor. Fata Morganen erscheinen alle 14–28 s in 9–20 m Entfernung und verschwinden, wenn man auf 5 m herankommt.
 
 ## Sortiment und Abteilungen
 - Katalog `tools/catalog.json`: 19 Unterabteilungen (Obst, Gemüse, Brot, Milch, Käse, Fleisch, Fisch, Fertiggerichte, Eis, TK, Nudeln, Konserven, Frühstück, Kaffee, Süßes, Snacks, Drogerie, Haushalt, Getränke), jede mit einer Einrichtungsart (Obstkisten, Regal, Kühlwand, Truhe).
