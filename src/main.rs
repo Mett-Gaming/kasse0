@@ -720,6 +720,7 @@ impl App {
             camera_skins: &self.monitor_skins,
             bones: &self.bones,
             ui: &self.ui.verts,
+            ..Default::default()
         };
         stage.draw(&input);
     }
