@@ -999,6 +999,76 @@ fn stalkers_catch_up_faster_when_you_run() {
 }
 
 #[test]
+fn the_checkout_barrier_is_drawn_until_the_list_is_complete() {
+    let tape = |g: &Game| {
+        let mut out = Vec::new();
+        g.collect_draws(&mut out);
+        out.iter()
+            .filter(|d| {
+                d.mesh == MeshId::Cube as usize && d.tint == Vec4::new(0.9, 0.1, 0.08, 0.15)
+            })
+            .count()
+    };
+    let mut g = Game::new(12);
+    assert_eq!(tape(&g), 0, "Band im normalen Markt");
+    g.tip();
+    assert!(tape(&g) > 4, "kein Absperrband im gekippten Markt");
+    // auch mit geschobenem Wagen direkt daneben
+    let (x0, _, z0, _) = g.checkout_barrier().unwrap();
+    g.player.pos = g.world.collide(vec3(x0 + 1.0, 0.0, z0 - 1.0), 0.3);
+    g.trolley.pushing = true;
+    assert!(tape(&g) > 4);
+    g.fill_list_cheap();
+    assert_eq!(tape(&g), 0, "Band trotz vollem Zettel");
+}
+
+#[test]
+fn the_cart_fits_between_the_aisle_ends_and_the_checkout_barrier() {
+    let mut g = Game::new(12);
+    g.tip();
+    g.customers.clear();
+    g.employees.clear();
+    g.god = true;
+    let (x0, x1, z0, _) = g.checkout_barrier().expect("keine Absperrung");
+    // Wagen schieben, seitlich zwischen Gangenden (Gitterboxen) und Absperrband entlang
+    let z = (g.world.aisle_z1 + 1.0 + z0) * 0.5;
+    let start = g.world.collide(vec3(x0 + 0.5, 0.0, z), 0.3);
+    let push_along = |g: &mut Game, yaw: f32, secs: f32| {
+        g.player.yaw = yaw;
+        g.player.pitch = 0.0;
+        let (s, c) = yaw.sin_cos();
+        g.trolley.pushing = true;
+        g.trolley.yaw = yaw;
+        g.trolley.pos = g.player.pos + vec3(s, 0.0, -c) * hands::CART_OFFSET;
+        step(
+            g,
+            secs,
+            Input {
+                forward: true,
+                ..Default::default()
+            },
+        );
+    };
+    g.player.pos = start;
+    push_along(&mut g, std::f32::consts::FRAC_PI_2, 3.0); // nach Osten
+    assert!(
+        g.player.pos.x > start.x + 3.0 && g.player.pos.x < x1 + 2.0,
+        "Wagen bleibt haengen: {:?} (Start {:?})",
+        g.player.pos,
+        start
+    );
+    // mit dem Wagen von Norden aus dem Gang direkt aufs Band zu: der Wagen bleibt draussen
+    let lane_x = g.open_lane().unwrap().scan_point.x;
+    g.player.pos = g.world.collide(vec3(lane_x, 0.0, z0 - 2.4), 0.3);
+    push_along(&mut g, std::f32::consts::PI, 2.0); // nach Sueden
+    assert!(
+        g.trolley.pos.z < z0 - hands::CART_PUSH_RADIUS + 0.05,
+        "Wagen in der Kasse: {:?}",
+        g.trolley.pos
+    );
+}
+
+#[test]
 fn checkout_is_closed_until_the_list_is_complete() {
     let mut g = Game::new(12);
     g.tip();

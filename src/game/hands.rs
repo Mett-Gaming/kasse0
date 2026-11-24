@@ -15,7 +15,7 @@ const CART_ROW: f32 = 0.175;
 /// So weit sinkt Ware in den Drahtboden ein (sie soll aufliegen, nicht schweben)
 const CART_SINK: f32 = 0.01;
 /// Kollisionsradius des geschobenen Wagens (breiter als ein Durchgang)
-const CART_PUSH_RADIUS: f32 = 0.42;
+pub(super) const CART_PUSH_RADIUS: f32 = 0.42;
 /// Radius des abgestellten Wagens fuer die Spielerkollision
 const CART_RADIUS: f32 = 0.5;
 /// Wie nah der Wagen fuer Q/F sein muss
