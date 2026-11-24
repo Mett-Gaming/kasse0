@@ -1,6 +1,7 @@
 //! HUD des Kassen-Minispiels: Misstrauen der Kassiererin, Kassen-Leben, ihre Fragen,
 //! Karte durchziehen und PIN-Eingabe am Terminal.
 
+use super::KeyHints;
 use crate::game::till::cash::{denom_label, DENOMS};
 use crate::game::till::{Pay, Till, PIN_TIME, QUESTION_TIME, TILL_LIVES};
 use crate::game::Game;
@@ -42,9 +43,9 @@ fn draw_scamcart(u: &mut Ui, x: f32, y: f32, time: f32) {
     // Schriftzug; flackert ab und zu rot versetzt
     let ink = [0.95, 0.9, 0.55, 1.0];
     if (time * 0.9).fract() < 0.12 {
-        u.text(x + 9.0, y + 5.0, "SCAMCART", [0.9, 0.1, 0.1, 0.8], 1.0);
+        u.hint(x + 9.0, y + 5.0, "SCAMCART", [0.9, 0.1, 0.1, 0.8], 1.0);
     }
-    u.text(x + 8.0, y + 5.0, "SCAMCART", ink, 1.0);
+    u.hint(x + 8.0, y + 5.0, "SCAMCART", ink, 1.0);
 
     // Chip mit Kontaktlinien
     let (chx, chy) = (x + 10.0, y + 20.0);
@@ -78,9 +79,9 @@ fn draw_scamcart(u: &mut Ui, x: f32, y: f32, time: f32) {
 
     // Nummer, Name, Ablaufdatum
     let txt = [0.92, 0.92, 0.88, 1.0];
-    u.text(x + 8.0, y + 40.0, "0000 0000 0666", txt, 1.0);
-    u.text(x + 8.0, y + 54.0, "KUNDE 0", txt, 1.0);
-    u.text(
+    u.hint(x + 8.0, y + 40.0, "0000 0000 0666", txt, 1.0);
+    u.hint(x + 8.0, y + 54.0, "KUNDE 0", txt, 1.0);
+    u.hint(
         x + 8.0,
         y + 70.0,
         "GÜLTIG BIS 01/89",
@@ -105,7 +106,7 @@ fn draw_scamcart(u: &mut Ui, x: f32, y: f32, time: f32) {
     u.rect(sx, sy + sh - 1.0, sw, 1.0, red);
     u.rect(sx, sy, 1.0, sh, red);
     u.rect(sx + sw - 1.0, sy, 1.0, sh, red);
-    u.text(sx + 4.0, sy + 3.0, "ABGELAUFEN", red, 1.0);
+    u.hint(sx + 4.0, sy + 3.0, "ABGELAUFEN", red, 1.0);
 }
 
 /// Fenster des Kartenlesers: oben ein Display, darunter der Leser mit Schlitz. Erst steckt die
@@ -119,7 +120,7 @@ fn draw_reader(u: &mut Ui, t: &Till, progress: f32, moving: bool, ready: bool, t
     let (x0, y0) = ((ui::W - w) * 0.5, READER_Y);
     u.rect(x0, y0, w, h, [0.05, 0.05, 0.06, 0.92]);
     u.rect(x0, y0, w, 1.0, [0.9, 0.9, 0.85, 0.6]);
-    u.text_center(y0 + 5.0, "KARTE DURCHZIEHEN", YELLOW, 1.0);
+    u.hint_center(y0 + 5.0, "KARTE DURCHZIEHEN", YELLOW, 1.0);
 
     // Display: Rueckmeldung des Lesers
     let (text, color) = match t.reader {
@@ -132,7 +133,7 @@ fn draw_reader(u: &mut Ui, t: &Till, progress: f32, moving: bool, ready: bool, t
     let (lw, lx) = (184.0, (ui::W - 184.0) * 0.5);
     u.rect(lx, y0 + 17.0, lw, 14.0, [0.03, 0.12, 0.06, 1.0]);
     let tx = (ui::W - Ui::text_width(text, 1.0)) * 0.5;
-    u.text(tx, y0 + 20.0, text, color, 1.0);
+    u.hint(tx, y0 + 20.0, text, color, 1.0);
 
     let (rx, rw) = (x0 + 8.0, w - 16.0);
     let body = [0.2, 0.2, 0.23, 1.0];
@@ -148,7 +149,7 @@ fn draw_reader(u: &mut Ui, t: &Till, progress: f32, moving: bool, ready: bool, t
         let ay = y0 + 40.0;
         for k in 0..3 {
             let ax = rx + rw * 0.5 - 12.0 + k as f32 * 10.0;
-            u.text(ax, ay, ">", DIM, 1.0);
+            u.hint(ax, ay, ">", DIM, 1.0);
         }
     } else {
         u.rect(rx, y0 + 36.0, rw, 12.0, [0.26, 0.26, 0.29, 1.0]);
@@ -183,16 +184,16 @@ fn draw_reader(u: &mut Ui, t: &Till, progress: f32, moving: bool, ready: bool, t
     } else {
         "[E] Karte aus dem Portemonnaie nehmen"
     };
-    u.text_center(y0 + h - 30.0, hint, WHITE, 1.0);
+    u.hint_center(y0 + h - 30.0, hint, WHITE, 1.0);
     if ready {
-        u.text_center(
+        u.hint_center(
             y0 + h - 20.0,
             "nicht zu schnell - nicht zu langsam",
             DIM,
             1.0,
         );
     }
-    u.text_center(y0 + h - 10.0, "F: Abbruch", DIM, 1.0);
+    u.hint_center(y0 + h - 10.0, "F: Abbruch", DIM, 1.0);
 }
 
 #[cfg(test)]

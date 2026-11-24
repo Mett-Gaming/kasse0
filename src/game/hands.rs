@@ -66,6 +66,12 @@ impl Game {
         if input.left {
             wish -= right;
         }
+        // Stick: jede Richtung, halb gedrueckt langsamer
+        let (sx, sy) = input.stick;
+        let push = sx.hypot(sy).min(1.0);
+        if push > 0.0 {
+            wish = forward * sy + right * sx;
+        }
         // im Fluchtkorridor: Ausdauer unendlich; dort auch Tempo-Grenzen (Stolpern, Engstellen)
         let endless = self.corridor_endless_stamina();
         let (slow, cap) = self.corridor_speed();
@@ -117,7 +123,8 @@ impl Game {
         if wish.length_squared() > 0.0 {
             let base = if running { RUN_SPEED } else { WALK_SPEED };
             let v = (base + (RUN_SPEED * CROUCH_SPEED - base) * crouch) * slow;
-            wish = wish.normalize() * v.min(cap);
+            let push = if push > 0.0 { push.max(0.25) } else { 1.0 };
+            wish = wish.normalize() * v.min(cap) * push;
         }
         if landed {
             self.play(Sfx::Step, 0.6);

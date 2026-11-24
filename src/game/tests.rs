@@ -2185,3 +2185,40 @@ fn the_side_wing_is_quiet_and_stalkers_find_the_way_in() {
     step(&mut g, 3.0, Input::default());
     assert_eq!(g.outcome, Outcome::Running);
 }
+
+#[test]
+fn the_stick_walks_in_any_direction_and_gently_when_pushed_gently() {
+    let walked = |stick: (f32, f32)| {
+        let mut g = Game::new(3);
+        g.customers.clear();
+        g.trolley.pushing = false;
+        g.trolley.pos = g.world.corral;
+        let from = g.player.pos;
+        let yaw = g.player.yaw;
+        let mut inp = Input {
+            stick,
+            ..Default::default()
+        };
+        for _ in 0..30 {
+            g.update(1.0 / 60.0, &mut inp);
+        }
+        let d = g.player.pos - from;
+        (d.x * yaw.sin() - d.z * yaw.cos(), d.length())
+    };
+    let (full, _) = walked((0.0, 1.0));
+    let (half, _) = walked((0.0, 0.5));
+    assert!(full > 0.3, "geht nicht vorwaerts: {full}");
+    assert!(half > 0.1 && half < full * 0.75, "{half} von {full}");
+    assert!(walked((0.0, 0.0)).1 < 0.05);
+}
+
+#[test]
+fn the_pad_turns_the_view_the_same_at_any_mouse_sensitivity() {
+    for s in [0.3, 1.0, 2.5] {
+        let mut g = Game::new(3);
+        g.sensitivity = s;
+        let yaw = g.player.yaw;
+        g.turn(0.4, 0.1);
+        assert!((g.player.yaw - yaw - 0.4).abs() < 1e-3);
+    }
+}

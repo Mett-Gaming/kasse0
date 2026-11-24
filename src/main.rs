@@ -3,10 +3,12 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod air;
 mod assets;
 mod audio;
 mod autoshot;
 mod catalog;
+mod controls;
 // Engine-Teile aus Mettgine unter den gewohnten Namen
 use mettgine::app::{AppConfig, Stage};
 use mettgine::presence::Status;
@@ -14,6 +16,7 @@ use mettgine::time::FixedStep;
 pub use mettgine::{crash, render, ui};
 mod game;
 mod hud;
+mod pad;
 mod people;
 mod settings;
 mod signs;
@@ -23,6 +26,7 @@ use audio::{Audio, Mood, Sfx};
 use game::{Game, Outcome};
 use hud::options::{self, Page, Row};
 use hud::Screen;
+use mettgine::input::Bind;
 use settings::Settings;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use winit::{
@@ -54,6 +58,9 @@ struct App {
     ui: ui::Ui,
     draws: Vec<render::MeshDraw>,
     ghosts: Vec<render::MeshDraw>,
+    /// Staub, Rauch, Atem
+    air: air::Air,
+    air_draws: Vec<mettgine::particles::ParticleInst>,
     /// animierte Figuren dieses Frames und ihre Knochen-Matrizen
     people: Vec<people::PersonDraw>,
     skins: Vec<render::SkinDraw>,
@@ -61,6 +68,12 @@ struct App {
     monitor_skins: Vec<render::SkinDraw>,
     bones: Vec<glam::Mat4>,
     input: game::Input,
+    keys: controls::Keys,
+    pad: pad::PadState,
+    /// Aktion, die gerade eine neue Taste bekommt
+    rebinding: Option<controls::Action>,
+    /// Geraet, fuer das die Hinweise gerade gelten (None = neu rechnen)
+    hints_for: Option<bool>,
     show_list: bool,
     mouse_delta: (f32, f32),
     cursor: (f32, f32),
@@ -106,11 +119,17 @@ impl App {
             ui: ui::Ui::default(),
             draws: Vec::new(),
             ghosts: Vec::new(),
+            air: air::Air::new(),
+            air_draws: Vec::new(),
             people: Vec::new(),
             skins: Vec::new(),
             monitor_skins: Vec::new(),
             bones: Vec::new(),
             input: game::Input::default(),
+            keys: controls::load(),
+            pad: Default::default(),
+            rebinding: None,
+            hints_for: None,
             show_list: false,
             mouse_delta: (0.0, 0.0),
             cursor: (0.0, 0.0),
@@ -287,6 +306,12 @@ impl App {
             Row::Back => return self.leave_options(),
             // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
             Row::Jumpscares => return self.start_menu_scare(),
+            Row::Keys => {
+                let Screen::Options { from_pause, .. } = self.screen else {
+                    return;
+                };
+                return self.go(Screen::Keys { from_pause });
+            }
             Row::Tutorial => {
                 self.settings.save();
                 return self.start_game(random_seed(), true);
@@ -368,6 +393,7 @@ impl App {
             },
             Screen::TutorialDone => self.to_title(),
             Screen::Options { .. } => self.activate_option(dir),
+            Screen::Keys { .. } => self.activate_key_row(),
             // Kategorien: Kategorie oeffnen oder zurueck ins Spiel
             Screen::Cheats { group: None } => {
                 if self.sel < game::cheat_groups().len() {
@@ -420,6 +446,17 @@ impl App {
             Screen::Playing => self.go(Screen::Paused),
             Screen::Paused => self.go(Screen::Playing),
             Screen::Options { .. } => self.leave_options(),
+            Screen::Keys { from_pause } => {
+                let mut to = self.options_screen(from_pause);
+                if let Screen::Options { page, .. } = &mut to {
+                    *page = Page::Controls;
+                }
+                self.go(to);
+                self.sel = options::rows(Page::Controls, true)
+                    .iter()
+                    .position(|r| *r == Row::Keys)
+                    .unwrap_or(0);
+            }
             Screen::Cheats { group: Some(g) } => {
                 self.go(Screen::Cheats { group: None });
                 self.sel = g;
@@ -487,6 +524,8 @@ impl App {
         // Screenshots wechseln den Bildschirm: Wuensche gleich erfuellen
         self.sync(stage);
 
+        self.poll_pad(stage, dt);
+
         match self.screen {
             Screen::Playing => {
                 // Kassenfenster: Mauszeiger frei, Position geht ans Spiel (game/belt_window.rs)
@@ -511,6 +550,7 @@ impl App {
                         ));
                     }
                 }
+                self.air.update(&self.game, dt);
                 let wait = if self.game.outcome == Outcome::Caught {
                     2.2
                 } else {
@@ -538,7 +578,9 @@ impl App {
             _ => {}
         }
 
-        for (s, v) in self.game.sfx.drain(..) {
+        let sounds = std::mem::take(&mut self.game.sfx);
+        self.rumble(stage, dt, &sounds);
+        for (s, v) in sounds {
             self.audio.play_vol(s, v);
         }
         self.game.scares.clear();
@@ -563,6 +605,7 @@ impl App {
                 paused: matches!(
                     self.screen,
                     Screen::Paused
+                        | Screen::Keys { from_pause: true }
                         | Screen::Options {
                             from_pause: true,
                             ..
@@ -595,11 +638,20 @@ impl App {
                 from_pause,
                 page,
             ),
+            Screen::Keys { from_pause } => hud::keys::draw(
+                &mut self.ui,
+                self.sel,
+                self.clock,
+                &self.keys,
+                self.rebinding,
+                from_pause,
+            ),
             Screen::End => hud::draw_end(&mut self.ui, &self.game, self.sel, self.clock),
             Screen::Cheats { group } => {
                 hud::draw_cheats(&mut self.ui, self.sel, self.clock, &self.game, group)
             }
         }
+        self.draw_pin_digit(stage.input.using_pad);
         if self.menu_scare > 0.0 {
             hud::draw_menu_scare(
                 &mut self.ui,
@@ -764,10 +816,18 @@ impl App {
             ui: &self.ui.verts,
             ..Default::default()
         };
+        self.air.instances(g.eye(), &mut self.air_draws);
+        stage.renderer.queue_particles(&self.air_draws);
         stage.draw(&input);
     }
 
     fn key(&mut self, code: KeyCode, pressed: bool, repeat: bool) {
+        if let Some(a) = self.rebinding {
+            if pressed && !repeat {
+                self.finish_rebind(a, Bind::Key(code));
+            }
+            return;
+        }
         if code == KeyCode::F12 && pressed && !repeat {
             let dir = std::env::var_os("USERPROFILE")
                 .map(std::path::PathBuf::from)
@@ -787,46 +847,33 @@ impl App {
         if self.screen == Screen::Playing {
             // Ziffern: 1-3 waehlen Antworten, 0-9 tippen die PIN am Kartenterminal
             if let Some(d) = digit_key(code) {
-                if pressed {
-                    if (1..=3).contains(&d) {
-                        self.input.choice = Some(d as usize - 1);
-                    }
-                    if !repeat {
-                        self.input.digit = Some(d);
-                    }
+                if pressed && !repeat {
+                    self.digit(d);
                 }
                 return;
             }
             match code {
-                KeyCode::KeyW | KeyCode::ArrowUp => self.input.forward = pressed,
-                KeyCode::KeyS | KeyCode::ArrowDown => self.input.back = pressed,
-                KeyCode::KeyA | KeyCode::ArrowLeft => self.input.left = pressed,
-                KeyCode::KeyD | KeyCode::ArrowRight => self.input.right = pressed,
-                KeyCode::ShiftLeft | KeyCode::ShiftRight => self.input.run = pressed,
-                KeyCode::Tab => {
-                    self.show_list = pressed;
-                    self.input.list_open = pressed;
-                }
-                KeyCode::KeyQ if pressed && !repeat => self.input.cart_toggle = true,
-                KeyCode::KeyF if pressed && !repeat => self.input.take_out = true,
-                KeyCode::KeyR if pressed && !repeat => self.input.complain = true,
-                KeyCode::KeyE if pressed && !repeat => self.input.interact = true,
-                // Leertaste springt, C oder Strg duckt (gehalten)
-                KeyCode::Space if pressed && !repeat => self.input.jump = true,
-                KeyCode::KeyC | KeyCode::ControlLeft | KeyCode::ControlRight => {
-                    self.input.crouch = pressed
-                }
                 // Esc schliesst zuerst das Kassenfenster, sonst Pause
                 KeyCode::Escape if pressed && !repeat && self.game.belt_window_open() => {
                     self.game.close_belt_window();
                 }
-                KeyCode::Escape | KeyCode::KeyP if pressed && !repeat => {
+                KeyCode::Escape | KeyCode::KeyP
+                    if pressed
+                        && !repeat
+                        && (code == KeyCode::Escape
+                            || self.action_of(Bind::Key(code)).is_none()) =>
+                {
                     if self.game.outcome == Outcome::Running {
                         self.go(Screen::Paused);
                     }
                 }
                 KeyCode::F1 if pressed && !repeat && self.game.outcome == Outcome::Running => {
                     self.go(Screen::Cheats { group: None })
+                }
+                _ if !repeat => {
+                    if let Some(a) = self.action_of(Bind::Key(code)) {
+                        self.action(a, pressed);
+                    }
                 }
                 _ => {}
             }
@@ -939,7 +986,9 @@ impl mettgine::app::Game for App {
 
     fn event(&mut self, stage: &mut Stage, event: &WindowEvent) {
         match event {
+            WindowEvent::Focused(true) => self.pad.focused = true,
             WindowEvent::Focused(false) => {
+                self.pad.focused = false;
                 if self.screen == Screen::Playing
                     && self.game.outcome == Outcome::Running
                     && self.autoshot.is_none()
@@ -970,11 +1019,16 @@ impl mettgine::app::Game for App {
             // Kassenfenster: Ware loslassen
             WindowEvent::MouseInput {
                 state: ElementState::Released,
-                button: MouseButton::Left,
+                button,
                 ..
             } => {
-                self.input.ui_released = true;
-                self.input.ui_down = false;
+                if *button == MouseButton::Left {
+                    self.input.ui_released = true;
+                    self.input.ui_down = false;
+                }
+                if let Some(a) = self.action_of(Bind::Mouse(*button)) {
+                    self.action(a, false);
+                }
             }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
@@ -990,9 +1044,11 @@ impl mettgine::app::Game for App {
                 } else if self.screen == Screen::Playing {
                     if !self.grabbed {
                         self.set_grab(true);
-                    } else if *button == MouseButton::Left {
-                        self.input.interact = true;
+                    } else if let Some(a) = self.action_of(Bind::Mouse(*button)) {
+                        self.action(a, true);
                     }
+                } else if let Some(a) = self.rebinding {
+                    self.finish_rebind(a, Bind::Mouse(*button));
                 } else if let Some(i) = hud::menu_hit(self.screen, self.cursor.0, self.cursor.1) {
                     self.sel = i;
                     let dir = if *button == MouseButton::Right { -1 } else { 1 };

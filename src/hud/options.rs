@@ -39,6 +39,9 @@ pub enum Row {
     /// erst, wenn man das Tutorial einmal geschafft hat
     Tutorial,
     Sensitivity,
+    PadSensitivity,
+    Rumble,
+    Keys,
     Volume,
     Music,
     Vhs,
@@ -52,7 +55,7 @@ pub enum Row {
 impl Row {
     /// Mit links/rechts verstellbar?
     pub fn is_value(self) -> bool {
-        !matches!(self, Row::Tutorial | Row::Back)
+        !matches!(self, Row::Tutorial | Row::Keys | Row::Back)
     }
 
     fn name(self) -> &'static str {
@@ -61,6 +64,9 @@ impl Row {
             Row::Jumpscares => "Jumpscares",
             Row::Tutorial => "Tutorial spielen",
             Row::Sensitivity => "Mausempfindlichkeit",
+            Row::PadSensitivity => "Controller-Blick",
+            Row::Rumble => "Vibration",
+            Row::Keys => "Tasten belegen",
             Row::Volume => "Lautstärke",
             Row::Music => "Musik",
             Row::Vhs => "VHS-Effekt",
@@ -79,6 +85,9 @@ impl Row {
             Row::Jumpscares => "Schreckmomente im Markt",
             Row::Tutorial => "Neuer Einkauf mit Anleitung",
             Row::Sensitivity => "Wie schnell sich der Blick mit der Maus dreht",
+            Row::PadSensitivity => "Wie schnell sich der Blick mit dem Stick dreht",
+            Row::Rumble => "Controller vibriert bei Schrecken",
+            Row::Keys => "Tastatur, Maus und Controller umstellen",
             Row::Volume => "Gesamte Lautstärke",
             Row::Music => "Kaufhaus-Gedudel",
             Row::Vhs => "Bildrauschen und Verzerrung der Videokassette",
@@ -93,7 +102,7 @@ impl Row {
     /// Grenzen der Werte mit Schieberegler.
     pub fn range(self) -> Option<(f32, f32)> {
         Some(match self {
-            Row::Sensitivity => (0.2, 3.0),
+            Row::Sensitivity | Row::PadSensitivity => (0.2, 3.0),
             Row::Volume | Row::Music => (0.0, 1.0),
             Row::Vhs => (0.0, 1.5),
             Row::Fov => (55.0, 100.0),
@@ -119,7 +128,12 @@ pub fn rows(page: Page, tutorial: bool) -> Vec<Row> {
                 rows.push(Row::Tutorial);
             }
         }
-        Page::Controls => rows.push(Row::Sensitivity),
+        Page::Controls => rows.extend([
+            Row::Sensitivity,
+            Row::PadSensitivity,
+            Row::Rumble,
+            Row::Keys,
+        ]),
     }
     rows.push(Row::Back);
     rows
@@ -132,6 +146,8 @@ pub fn value(row: Row, s: &Settings) -> String {
     match row {
         Row::Jumpscares => on_off(true),
         Row::Sensitivity => format!("{:.1}x", s.sensitivity),
+        Row::PadSensitivity => format!("{:.1}x", s.pad_sensitivity),
+        Row::Rumble => on_off(s.rumble),
         Row::Volume => percent(s.volume),
         Row::Music => percent(s.music),
         Row::Vhs => percent(s.vhs),
@@ -140,7 +156,7 @@ pub fn value(row: Row, s: &Settings) -> String {
         Row::FpsLimit if s.fps_limit == 0 => "frei".into(),
         Row::FpsLimit => s.fps_limit.to_string(),
         Row::LowLatency => on_off(s.low_latency),
-        Row::Tabs | Row::Tutorial | Row::Back => String::new(),
+        Row::Tabs | Row::Tutorial | Row::Keys | Row::Back => String::new(),
     }
 }
 
@@ -285,7 +301,11 @@ pub fn draw(u: &mut Ui, sel: usize, time: f32, s: &Settings, from_pause: bool, p
     }
     u.text_center(
         HINT_Y + 4.0,
-        "Tab: nächster Reiter - Links/Rechts: ändern - Esc: zurück",
+        if crate::controls::pad_active() {
+            "LB / RB: Reiter - Links/Rechts: ändern - B: zurück"
+        } else {
+            "Tab: nächster Reiter - Links/Rechts: ändern - Esc: zurück"
+        },
         DIM,
         1.0,
     );

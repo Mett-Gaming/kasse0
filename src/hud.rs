@@ -1,8 +1,8 @@
 //! HUD, Menues und End-Screens (alles im 480x270-Raster, unter dem VHS-Effekt).
 
 mod belt_window;
+pub mod keys;
 pub mod options;
-mod smoke;
 mod till;
 
 use crate::game::dialog::CART_OPENER;
@@ -10,6 +10,25 @@ use crate::game::tutorial::{Phase, Tutorial, PHASES as TUTORIAL_PHASES, STEPS as
 use crate::game::{Focus, Game, Outcome, PickupKind};
 use crate::settings::Settings;
 use crate::ui::{self, euro, Ui, DIM, GREEN, RED, WHITE, YELLOW};
+
+/// Text mit Tastenhinweisen: zeigt die Tasten, die gerade gelten (controls.rs).
+pub(crate) trait KeyHints {
+    fn hint(&mut self, x: f32, y: f32, s: &str, color: ui::Color, scale: f32);
+    fn hint_s(&mut self, x: f32, y: f32, s: &str, color: ui::Color, scale: f32);
+    fn hint_center(&mut self, y: f32, s: &str, color: ui::Color, scale: f32);
+}
+
+impl KeyHints for Ui {
+    fn hint(&mut self, x: f32, y: f32, s: &str, color: ui::Color, scale: f32) {
+        self.text(x, y, &crate::controls::hint(s), color, scale);
+    }
+    fn hint_s(&mut self, x: f32, y: f32, s: &str, color: ui::Color, scale: f32) {
+        self.text_s(x, y, &crate::controls::hint(s), color, scale);
+    }
+    fn hint_center(&mut self, y: f32, s: &str, color: ui::Color, scale: f32) {
+        self.text_center(y, &crate::controls::hint(s), color, scale);
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Screen {
@@ -19,6 +38,10 @@ pub enum Screen {
         /// Zeile "Tutorial spielen" (erst, wenn man das Tutorial einmal geschafft hat)
         tutorial: bool,
         page: options::Page,
+    },
+    /// Tasten belegen (aus den Optionen)
+    Keys {
+        from_pause: bool,
     },
     Playing,
     Paused,
@@ -68,7 +91,7 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
         Screen::AskTutorial => (150.0, 18.0),
         Screen::Champ | Screen::TutorialDone => (158.0, 18.0),
         // Optionen ordnet hud/options.rs selbst an
-        Screen::Playing | Screen::Options { .. } => (0.0, 0.0),
+        Screen::Playing | Screen::Options { .. } | Screen::Keys { .. } => (0.0, 0.0),
     }
 }
 
@@ -76,6 +99,7 @@ pub fn menu_len(screen: Screen) -> usize {
     match screen {
         Screen::Title => TITLE_ITEMS.len(),
         Screen::Options { tutorial, page, .. } => options::rows(page, tutorial).len(),
+        Screen::Keys { .. } => keys::count(),
         Screen::Paused => PAUSE_ITEMS.len(),
         Screen::End => END_ITEMS.len(),
         Screen::Cheats { group: None } => crate::game::cheat_groups().len() + 1,
@@ -115,6 +139,9 @@ pub fn menu_hit(screen: Screen, x: f32, y: f32) -> Option<usize> {
     if matches!(screen, Screen::Options { .. }) {
         return options::hit(menu_len(screen), x, y);
     }
+    if matches!(screen, Screen::Keys { .. }) {
+        return keys::hit(x, y);
+    }
     let (_, step) = menu_layout(screen);
     (0..menu_len(screen)).find(|&i| {
         let (cx, top, w) = menu_cell(screen, i);
@@ -141,16 +168,16 @@ fn draw_menu(u: &mut Ui, screen: Screen, items: &[String], sel: usize, time: f32
                 16.0,
                 [0.95, 0.95, 0.92, 0.12 + 0.05 * (time * 4.0).sin()],
             );
-            u.text_s(x, y, &shown, YELLOW, 1.0);
+            u.hint_s(x, y, &shown, YELLOW, 1.0);
         } else {
-            u.text_s(x, y, &shown, WHITE, 1.0);
+            u.hint_s(x, y, &shown, WHITE, 1.0);
         }
     }
 }
 
 fn osd(u: &mut Ui, time: f32, label: &str) {
     if (time * 1.5).fract() < 0.7 {
-        u.text_s(12.0, 10.0, &format!("▶ {label}"), WHITE, 1.0);
+        u.hint_s(12.0, 10.0, &format!("▶ {label}"), WHITE, 1.0);
     }
 }
 
@@ -162,11 +189,11 @@ fn timestamp(secs: f32) -> String {
 pub fn draw_title(u: &mut Ui, sel: usize, time: f32, seed_hint: u64) {
     u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.35]);
     osd(u, time, "PLAY");
-    u.text_center(52.0, "KASSE 0", WHITE, 4.0);
-    u.text_center(92.0, "ein ganz normaler Einkauf", DIM, 1.0);
+    u.hint_center(52.0, "KASSE 0", WHITE, 4.0);
+    u.hint_center(92.0, "ein ganz normaler Einkauf", DIM, 1.0);
     draw_menu(u, Screen::Title, &title_rows(), sel, time);
-    u.text_s(12.0, 252.0, &format!("Band #{seed_hint}"), DIM, 1.0);
-    u.text_s(
+    u.hint_s(12.0, 252.0, &format!("Band #{seed_hint}"), DIM, 1.0);
+    u.hint_s(
         ui::W - 12.0 - Ui::text_width(&timestamp(time), 1.0),
         252.0,
         &timestamp(time),
@@ -183,15 +210,15 @@ pub fn draw_ask_tutorial(u: &mut Ui, screen: Screen, sel: usize, time: f32) {
     u.rect(x, y, w, h, [0.03, 0.03, 0.04, 0.95]);
     u.rect(x, y, w, 1.0, [0.95, 0.85, 0.3, 0.7]);
     if screen == Screen::TutorialDone {
-        u.text_center(y + 12.0, "TUTORIAL GESCHAFFT", DIM, 1.0);
-        u.text_center(y + 28.0, "Du bist jetzt schlau genug,", WHITE, 1.0);
-        u.text_center(y + 40.0, "um einkaufen zu können.", WHITE, 1.0);
-        u.text_center(y + 56.0, "WOW.", YELLOW, 2.0);
+        u.hint_center(y + 12.0, "TUTORIAL GESCHAFFT", DIM, 1.0);
+        u.hint_center(y + 28.0, "Du bist jetzt schlau genug,", WHITE, 1.0);
+        u.hint_center(y + 40.0, "um einkaufen zu können.", WHITE, 1.0);
+        u.hint_center(y + 56.0, "WOW.", YELLOW, 2.0);
         let items: Vec<String> = CHAMP_ITEMS.iter().map(|s| s.to_string()).collect();
         draw_menu(u, screen, &items, sel, time);
     } else if screen == Screen::Champ {
-        u.text_center(y + 18.0, "OK Champ,", YELLOW, 2.0);
-        u.text_center(
+        u.hint_center(y + 18.0, "OK Champ,", YELLOW, 2.0);
+        u.hint_center(
             y + 48.0,
             "hab nicht gedacht, dass du so schlau bist.",
             WHITE,
@@ -200,9 +227,9 @@ pub fn draw_ask_tutorial(u: &mut Ui, screen: Screen, sel: usize, time: f32) {
         let items: Vec<String> = CHAMP_ITEMS.iter().map(|s| s.to_string()).collect();
         draw_menu(u, screen, &items, sel, time);
     } else {
-        u.text_center(y + 14.0, "DEIN ERSTER EINKAUF", YELLOW, 1.0);
-        u.text_center(y + 34.0, "Willst du das Tutorial spielen?", WHITE, 1.0);
-        u.text_center(
+        u.hint_center(y + 14.0, "DEIN ERSTER EINKAUF", YELLOW, 1.0);
+        u.hint_center(y + 34.0, "Willst du das Tutorial spielen?", WHITE, 1.0);
+        u.hint_center(
             y + 48.0,
             "Mit Pfeilen am Boden. Verlieren geht nicht.",
             DIM,
@@ -216,7 +243,7 @@ pub fn draw_ask_tutorial(u: &mut Ui, screen: Screen, sel: usize, time: f32) {
 pub fn draw_pause(u: &mut Ui, sel: usize, time: f32, g: &Game) {
     u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.65]);
     osd(u, time, "PAUSE");
-    u.text_center(28.0, "PAUSE", WHITE, 3.0);
+    u.hint_center(28.0, "PAUSE", WHITE, 3.0);
     let items: Vec<String> = PAUSE_ITEMS.iter().map(|s| s.to_string()).collect();
     draw_menu(u, Screen::Paused, &items, sel, time);
     draw_list(u, g, 16.0, 154.0, false);
@@ -245,9 +272,9 @@ fn draw_list(u: &mut Ui, g: &Game, x: f32, y: f32, panel: bool) {
     };
     let text = |u: &mut Ui, x: f32, y: f32, s: &str, c| {
         if panel {
-            u.text(x, y, s, c, 1.0)
+            u.hint(x, y, s, c, 1.0)
         } else {
-            u.text_s(x, y, s, c, 1.0)
+            u.hint_s(x, y, s, c, 1.0)
         }
     };
     text(u, x, y, "EINKAUFSZETTEL", head);
@@ -280,7 +307,7 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     }
     osd(u, time, "PLAY");
     let ts = timestamp(g.run_time);
-    u.text_s(
+    u.hint_s(
         ui::W - 12.0 - Ui::text_width(&ts, 1.0),
         252.0,
         &ts,
@@ -308,7 +335,7 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     // Interaktion
     let y = ui::H * 0.5 + 14.0;
     if let Some(item) = &g.held {
-        u.text_center(
+        u.hint_center(
             y,
             &format!("In der Hand: {}  {}", item.name, euro(item.cents)),
             WHITE,
@@ -321,15 +348,15 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         } else {
             "[E] Fallen lassen  (auf den Wagen zielen)"
         };
-        u.text_center(y + 11.0, action, YELLOW, 1.0);
+        u.hint_center(y + 11.0, action, YELLOW, 1.0);
     } else {
         match g.focus {
             Some(Focus::Door(_)) => {
-                u.text_center(y, "[E] Tür aufdrücken", YELLOW, 1.0);
+                u.hint_center(y, "[E] Tür aufdrücken", YELLOW, 1.0);
             }
             Some(Focus::Shelf(i)) => {
                 let p = crate::game::ItemData::from_shelf(&g.world.items[i]);
-                u.text_center(
+                u.hint_center(
                     y,
                     &format!("[E] {}   {}", p.name, euro(p.cents)),
                     WHITE,
@@ -344,10 +371,10 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                 } else {
                     WHITE
                 };
-                u.text_center(y, &label, c, 1.0);
+                u.hint_center(y, &label, c, 1.0);
             }
             Some(Focus::Loose(i)) => {
-                u.text_center(
+                u.hint_center(
                     y,
                     &format!("[E] Aufheben: {}", g.loose[i].data.name),
                     WHITE,
@@ -357,16 +384,16 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
             Some(Focus::Belt) => match g.belt_pick() {
                 Some(_) if g.cart_at_register() => {
                     let s = format!("[E] Kassenfenster öffnen ({} im Wagen)", g.cart.len());
-                    u.text_center(y, &s, YELLOW, 1.0);
-                    u.text_center(
+                    u.hint_center(y, &s, YELLOW, 1.0);
+                    u.hint_center(
                         y + 11.0,
                         "Dort ziehst du die Ware mit der Maus aufs Band.",
                         DIM,
                         1.0,
                     );
                 }
-                Some(_) => u.text_center(y, "Kassenband - bring deinen Wagen her", YELLOW, 1.0),
-                None => u.text_center(y, "Kassenband", YELLOW, 1.0),
+                Some(_) => u.hint_center(y, "Kassenband - bring deinen Wagen her", YELLOW, 1.0),
+                None => u.hint_center(y, "Kassenband", YELLOW, 1.0),
             },
             Some(Focus::Terminal) => {
                 let asking = g
@@ -384,14 +411,14 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                 } else {
                     "Zettel nicht vollständig gescannt".to_string()
                 };
-                u.text_center(y, &s, YELLOW, 1.0);
+                u.hint_center(y, &s, YELLOW, 1.0);
             }
             _ if g.at_register && g.checking_out() => {
                 let s = format!("Die Kassiererin scannt ... ({} auf dem Band)", g.belt.len());
-                u.text_center(y, &s, YELLOW, 1.0);
+                u.hint_center(y, &s, YELLOW, 1.0);
             }
             Some(Focus::Employee(_)) => {
-                u.text_center(y, "[E] \"Hey, das ist mein Wagen!\"", YELLOW, 1.0);
+                u.hint_center(y, "[E] \"Hey, das ist mein Wagen!\"", YELLOW, 1.0);
             }
             Some(Focus::Cart) => {
                 let s = if g.trolley.pushing {
@@ -399,9 +426,9 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                 } else {
                     "[E/Q] Wagen schieben"
                 };
-                u.text_center(y, s, WHITE, 1.0);
+                u.hint_center(y, s, WHITE, 1.0);
                 if let Some(i) = g.cart_selected() {
-                    u.text_center(
+                    u.hint_center(
                         y + 11.0,
                         &format!(
                             "[F] Herausnehmen: {}   ({}/{}, Mausrad oder draufzielen)",
@@ -431,21 +458,21 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     if show_list {
         draw_list(u, g, 18.0, 34.0, true);
     } else if g.run_time < 20.0 && g.tutorial.is_none() {
-        u.text_s(12.0, 24.0, "TAB: Einkaufszettel", DIM, 1.0);
+        u.hint_s(12.0, 24.0, "TAB: Einkaufszettel", DIM, 1.0);
     }
 
     // Durchsage
     if let Some((text, _)) = &g.announcement {
-        u.text_center(26.0, "~ DURCHSAGE ~", YELLOW, 1.0);
+        u.hint_center(26.0, "~ DURCHSAGE ~", YELLOW, 1.0);
         for (k, line) in Ui::wrap(text, 52).iter().enumerate() {
-            u.text_center(38.0 + k as f32 * 10.0, line, WHITE, 1.0);
+            u.hint_center(38.0 + k as f32 * 10.0, line, WHITE, 1.0);
         }
     }
 
     // Meldung
     if let Some((text, _)) = &g.message {
         for (k, line) in Ui::wrap(text, 52).iter().enumerate() {
-            u.text_center(196.0 + k as f32 * 10.0, line, WHITE, 1.0);
+            u.hint_center(196.0 + k as f32 * 10.0, line, WHITE, 1.0);
         }
     }
 
@@ -455,16 +482,16 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         u.rect(40.0, 160.0, 400.0, 86.0, [0.02, 0.02, 0.03, 0.85]);
         u.rect(40.0, 160.0, 400.0, 1.0, [0.9, 0.9, 0.85, 0.6]);
         if d.cart_talk {
-            u.text(48.0, 152.0, &format!("DU: {CART_OPENER}"), WHITE, 1.0);
+            u.hint(48.0, 152.0, &format!("DU: {CART_OPENER}"), WHITE, 1.0);
         }
-        u.text(48.0, 166.0, "MITARBEITER:", DIM, 1.0);
+        u.hint(48.0, 166.0, "MITARBEITER:", DIM, 1.0);
         match d.reply {
-            Some((reply, _)) => u.text(48.0, 180.0, reply, WHITE, 1.0),
+            Some((reply, _)) => u.hint(48.0, 180.0, reply, WHITE, 1.0),
             None => {
-                u.text(48.0, 180.0, q.text, WHITE, 1.0);
+                u.hint(48.0, 180.0, q.text, WHITE, 1.0);
                 for k in 0..3 {
                     let a = q.answers[d.order[k]];
-                    u.text(
+                    u.hint(
                         56.0,
                         198.0 + k as f32 * 12.0,
                         &format!("{}) {}", k + 1, a),
@@ -479,7 +506,6 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
     }
 
     // die nutzlose Zigarette (1/2/3)
-    smoke::draw(u, g, time);
 
     // Kassenfenster (Waren mit der Maus aufs Band)
     belt_window::draw(u, g, time);
@@ -498,18 +524,18 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         // je weiter man sich dreht, desto roter und schneller
         u.rect(0.0, 0.0, ui::W, ui::H, [0.6, 0.0, 0.0, 0.25 * warn]);
         if (time * (3.0 + 6.0 * warn)).fract() < 0.65 {
-            u.text_center(110.0, "NICHT UMDREHEN", RED, 3.0);
+            u.hint_center(110.0, "NICHT UMDREHEN", RED, 3.0);
         }
     } else if g.chasing() && g.in_corridor() {
         // die Front holt auf: SCHNELLER (blinkt schneller, je naeher)
         let near = g.front_warning();
         if near > 0.0 && (time * (2.0 + 6.0 * near)).fract() < 0.6 {
-            u.text_center(64.0, "SCHNELLER", RED, 2.0);
+            u.hint_center(64.0, "SCHNELLER", RED, 2.0);
         } else if near <= 0.0 && (time * 1.5).fract() < 0.7 {
-            u.text_center(64.0, "NICHT UMDREHEN. LAUF.", RED, 1.0);
+            u.hint_center(64.0, "NICHT UMDREHEN. LAUF.", RED, 1.0);
         }
     } else if g.chasing() && (time * 2.5).fract() < 0.6 {
-        u.text_center(64.0, "ALARM - LAUF ZUM AUSGANG!", RED, 2.0);
+        u.hint_center(64.0, "ALARM - LAUF ZUM AUSGANG!", RED, 2.0);
     }
 }
 
@@ -528,14 +554,14 @@ fn draw_tutorial_phase(u: &mut Ui, phase: Phase, time: f32) {
         TUTORIAL_PHASES,
         phase.title()
     );
-    u.text(x + 6.0, y + 5.0, &title, YELLOW, 1.0);
+    u.hint(x + 6.0, y + 5.0, &title, YELLOW, 1.0);
     // mehrere Seiten (z. B. Einkaufen, Kunden, Mitarbeiter): Seitenzahl rechts oben
     if pages > 1 {
         let n = format!("{}/{}", page + 1, pages);
-        u.text(x + w - 6.0 - Ui::text_width(&n, 1.0), y + 5.0, &n, DIM, 1.0);
+        u.hint(x + w - 6.0 - Ui::text_width(&n, 1.0), y + 5.0, &n, DIM, 1.0);
     }
     for (k, l) in lines.iter().enumerate() {
-        u.text(x + 6.0, y + 17.0 + k as f32 * 10.0, l, WHITE, 1.0);
+        u.hint(x + 6.0, y + 17.0 + k as f32 * 10.0, l, WHITE, 1.0);
     }
 }
 
@@ -554,9 +580,9 @@ fn draw_tutorial_bar(u: &mut Ui, hints: &[&str], time: f32) {
     let (x, y, h) = ((ui::W - w) * 0.5, TUTORIAL_BAR_Y, 14.0);
     u.rect(x - 1.0, y - 1.0, w + 2.0, h + 2.0, [0.95, 0.85, 0.3, 0.9]);
     u.rect(x, y, w, h, [0.02, 0.02, 0.03, 0.97]);
-    u.text(x + 4.0, y + 3.0, "TUTORIAL", YELLOW, 1.0);
-    u.text(x + 72.0, y + 3.0, hints[k], WHITE, 1.0);
-    u.text(x + w - 6.0 - Ui::text_width(&n, 1.0), y + 3.0, &n, DIM, 1.0);
+    u.hint(x + 4.0, y + 3.0, "TUTORIAL", YELLOW, 1.0);
+    u.hint(x + 72.0, y + 3.0, hints[k], WHITE, 1.0);
+    u.hint(x + w - 6.0 - Ui::text_width(&n, 1.0), y + 3.0, &n, DIM, 1.0);
 }
 
 /// Hoehe der Tutorial-Leiste ueber den Kassen-Fenstern (Kassenfenster ab y = 14,
@@ -575,7 +601,7 @@ fn draw_tutorial(u: &mut Ui, t: &Tutorial) {
         18.0 + n * 11.0,
         [0.02, 0.02, 0.03, 0.75],
     );
-    u.text(x, y, "STEUERUNG", YELLOW, 1.0);
+    u.hint(x, y, "STEUERUNG", YELLOW, 1.0);
     for (i, (key, what)) in TUTORIAL_STEPS.iter().enumerate() {
         let yy = y + 14.0 + i as f32 * 11.0;
         let (mark, c) = match i.cmp(&t.step) {
@@ -584,7 +610,7 @@ fn draw_tutorial(u: &mut Ui, t: &Tutorial) {
             std::cmp::Ordering::Greater => (" ", DIM),
         };
         let line = format!("{mark} {key:<11} {what}");
-        u.text(x, yy, &line, c, 1.0);
+        u.hint(x, yy, &line, c, 1.0);
     }
 }
 
@@ -617,21 +643,26 @@ fn draw_controls(u: &mut Ui) {
     let (bx, by, bw, bh) = CONTROLS_BOX;
     u.rect(bx, by, bw, bh, [0.03, 0.03, 0.04, 0.85]);
     u.rect(bx, by, bw, 1.0, [0.95, 0.85, 0.3, 0.7]);
-    u.text(bx + 6.0, by + 4.0, "STEUERUNG", YELLOW, 1.0);
+    u.hint(bx + 6.0, by + 4.0, "STEUERUNG", YELLOW, 1.0);
     let sections = [
         ("BEWEGEN", CONTROLS_MOVE),
         ("EINKAUF & KASSE", CONTROLS_SHOP),
     ];
     for ((title, list), (cx, cap)) in sections.iter().zip(CONTROLS_COLS) {
-        u.text(cx, by + 17.0, title, DIM, 1.0);
+        u.hint(cx, by + 17.0, title, DIM, 1.0);
         for (k, (key, what)) in list.iter().enumerate() {
             let y = by + 30.0 + k as f32 * CONTROLS_ROW;
             // Tastenkappe: heller Rahmen, Taste mittig
             u.rect(cx, y - 2.0, cap, 11.0, [0.75, 0.75, 0.7, 1.0]);
             u.rect(cx + 1.0, y - 1.0, cap - 2.0, 9.0, [0.16, 0.16, 0.18, 1.0]);
-            let kx = cx + (cap - Ui::text_width(key, 1.0)) * 0.5;
-            u.text(kx, y, key, WHITE, 1.0);
-            u.text(cx + cap + 5.0, y, what, WHITE, 1.0);
+            // lange Knopfnamen gekuerzt, damit sie in die Kappe passen
+            let key: String = crate::controls::hint(key)
+                .chars()
+                .take((cap / 8.0) as usize)
+                .collect();
+            let kx = cx + (cap - Ui::text_width(&key, 1.0)) * 0.5;
+            u.text(kx, y, &key, WHITE, 1.0);
+            u.hint(cx + cap + 5.0, y, what, WHITE, 1.0);
         }
     }
 }
@@ -644,8 +675,8 @@ pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game, group: Option<us
     let screen = Screen::Cheats { group };
     match group.and_then(|i| groups.get(i).map(|c| (i, c))) {
         None => {
-            u.text_center(14.0, "CHEATS (F1)", RED, 2.0);
-            u.text_center(36.0, "Kategorie wählen", DIM, 1.0);
+            u.hint_center(14.0, "CHEATS (F1)", RED, 2.0);
+            u.hint_center(36.0, "Kategorie wählen", DIM, 1.0);
             let mut items: Vec<String> = groups
                 .iter()
                 .map(|(name, _, list)| format!("{name}  ({})", list.len()))
@@ -655,12 +686,12 @@ pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game, group: Option<us
             // Beschreibung der gewaehlten Kategorie
             if let Some((_, about, _)) = groups.get(sel) {
                 let (_, y, _) = menu_cell(screen, groups.len() + 1);
-                u.text_center(y + 4.0, about, YELLOW, 1.0);
+                u.hint_center(y + 4.0, about, YELLOW, 1.0);
             }
         }
         Some((_, (name, _, list))) => {
-            u.text_center(14.0, &format!("CHEATS > {}", name.to_uppercase()), RED, 1.0);
-            u.text_center(30.0, "Enter: auslösen   Esc: zurück", DIM, 1.0);
+            u.hint_center(14.0, &format!("CHEATS > {}", name.to_uppercase()), RED, 1.0);
+            u.hint_center(30.0, "Enter: auslösen   Esc: zurück", DIM, 1.0);
             let mut items: Vec<String> = list
                 .iter()
                 .map(|&i| {
@@ -682,7 +713,7 @@ pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game, group: Option<us
         g.suspicion * 100.0,
         if g.tipped { "gekippt" } else { "normal" }
     );
-    u.text_center(252.0, &state, DIM, 1.0);
+    u.hint_center(252.0, &state, DIM, 1.0);
 }
 
 /// Gruselige Schriftzuege beim Tod (statt "DU BIST AUFGEFALLEN"), einer je Tod.
@@ -728,23 +759,23 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
                 [0.94, 0.93, 0.88, 1.0],
             );
             let ink = [0.1, 0.1, 0.12, 1.0];
-            u.text(x + 46.0, 26.0, "KAUF NULL", ink, 1.0);
-            u.text(x + 10.0, 40.0, &format!("Band #{}", g.seed), ink, 1.0);
+            u.hint(x + 46.0, 26.0, "KAUF NULL", ink, 1.0);
+            u.hint(x + 10.0, 40.0, &format!("Band #{}", g.seed), ink, 1.0);
             for (i, item) in g.scanned.iter().take(lines).enumerate() {
                 let name: String = item.name.chars().take(13).collect();
                 let price = euro(item.cents);
                 let y = 56.0 + i as f32 * 10.0;
-                u.text(x + 8.0, y, &name, ink, 1.0);
-                u.text(x + 172.0 - Ui::text_width(&price, 1.0), y, &price, ink, 1.0);
+                u.hint(x + 8.0, y, &name, ink, 1.0);
+                u.hint(x + 172.0 - Ui::text_width(&price, 1.0), y, &price, ink, 1.0);
             }
             if g.scanned.len() > lines {
-                u.text(x + 8.0, 56.0 + lines as f32 * 10.0, "...", ink, 1.0);
+                u.hint(x + 8.0, 56.0 + lines as f32 * 10.0, "...", ink, 1.0);
             }
             let y = 62.0 + (lines as f32 + 1.0) * 10.0;
             let total = format!("SUMME {}", euro(g.scanned_value()));
-            u.text(x + 172.0 - Ui::text_width(&total, 1.0), y, &total, ink, 1.0);
+            u.hint(x + 172.0 - Ui::text_width(&total, 1.0), y, &total, ink, 1.0);
             let t = g.run_time as u32;
-            u.text(
+            u.hint(
                 x + 8.0,
                 y + 12.0,
                 &format!("Zeit {}:{:02}", t / 60, t % 60),
@@ -752,7 +783,7 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
                 1.0,
             );
             // (das Lob nach dem Tutorial kommt erst auf dem Weg ins Hauptmenue)
-            u.text_center(y + 34.0, "Danke für Ihren Einkauf.", WHITE, 1.0);
+            u.hint_center(y + 34.0, "Danke für Ihren Einkauf.", WHITE, 1.0);
         }
         _ => {
             osd(u, time, "STOP");
@@ -767,9 +798,9 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
             let x = (ui::W - Ui::text_width(title, 2.0)) * 0.5 + jx;
             if glitch {
                 // kurzer Bildriss: weisser Schatten versetzt dahinter
-                u.text(x + 2.0, 69.0, title, [1.0, 1.0, 1.0, 0.5], 2.0);
+                u.hint(x + 2.0, 69.0, title, [1.0, 1.0, 1.0, 0.5], 2.0);
             }
-            u.text(x, 70.0, title, RED, 2.0);
+            u.hint(x, 70.0, title, RED, 2.0);
             let why = if g.till_caught {
                 "Die Kassiererin hat dich durchschaut."
             } else if g.turned_back {
@@ -781,9 +812,9 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
             } else {
                 "Sie haben dich erreicht."
             };
-            u.text_center(100.0, why, WHITE, 1.0);
+            u.hint_center(100.0, why, WHITE, 1.0);
             let t = g.run_time as u32;
-            u.text_center(
+            u.hint_center(
                 124.0,
                 &format!(
                     "Im Wagen: {}   Zeit {}:{:02}",
@@ -794,7 +825,7 @@ pub fn draw_end(u: &mut Ui, g: &Game, sel: usize, time: f32) {
                 DIM,
                 1.0,
             );
-            u.text_center(140.0, &format!("Stufe: {}", g.tier.name()), DIM, 1.0);
+            u.hint_center(140.0, &format!("Stufe: {}", g.tier.name()), DIM, 1.0);
         }
     }
     let items: Vec<String> = END_ITEMS.iter().map(|s| s.to_string()).collect();

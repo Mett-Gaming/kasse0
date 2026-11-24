@@ -176,7 +176,7 @@ impl Game {
         })
     }
 
-    /// Wo die Glut gerade ist (fuer den Rauch im HUD).
+    /// Wo die Glut gerade ist (fuer den Rauch, air.rs).
     pub fn cigarette_ember(&self) -> Option<Vec3> {
         let (filter, dir, len) = self.cigarette_pose()?;
         Some(filter + dir * CIG_LEN * shown_len(len))

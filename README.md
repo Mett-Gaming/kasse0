@@ -79,6 +79,9 @@ Beim **allerersten Einkauf** fragt das Spiel, ob du das **Tutorial** spielen wil
 - Sortiert ist logisch nach Warengruppen. Mit steigender Eskalation verschieben sich die Abteilungen: erst tauschen Unterabteilungen (Fisch ↔ Käse), dann wandern ganze Abteilungen in fremde Einrichtungen, am Ende steht Ware wild durcheinander und **die Schilder lügen**.
 - Im gekippten Markt verderben die Sprüche ("Frisch & ewig", "Bleib & kauf"), die Kassen zeigen "0 Kasse", das Zigaretten-Rollo ist offen, die Überwachungskameras drehen sich nach dir, hinter den Fenstern ist nur noch Schwärze.
 
+### In der Luft
+Staub schwebt im Licht der Lampen, die Zigarette raucht wirklich, und an der Kühlung sieht man deinen Atem.
+
 ### Passende Ware leuchtet
 Stehst du höchstens **4 m** von einer Ware entfernt, die zu einem offenen Zettel-Eintrag passt, pulsiert sie kräftig gelblich hell und wirkt etwas größer. Es leuchtet immer nur **eine**, die nächste. Auch **falsch beschriftete** und teure Ware leuchtet: Hinsehen musst du selbst. Mit Ware in der Hand, in Gesprächen und an der Kasse leuchtet nichts.
 
@@ -122,8 +125,10 @@ Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umd
 
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 
+**Controller:** Stick laufen/umsehen, A springen, B ducken, X benutzen, Y Wagen, LT rennen, RT Ware herausnehmen, LB/RB auswählen, Select Zettel, Start Pause, Kreuz: Antworten, PIN, Reklamieren. Die Hinweise im Bild wechseln mit.
+
 ## Optionen
-Waagerechte Reiter (Tab, Q/E oder Mausklick): **Anzeige** (VHS-Effekt, Sichtfeld, Vollbild, höchste Bildrate, „Weniger Verzögerung“ über NVIDIA Reflex bzw. AMD Anti-Lag), **Gameplay** (Lautstärke, Musik, Jumpscares) und **Steuerung** (Mausempfindlichkeit). Schieberegler lassen sich anklicken. Hast du das Tutorial einmal geschafft, gibt es hier auch **„Tutorial spielen“**. Das Spiel startet im **randlosen Vollbild**; abgeschaltet läuft es im Fenster (1280×720). Sie werden in `%APPDATA%\.mettlauncher\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
+Waagerechte Reiter (Tab, Q/E oder Mausklick): **Anzeige** (VHS-Effekt, Sichtfeld, Vollbild, höchste Bildrate, „Weniger Verzögerung“ über NVIDIA Reflex bzw. AMD Anti-Lag), **Gameplay** (Lautstärke, Musik, Jumpscares) und **Steuerung** (Maus- und Controller-Blick, Vibration, alle Tasten umbelegen). Schieberegler lassen sich anklicken. Hast du das Tutorial einmal geschafft, gibt es hier auch **„Tutorial spielen“**. Das Spiel startet im **randlosen Vollbild**; abgeschaltet läuft es im Fenster (1280×720). Sie werden in `%APPDATA%\.mettlauncher\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.
 
 ## Entwicklung
 Die Engine **Mettgine** liegt als Git-Submodule in `mettgine/` ([Mett-Gaming/mettgine](https://github.com/Mett-Gaming/mettgine)). Darum mit `--recursive` klonen bzw. nach dem Holen die Engine mitziehen:
