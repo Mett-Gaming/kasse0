@@ -1091,7 +1091,6 @@ dependencies = [
  "naga",
  "rand",
  "rand_pcg",
- "rodio",
  "serde",
  "serde_json",
  "winit",

@@ -1,7 +1,11 @@
 //! Audio: alles wird beim Start synthetisiert (keine Sounddateien).
 //! Kaufhaus-Gedudel, Neonbrummen, Durchsage-Gong, Scanner-Piep, Schritte, Schock.
 
-use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink, Source};
+use glam::Vec3;
+use mettgine::audio::mixer::{TrackId, TrackOptions};
+use mettgine::audio::spatial::Emitter;
+pub use mettgine::audio::spatial::Listener;
+use mettgine::audio::{Audio as Output, Sound};
 use std::f32::consts::TAU;
 
 const RATE: u32 = 44_100;
@@ -68,6 +72,8 @@ pub enum Sfx {
 
 /// Bis zu dieser Entfernung hoert man Geraeusche mit Ort (Meter)
 pub const HEAR_RANGE: f32 = 18.0;
+/// Verdeckung hinter Regalen und Waenden
+pub const HIDDEN: f32 = 0.6;
 
 /// Was die Musik gerade tun soll.
 pub struct Mood {
@@ -81,15 +87,30 @@ pub struct Mood {
     pub hush: f32,
     /// 0..1: im Seitentrakt - Musik fast weg (wie hinter Waenden), Roehrenbrummen lauter
     pub muffle: f32,
+    /// 0..1: alles klingt dumpf (Rausch, Sterben)
+    pub dull: f32,
 }
 
 pub struct Audio {
-    _stream: OutputStream,
-    handle: OutputStreamHandle,
-    music: Sink,
-    hum: Sink,
-    sounds: Vec<(Sfx, Vec<f32>)>,
-    master: f32,
+    out: Output,
+    music: Option<TrackId>,
+    hum: Option<TrackId>,
+    sounds: Vec<(Sfx, Sound)>,
+    music_volume: f32,
+    /// 0..1: alles klingt dumpf (Rausch, Sterben)
+    dull: f32,
+}
+
+/// So klingt ein Geraeusch mit Ort.
+fn emitter(vol: f32, at: Vec3, muffled: f32) -> Emitter {
+    Emitter {
+        gain: vol * 0.9,
+        near: 3.0,
+        far: HEAR_RANGE,
+        muffled,
+        doppler: 0.0,
+        ..Emitter::at(at)
+    }
 }
 
 struct Rng(u32);
@@ -545,14 +566,15 @@ fn synth(sfx: Sfx) -> Vec<f32> {
 }
 
 impl Audio {
-    pub fn new(volume: f32) -> Option<Self> {
-        let (stream, handle) = OutputStream::try_default()
-            .map_err(|e| crate::crash::log(&format!("Kein Audio: {e}")))
-            .ok()?;
-        let music = Sink::try_new(&handle).ok()?;
-        music.append(SamplesBuffer::new(1, RATE, muzak()).repeat_infinite());
-        let hum_sink = Sink::try_new(&handle).ok()?;
-        hum_sink.append(SamplesBuffer::new(1, RATE, hum()).repeat_infinite());
+    pub fn new(volume: f32, music_volume: f32) -> Self {
+        let mut out = Output::new(volume, 1.0);
+        // stumm starten, `update` regelt die Lautstaerke
+        let silent = TrackOptions {
+            gain: 0.0,
+            ..Default::default()
+        };
+        let music = out.start_track(&Sound::new(muzak()), silent);
+        let hum = out.start_track(&Sound::new(hum()), silent);
         let sounds = [
             Sfx::Beep,
             Sfx::Chime,
@@ -588,65 +610,50 @@ impl Audio {
             Sfx::Vomit,
         ]
         .into_iter()
-        .map(|s| (s, synth(s)))
+        .map(|s| (s, Sound::new(synth(s))))
         .collect();
-        let mut a = Self {
-            _stream: stream,
-            handle,
+        Self {
+            out,
             music,
-            hum: hum_sink,
+            hum,
             sounds,
-            master: volume,
-        };
-        a.set_master(volume);
-        Some(a)
+            music_volume,
+            dull: 0.0,
+        }
     }
 
-    pub fn set_master(&mut self, v: f32) {
-        self.master = v;
+    pub fn set_volumes(&mut self, volume: f32, music: f32) {
+        self.out.set_volumes(volume, 1.0);
+        self.music_volume = music;
     }
 
-    pub fn play(&self, sfx: Sfx) {
+    pub fn play(&mut self, sfx: Sfx) {
         self.play_vol(sfx, 1.0);
     }
 
-    /// Wie `play_vol`, aber im Stereobild verteilt: `pan` -1 = links, 1 = rechts.
-    pub fn play_at(&self, sfx: Sfx, vol: f32, pan: f32) {
-        let Some((_, data)) = self
-            .sounds
-            .iter()
-            .find(|(s, _)| std::mem::discriminant(s) == std::mem::discriminant(&sfx))
-        else {
-            return;
-        };
-        // gleiche Lautheit in der Mitte (Sinus/Kosinus-Verteilung)
-        let a = (pan.clamp(-1.0, 1.0) + 1.0) * std::f32::consts::FRAC_PI_4;
-        let (l, r) = (a.cos(), a.sin());
-        let stereo: Vec<f32> = data.iter().flat_map(|&x| [x * l, x * r]).collect();
-        if let Ok(sink) = Sink::try_new(&self.handle) {
-            sink.set_volume(self.master * vol);
-            sink.append(SamplesBuffer::new(2, RATE, stereo));
-            sink.detach();
-        }
+    fn sound(&self, sfx: Sfx) -> Sound {
+        let same = |s: &Sfx| std::mem::discriminant(s) == std::mem::discriminant(&sfx);
+        let found = self.sounds.iter().find(|(s, _)| same(s));
+        found.map(|(_, d)| d.clone()).unwrap_or_default()
     }
 
-    pub fn play_vol(&self, sfx: Sfx, vol: f32) {
-        let Some((_, data)) = self
-            .sounds
-            .iter()
-            .find(|(s, _)| std::mem::discriminant(s) == std::mem::discriminant(&sfx))
-        else {
-            return;
-        };
-        if let Ok(sink) = Sink::try_new(&self.handle) {
-            sink.set_volume(self.master * vol);
-            sink.append(SamplesBuffer::new(1, RATE, data.clone()));
-            sink.detach();
-        }
+    pub fn play_vol(&mut self, sfx: Sfx, vol: f32) {
+        let sound = self.sound(sfx);
+        self.out.play(&sound, vol, 1.0);
     }
 
-    /// Jedes Frame: Musik leiern lassen, Brummen regeln.
-    pub fn update(&self, m: &Mood) {
+    /// Geraeusch mit Ort; `muffled` = 0 frei, 1 ganz verdeckt.
+    pub fn play_at(&mut self, sfx: Sfx, vol: f32, at: Vec3, muffled: f32) {
+        let sound = self.sound(sfx);
+        let dull = muffled.max(self.dull);
+        self.out.play_at(&sound, emitter(vol, at, dull));
+    }
+
+    /// Jedes Bild: Hoerer mitfuehren, Musik leiern lassen, Brummen regeln.
+    pub fn update(&mut self, m: &Mood, listener: Listener, dt: f32) {
+        self.out.set_listener(listener);
+        self.dull = m.dull.clamp(0.0, 1.0);
+        self.out.set_muffle(self.dull);
         let tier = m.tier as f32;
         let (speed, music_vol, hum_vol) = if !m.playing {
             (1.0, 0.55, 0.0)
@@ -661,20 +668,41 @@ impl Audio {
             (1.0, 0.5, 0.06)
         };
         let pause = if m.paused { 0.35 } else { 1.0 };
-        self.music.set_speed(speed.max(0.5));
         let quiet = 1.0 - m.hush.clamp(0.0, 1.0);
         // im Seitentrakt: Musik nur noch ganz fern, das Brummen der Roehren ist nah
         let muffle = m.muffle.clamp(0.0, 1.0);
-        self.music
-            .set_volume(self.master * music_vol.max(0.1) * pause * quiet * (1.0 - 0.88 * muffle));
-        self.hum
-            .set_volume(self.master * (hum_vol + 0.35 * muffle) * pause * quiet);
+        let music = music_vol.max(0.1) * pause * quiet * (1.0 - 0.88 * muffle);
+        let hum = (hum_vol + 0.35 * muffle) * pause * quiet;
+        if let Some(t) = self.music {
+            let gain = music * self.music_volume;
+            self.out.set_track(t, gain, speed.max(0.5));
+        }
+        if let Some(t) = self.hum {
+            self.out.set_track(t, hum, 1.0);
+        }
+        self.out.update_tracks(dt);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sounds_behind_shelves_are_dull_and_keep_their_side() {
+        use mettgine::audio::spatial::spatialize;
+        let l = Listener::default();
+        let left = glam::vec3(-6.0, 0.0, 0.0);
+        let free = spatialize(&l, &emitter(1.0, left, 0.0));
+        let hidden = spatialize(&l, &emitter(1.0, left, HIDDEN));
+        assert!(free.left > free.right && hidden.left > hidden.right);
+        assert!(hidden.left < free.left && hidden.cutoff < free.cutoff * 0.5);
+        // aus der Ferne nichts, aus der Naehe nie lauter als der Klang selbst
+        let far = spatialize(&l, &emitter(1.0, left * 4.0, 0.0));
+        assert_eq!(far.left.max(far.right), 0.0);
+        let near = spatialize(&l, &emitter(1.0, left * 0.01, 0.0));
+        assert!(near.left.hypot(near.right) <= 1.0);
+    }
 
     #[test]
     fn synthesized_sounds_are_sane() {

@@ -21,6 +21,7 @@ mod world;
 
 use audio::{Audio, Mood, Sfx};
 use game::{Game, Outcome};
+use hud::options::{self, Page, Row};
 use hud::Screen;
 use settings::Settings;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -38,6 +39,8 @@ struct Wishes {
     grab: Option<bool>,
     fullscreen: Option<bool>,
     title: Option<String>,
+    /// Verzoegerung und Bildrate neu einstellen
+    pace: bool,
     quit: bool,
 }
 
@@ -45,7 +48,7 @@ struct App {
     wishes: Wishes,
     game: Game,
     settings: Settings,
-    audio: Option<Audio>,
+    audio: Audio,
     screen: Screen,
     sel: usize,
     ui: ui::Ui,
@@ -90,7 +93,7 @@ fn random_seed() -> u64 {
 impl App {
     fn new(fixed_seed: Option<u64>) -> Self {
         let settings = Settings::load();
-        let audio = Audio::new(settings.volume);
+        let audio = Audio::new(settings.volume, settings.music);
         let mut game = Game::new(random_seed());
         game.player.pos = game.world.spawn + glam::vec3(0.0, 0.0, -2.0);
         Self {
@@ -128,16 +131,12 @@ impl App {
         }
     }
 
-    fn sfx(&self, s: Sfx) {
-        if let Some(a) = &self.audio {
-            a.play(s);
-        }
+    fn sfx(&mut self, s: Sfx) {
+        self.audio.play(s);
     }
 
-    fn sfx_vol(&self, s: Sfx, vol: f32) {
-        if let Some(a) = &self.audio {
-            a.play_vol(s, vol);
-        }
+    fn sfx_vol(&mut self, s: Sfx, vol: f32) {
+        self.audio.play_vol(s, vol);
     }
 
     /// Troll-Jumpscare starten (Optionen, oder Cheat).
@@ -173,6 +172,16 @@ impl App {
         if let Some(full) = w.fullscreen {
             stage.set_fullscreen(full);
         }
+        if w.pace {
+            stage
+                .renderer
+                .set_low_latency(if self.settings.low_latency {
+                    render::LowLatency::On
+                } else {
+                    render::LowLatency::Off
+                });
+            stage.renderer.set_fps_limit(self.settings.fps_limit as f32);
+        }
         if let Some(t) = w.title {
             stage.window.set_title(&t);
         }
@@ -184,10 +193,10 @@ impl App {
     fn apply_settings(&mut self) {
         self.game.sensitivity = self.settings.sensitivity;
         self.game.fov_deg = self.settings.fov;
-        if let Some(a) = &mut self.audio {
-            a.set_master(self.settings.volume);
-        }
+        self.audio
+            .set_volumes(self.settings.volume, self.settings.music);
         self.wishes.fullscreen = Some(self.wanted_fullscreen());
+        self.wishes.pace = true;
     }
 
     /// Neuer Einkauf; `tutorial` = Tutorial-Modus (Anleitung, Wegweiser, entschaerft).
@@ -222,6 +231,7 @@ impl App {
         Screen::Options {
             from_pause,
             tutorial: self.settings.tutorial_done,
+            page: Page::Display,
         }
     }
 
@@ -233,6 +243,80 @@ impl App {
         if !playing {
             self.input = game::Input::default();
             self.show_list = false;
+        }
+    }
+
+    /// Gewaehlte Zeile, wenn gerade Optionen offen sind.
+    fn option_row(&self) -> Option<Row> {
+        match self.screen {
+            Screen::Options { tutorial, page, .. } => {
+                options::rows(page, tutorial).get(self.sel).copied()
+            }
+            _ => None,
+        }
+    }
+
+    /// Anderen Reiter der Optionen zeigen.
+    fn open_page(&mut self, to: Page) {
+        if let Screen::Options { page, .. } = &mut self.screen {
+            *page = to;
+            // auf den Reitern bleiben, damit man weiterblaettern kann
+            self.sel = 0;
+            self.sfx(Sfx::Blip);
+        }
+    }
+
+    fn leave_options(&mut self) {
+        self.settings.save();
+        self.go(match self.screen {
+            Screen::Options {
+                from_pause: true, ..
+            } => Screen::Paused,
+            _ => Screen::Title,
+        });
+        // zurueck auf "Optionen" (in Pause und Hauptmenue die 2. Zeile)
+        self.sel = 1;
+    }
+
+    fn activate_option(&mut self, dir: i32) {
+        let (Some(row), Screen::Options { page, .. }) = (self.option_row(), self.screen) else {
+            return;
+        };
+        match row {
+            Row::Tabs => return self.open_page(page.next(dir)),
+            Row::Back => return self.leave_options(),
+            // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
+            Row::Jumpscares => return self.start_menu_scare(),
+            Row::Tutorial => {
+                self.settings.save();
+                return self.start_game(random_seed(), true);
+            }
+            _ => self.settings.change(row, dir),
+        }
+        self.apply_settings();
+        self.settings.save();
+    }
+
+    /// Mausklick in den Optionen: Reiter und Schieberegler treffen, sonst wie im Menue.
+    fn click_option(&mut self, dir: i32) {
+        let x = self.cursor.0;
+        match self.option_row() {
+            Some(Row::Tabs) => {
+                if let Some(p) = options::tab_at(x) {
+                    self.sfx(Sfx::Click);
+                    self.open_page(p);
+                }
+            }
+            Some(row) => match options::slider_value(row, x) {
+                Some(v) if dir > 0 => {
+                    self.settings.set_number(row, v);
+                    self.sfx(Sfx::Click);
+                    self.apply_settings();
+                    self.settings.save();
+                }
+                _ => self.activate(dir),
+            },
+            None => {}
         }
     }
 
@@ -283,48 +367,7 @@ impl App {
                 _ => self.to_title(),
             },
             Screen::TutorialDone => self.to_title(),
-            Screen::Options {
-                from_pause,
-                tutorial,
-            } => {
-                // "Tutorial spielen" (nur nach einem geschafften Tutorial): neuer Tutorial-Einkauf
-                if tutorial && self.sel == hud::OPTION_TUTORIAL {
-                    self.settings.save();
-                    self.start_game(random_seed(), true);
-                    return;
-                }
-                let s = &mut self.settings;
-                let d = dir as f32;
-                match self.sel {
-                    0 => s.sensitivity = (s.sensitivity + 0.1 * d).clamp(0.2, 3.0),
-                    1 => s.volume = (s.volume + 0.1 * d).clamp(0.0, 1.0),
-                    2 => s.vhs = (s.vhs + 0.25 * d).clamp(0.0, 1.5),
-                    3 => s.fov = (s.fov + 5.0 * d).clamp(55.0, 100.0),
-                    4 => s.fullscreen = !s.fullscreen,
-                    5 => {
-                        // Jumpscares lassen sich nicht abschalten - der Versuch loest einen aus
-                        self.start_menu_scare();
-                        return;
-                    }
-                    _ => {
-                        self.settings.save();
-                        let back = if from_pause {
-                            Screen::Paused
-                        } else {
-                            Screen::Title
-                        };
-                        self.go(back);
-                        // zurueck auf "Optionen" (in Pause und Hauptmenue die 2. Zeile)
-                        self.sel = 1;
-                        return;
-                    }
-                }
-                // Rundungsfehler der Schritte vermeiden
-                s.sensitivity = (s.sensitivity * 10.0).round() / 10.0;
-                s.volume = (s.volume * 10.0).round() / 10.0;
-                self.apply_settings();
-                self.settings.save();
-            }
+            Screen::Options { .. } => self.activate_option(dir),
             // Kategorien: Kategorie oeffnen oder zurueck ins Spiel
             Screen::Cheats { group: None } => {
                 if self.sel < game::cheat_groups().len() {
@@ -376,15 +419,7 @@ impl App {
         match self.screen {
             Screen::Playing => self.go(Screen::Paused),
             Screen::Paused => self.go(Screen::Playing),
-            Screen::Options { from_pause, .. } => {
-                self.settings.save();
-                self.go(if from_pause {
-                    Screen::Paused
-                } else {
-                    Screen::Title
-                });
-                self.sel = 1;
-            }
+            Screen::Options { .. } => self.leave_options(),
             Screen::Cheats { group: Some(g) } => {
                 self.go(Screen::Cheats { group: None });
                 self.sel = g;
@@ -503,28 +538,24 @@ impl App {
             _ => {}
         }
 
-        if let Some(a) = &self.audio {
-            for (s, v) in self.game.sfx.drain(..) {
-                a.play_vol(s, v);
-            }
-            self.game.scares.clear();
-            // Geraeusche mit Ort: leiser mit der Entfernung, links/rechts nach Richtung
-            let eye = self.game.eye();
-            let right = self
-                .game
-                .view_dir()
-                .cross(glam::Vec3::Y)
-                .normalize_or_zero();
-            for (s, v, at) in self.game.sfx_at.drain(..) {
-                let d = at - eye;
-                let dist = d.length();
-                let fall = (1.0 - dist / audio::HEAR_RANGE).clamp(0.0, 1.0).powf(1.5);
-                if fall > 0.0 {
-                    let pan = right.dot(d / dist.max(0.01)).clamp(-1.0, 1.0);
-                    a.play_at(s, v * fall, pan);
-                }
-            }
-            a.update(&Mood {
+        for (s, v) in self.game.sfx.drain(..) {
+            self.audio.play_vol(s, v);
+        }
+        self.game.scares.clear();
+        // Geraeusche mit Ort: hinter Regalen dumpf
+        let eye = self.game.eye();
+        for (s, v, at) in std::mem::take(&mut self.game.sfx_at) {
+            let hidden = self.game.sound_hidden(at);
+            let muffled = if hidden { audio::HIDDEN } else { 0.0 };
+            self.audio.play_at(s, v, at, muffled);
+        }
+        let listener = audio::Listener {
+            pos: eye,
+            forward: self.game.view_dir(),
+            ..Default::default()
+        };
+        self.audio.update(
+            &Mood {
                 playing: !hud::on_title(self.screen),
                 tipped: self.game.tipped,
                 tier: self.game.tier.level(),
@@ -539,10 +570,11 @@ impl App {
                 ),
                 hush: self.game.hush(),
                 muffle: self.game.wing_muffle(),
-            });
-        } else {
-            self.game.sfx.clear();
-        }
+                dull: (self.game.trip_level() * 0.7).max(self.game.dying_progress().unwrap_or(0.0)),
+            },
+            listener,
+            dt,
+        );
 
         // UI aufbauen
         self.ui.clear();
@@ -553,12 +585,15 @@ impl App {
             }
             Screen::Playing => hud::draw_hud(&mut self.ui, &self.game, self.show_list, self.clock),
             Screen::Paused => hud::draw_pause(&mut self.ui, self.sel, self.clock, &self.game),
-            Screen::Options { from_pause, .. } => hud::draw_options(
+            Screen::Options {
+                from_pause, page, ..
+            } => options::draw(
                 &mut self.ui,
                 self.sel,
                 self.clock,
                 &self.settings,
                 from_pause,
+                page,
             ),
             Screen::End => hud::draw_end(&mut self.ui, &self.game, self.sel, self.clock),
             Screen::Cheats { group } => {
@@ -801,6 +836,14 @@ impl App {
             return;
         }
         let n = hud::menu_len(self.screen);
+        if let Screen::Options { page, .. } = self.screen {
+            // Reiter wechseln: Tab / E weiter, Q zurueck
+            match code {
+                KeyCode::Tab | KeyCode::KeyE if !repeat => return self.open_page(page.next(1)),
+                KeyCode::KeyQ if !repeat => return self.open_page(page.next(-1)),
+                _ => {}
+            }
+        }
         match code {
             KeyCode::ArrowUp | KeyCode::KeyW => {
                 self.sel = (self.sel + n - 1) % n.max(1);
@@ -810,16 +853,10 @@ impl App {
                 self.sel = (self.sel + 1) % n.max(1);
                 self.sfx(Sfx::Blip);
             }
-            KeyCode::ArrowLeft | KeyCode::KeyA
-                if matches!(self.screen, Screen::Options { .. })
-                    && self.sel < hud::OPTION_VALUES =>
-            {
+            KeyCode::ArrowLeft | KeyCode::KeyA if self.option_row().is_some_and(Row::is_value) => {
                 self.activate(-1)
             }
-            KeyCode::ArrowRight | KeyCode::KeyD
-                if matches!(self.screen, Screen::Options { .. })
-                    && self.sel < hud::OPTION_VALUES =>
-            {
+            KeyCode::ArrowRight | KeyCode::KeyD if self.option_row().is_some_and(Row::is_value) => {
                 self.activate(1)
             }
             // Cheat-Menue: rechts oeffnet die Kategorie, links geht zurueck
@@ -874,6 +911,9 @@ impl mettgine::app::Game for App {
             second_camera: Some(MONITOR_SIZE),
             smooth: false,
             last_wins: false,
+            // Reflex/Anti-Lag moeglich, Grund bei Grafikkarten-Ausfaellen im Absturzbericht
+            low_latency: true,
+            diagnostics: true,
             world: WORLD,
             ..render::Config::new(&meshes, &skins, (&font, 128, 128))
         };
@@ -957,7 +997,11 @@ impl mettgine::app::Game for App {
                     self.sel = i;
                     let dir = if *button == MouseButton::Right { -1 } else { 1 };
                     if *button == MouseButton::Left || *button == MouseButton::Right {
-                        self.activate(dir);
+                        if matches!(self.screen, Screen::Options { .. }) {
+                            self.click_option(dir);
+                        } else {
+                            self.activate(dir);
+                        }
                     }
                 }
             }

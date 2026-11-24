@@ -298,3 +298,9 @@ Eigenes Modell, ausdrücklich gewünschte Ausnahme von der Regel „keine selbst
 
 ## Randloses Vollbild
 Das Spiel startet im randlosen Vollbild (`Settings::fullscreen`, Standard an). Das Fenster entsteht direkt so, ohne kurz klein aufzublitzen. In den Optionen abschaltbar, die Wahl wird gespeichert. Autoshot bleibt im Fenster.
+
+## Optionen mit Reitern, Bildtakt (v0.29/v0.30)
+`hud/options.rs`: oben waagerechte Reiter Anzeige, Gameplay, Steuerung (`Page`), darunter Zeilen (`Row`); Zeile 0 sind die Reiter selbst. Tab/E weiter, Q zurück, Mausklick auf Reiter und Schieberegler. Unten steht eine Erklärung der gewählten Zeile. `Settings::change` und `set_number` verstellen die Werte. Bildrate (frei, 60, 120, 144, 240) und „Weniger Verzögerung“ (Reflex/Anti-Lag der Engine, Vorgabe an). Fällt die Grafikkarte aus, steht der Grund des Treibers im Absturzbericht.
+
+## Raumklang (v0.30)
+Klang läuft über `mettgine::audio`. Geräusche mit Ort bewegen sich beim Umdrehen mit, klingen hinter dem Kopf etwas und hinter Regalen deutlich dumpfer und leiser (`Game::sound_hidden`, Sichtlinie ohne den letzten halben Meter). Im Tomatensaft-Rausch und beim Sterben wird alles dumpf. Musik hat einen eigenen Regler.
