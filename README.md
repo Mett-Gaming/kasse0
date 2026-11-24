@@ -125,7 +125,7 @@ Ab der zweiten Stufe baut sich der Markt um, wenn du gerade nicht hinsiehst (umd
 
 In Menüs: Pfeiltasten oder W/S, Enter, Esc oder die Maus. In den Optionen ändern Links/Rechts (bzw. Links- und Rechtsklick) die Werte.
 
-**Controller:** Stick laufen/umsehen, A benutzen, B ducken, X Wagen, Y springen, LT rennen, RT Ware herausnehmen, LB/RB auswählen, Select Zettel, Start Pause, Kreuz: Antworten, PIN, Reklamieren. Die Hinweise im Bild wechseln mit.
+**Controller:** Stick laufen/umsehen, A springen, B ducken, X benutzen, Y Wagen, LT rennen, RT Ware herausnehmen, LB/RB auswählen, Select Zettel, Start Pause, Kreuz: Antworten, PIN, Reklamieren. Die Hinweise im Bild wechseln mit.
 
 ## Optionen
 Waagerechte Reiter (Tab, Q/E oder Mausklick): **Anzeige** (VHS-Effekt, Sichtfeld, Vollbild, höchste Bildrate, „Weniger Verzögerung“ über NVIDIA Reflex bzw. AMD Anti-Lag), **Gameplay** (Lautstärke, Musik, Jumpscares) und **Steuerung** (Maus- und Controller-Blick, Vibration, alle Tasten umbelegen). Schieberegler lassen sich anklicken. Hast du das Tutorial einmal geschafft, gibt es hier auch **„Tutorial spielen“**. Das Spiel startet im **randlosen Vollbild**; abgeschaltet läuft es im Fenster (1280×720). Sie werden in `%APPDATA%\.mettlauncher\kasse0\settings.txt` gespeichert. Dazu gibt es „Jumpscares“: Die lassen sich nicht abschalten. Probier es ruhig.

@@ -100,7 +100,7 @@ nur erklärt. Es erklärt auch Kunden und Mitarbeiter. Der normale Einkauf ("Neu
 Hast du das Tutorial einmal geschafft, kannst du es in den Optionen mit
 "Tutorial spielen" jederzeit wieder starten.
 
-Controller werden unterstützt (A benutzen, B ducken, X Wagen, Y springen, LT rennen);
+Controller werden unterstützt (A springen, B ducken, X benutzen, Y Wagen, LT rennen);
 alle Tasten lassen sich unter Optionen - Steuerung umbelegen.
 Die Optionen haben drei Reiter: Anzeige, Gameplay und Steuerung (Tab wechselt).
 Das Spiel startet im randlosen Vollbild; in den Optionen lässt es sich abschalten.

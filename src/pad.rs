@@ -207,9 +207,11 @@ impl App {
             }
         }
         for (a, down) in edges {
-            // Kassenfenster: A greift, B schliesst; beim PIN-Tippen gehoert A der Ziffer
-            let taken = (window && matches!(a, Action::Interact | Action::Crouch))
-                || (pin && matches!(a, Action::Interact | Action::Complain));
+            // Kassenfenster: A greift, B schliesst; beim PIN-Tippen gehoeren A und das Kreuz
+            // der Ziffer (egal, welche Aktion darauf liegt)
+            let on = |p: Pad| self.keys.of(a).contains(&Bind::Pad(p));
+            let taken = (window && (on(Pad::South) || on(Pad::East)))
+                || (pin && (on(Pad::South) || on(Pad::Down)));
             if !down || !taken {
                 self.action(a, down);
             }

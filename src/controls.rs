@@ -87,7 +87,7 @@ const DEFAULTS: &[(Action, &str, &[Bind])] = {
         (
             Jump,
             "springen",
-            &[Bind::Key(Key::Space), Bind::Pad(Pad::North)],
+            &[Bind::Key(Key::Space), Bind::Pad(Pad::South)],
         ),
         (
             Interact,
@@ -95,10 +95,14 @@ const DEFAULTS: &[(Action, &str, &[Bind])] = {
             &[
                 Bind::Key(Key::KeyE),
                 Bind::Mouse(MouseButton::Left),
-                Bind::Pad(Pad::South),
+                Bind::Pad(Pad::West),
             ],
         ),
-        (Cart, "wagen", &[Bind::Key(Key::KeyQ), Bind::Pad(Pad::West)]),
+        (
+            Cart,
+            "wagen",
+            &[Bind::Key(Key::KeyQ), Bind::Pad(Pad::North)],
+        ),
         (
             TakeOut,
             "herausnehmen",
@@ -319,7 +323,6 @@ fn hints(k: &Keys, pad: bool) -> Vec<(String, String)> {
             ("W A S D", "Stick"),
             ("WASD", "Stick"),
             ("Mausrad", "LB/RB"),
-            ("E / Klick", "A"),
             ("Zifferntasten 0-9", "Kreuz wählt, A tippt"),
             ("Zifferntasten", "Kreuz"),
             ("0-9", "Kreuz"),
@@ -341,7 +344,7 @@ fn hints(k: &Keys, pad: bool) -> Vec<(String, String)> {
         (Action::Jump, &["Leertaste", "Leer"]),
         (Action::List, &["TAB", "Tab"]),
         (Action::Run, &["Shift"]),
-        (Action::Interact, &["E"]),
+        (Action::Interact, &["E / Klick", "E"]),
         (Action::Cart, &["Q"]),
         (Action::TakeOut, &["F"]),
         (Action::Complain, &["R"]),
@@ -418,9 +421,9 @@ mod tests {
         assert_eq!(label(&k, Action::Interact, false), "Q");
         assert_eq!(label(&k, Action::Cart, false), "E");
         // Controller bleibt, wie er war
+        assert_eq!(label(&k, Action::Interact, true), "X");
+        rebind(&mut k, Action::Jump, Bind::Pad(Pad::West));
         assert_eq!(label(&k, Action::Interact, true), "A");
-        rebind(&mut k, Action::Jump, Bind::Pad(Pad::South));
-        assert_eq!(label(&k, Action::Interact, true), "Y");
         for a in all() {
             assert!(k.of(a).iter().any(is_pad) && k.of(a).iter().any(|b| !is_pad(b)));
         }
@@ -445,10 +448,10 @@ mod tests {
         assert!(hints(&k, false).is_empty(), "Tastatur-Vorgabe bleibt");
         let pad = hints(&k, true);
         let show = |s: &str| replace_words(s, &pad);
-        assert_eq!(show("[E] Aufheben: Eier"), "[A] Aufheben: Eier");
-        assert_eq!(show("[E/Q] Wagen schieben"), "[A/X] Wagen schieben");
+        assert_eq!(show("[E] Aufheben: Eier"), "[X] Aufheben: Eier");
+        assert_eq!(show("[E/Q] Wagen schieben"), "[X/Y] Wagen schieben");
         assert_eq!(show("TAB: Einkaufszettel"), "Select: Einkaufszettel");
-        assert_eq!(show("Leertaste springt, C oder"), "Y springt, C oder");
+        assert_eq!(show("Leertaste springt, C oder"), "A springt, C oder");
         assert_eq!(show("A/D oder Mausrad wählt"), "Stick oder LB/RB wählt");
         let mut k = k;
         rebind(&mut k, Action::Interact, Bind::Key(Key::KeyG));
