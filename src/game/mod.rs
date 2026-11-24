@@ -266,6 +266,8 @@ pub struct Game {
     /// Tutorial-Modus: man kann nicht verlieren, Fehler werden nur erklaert
     pub tutorial_run: bool,
     pub suspicion: f32,
+    /// in diesem Einkauf wurde ein Cheat benutzt (dann keine Erfolge, achievements.rs)
+    pub cheated: bool,
     /// Cheat: Kunden koennen einen nicht erwischen
     pub god: bool,
     /// Schonfrist nach einem Gespraech
@@ -527,6 +529,7 @@ impl Game {
             tutorial: None,
             tutorial_run: false,
             suspicion: 0.0,
+            cheated: false,
             god: false,
             grace: 0.0,
             deaths: 0,

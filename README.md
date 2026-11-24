@@ -5,6 +5,7 @@ Liminaler Supermarkt-Horror auf VHS. Du willst nur kurz bei **KAUF NULL** einkau
 Eigene Engine in Rust mit Vulkan-Renderer (ash, winit). Die Shader sind in WGSL geschrieben und werden beim Bauen per naga zu SPIR-V kompiliert. Ein Vulkan SDK ist nicht nötig. Alle Sounds werden beim Start synthetisiert.
 
 - Design: [docs/game-design.md](docs/game-design.md)
+- Erfolge: Liste in `erfolge/erfolge.json` (gehört im Zip neben die exe), ausgelöst in `src/achievements.rs`
 - Credits und Lizenzen der Modelle: [CREDITS.md](CREDITS.md)
 
 ## Starten

@@ -676,7 +676,12 @@ pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game, group: Option<us
     match group.and_then(|i| groups.get(i).map(|c| (i, c))) {
         None => {
             u.hint_center(14.0, "CHEATS (F1)", RED, 2.0);
-            u.hint_center(36.0, "Kategorie wählen", DIM, 1.0);
+            u.hint_center(
+                36.0,
+                "Ein Cheat sperrt die Erfolge für diesen Einkauf",
+                DIM,
+                1.0,
+            );
             let mut items: Vec<String> = groups
                 .iter()
                 .map(|(name, _, list)| format!("{name}  ({})", list.len()))

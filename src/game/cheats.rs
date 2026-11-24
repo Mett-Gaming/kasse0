@@ -133,7 +133,9 @@ impl Game {
         self.catcher = Some(self.player.pos + vec3(f.x, 0.0, f.z).normalize_or_zero() * 0.6);
     }
 
+    /// Cheat ausloesen. Danach zaehlt dieser Einkauf nicht mehr fuer Erfolge.
     pub fn cheat(&mut self, i: usize) {
+        self.cheated = true;
         let msg: String = match i {
             0 => {
                 self.god = !self.god;
