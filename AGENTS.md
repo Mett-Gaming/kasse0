@@ -67,7 +67,7 @@ Gearbeitet wird direkt auf `main`.
    git merge origin/main -m "🔀 Stand vom Server zusammengeführt"
    ```
    Konflikte löst der Agent selbst so, dass **beide** Absichten erhalten bleiben. Ist unklar, welche Absicht gilt, fragt er die Person im Chat.
-2. **Prüfen:** `cargo fmt`, dann `cargo test --release` und `cargo build --release`. Schlägt etwas fehl, wird **nicht** hochgeladen: erst reparieren oder der Person erklären, was nicht geht.
+2. **Prüfen:** `cargo fmt`, dann `cargo run --release -p mettpack -- pruefen`, `cargo test --release` und `cargo build --release`. Schlägt etwas fehl, wird **nicht** hochgeladen: erst reparieren oder der Person erklären, was nicht geht.
 3. **Eintragen** mit Emoji und deutschem Text (siehe 2.), den auch Nicht-Programmierer verstehen (Was ändert sich im Spiel?).
 4. **Versionsmarke setzen:** Jedes eigene Hochladen bekommt eine neue Versionsmarke (siehe 4.).
 5. **Hochladen:** erst `main`, dann die Versionsmarke. Wurde das Hochladen abgelehnt, weil inzwischen jemand anderes hochgeladen hat: wieder bei Schritt 1 anfangen.
@@ -99,12 +99,14 @@ Die Engine liegt als Git-Untermodul in `mettgine/` ([Mett-Gaming/mettgine](https
 - Ist die Marke beim Hochladen schon vergeben (jemand war schneller): Marken neu holen, nächste freie Version nehmen.
 - Betas heißen `vX.Y.Z-beta.N` und werden auf GitHub als Vorabversion gekennzeichnet. Andere Formen (z. B. `nightly`) sieht der Launcher nicht (siehe 8.).
 - GitHub Actions baut aus jeder `v*`-Versionsmarke automatisch eine Veröffentlichung mit dem Zip. Der Agent wartet, bis sie da ist, und nennt der Person den Link.
-- Danach ersetzt der Agent die automatischen Versionshinweise durch eine kurze, für Spieler lesbare Änderungsliste in Markdown (`gh release edit <tag> --notes-file …`). Der Launcher zeigt sie an. Am Zip ändert der Agent nichts mehr.
+- Danach ersetzt der Agent die automatischen Versionshinweise durch eine kurze, für Spieler lesbare Änderungsliste in Markdown (`gh release edit <tag> --notes-file …`). Der Launcher zeigt sie an. Am Zip und an der Dateiliste ändert der Agent nichts mehr.
 
 ## 5. Lokaler Bau zum Weitergeben
-Nach jeder Veröffentlichung auch lokal bauen und den Teilordner aktualisieren:
-- `dist/KASSE0/`: `KASSE0.exe` (aus `target/release/kasse0.exe`), `LIESMICH.txt` (aus `packaging/`), `Credits.md`, `Lizenzen/ArchivoBlack-OFL.txt`
-- daneben `dist/KASSE0-<tag>.zip`
+Nach jeder Veröffentlichung auch lokal packen: `cargo run --release -p mettpack -- packen --version <Versionsmarke>`. Das füllt:
+- `dist/KASSE0/`: alles, was Spieler bekommen (exe, `daten/`, Beilagen)
+- daneben `dist/KASSE0-<Versionsmarke>.zip` und `dist/KASSE0-<Versionsmarke>.dateien.json`
+
+Nichts von Hand hineinkopieren. Was ausgeliefert wird, steht in `spiel.toml` (Anleitung: `mettgine/docs/pakete.md`).
 
 `dist/` und `target/` gehören nicht ins Projektarchiv.
 
@@ -112,6 +114,7 @@ Nach jeder Veröffentlichung auch lokal bauen und den Teilordner aktualisieren:
 - **Keine selbst gebauten Modelle.** Figuren, Waren, Möbel, Geräte kommen aus freien Asset-Packs (CC0 bevorzugt, CC-BY nur mit Namensnennung). Räume und Einrichtung aus Boxen sind erlaubt.
 - **Jedes neue Asset kommt in `CREDITS.md`** (Quelle, Autor, Lizenz). Was dort fehlt, wird nicht eingetragen.
 - **Keine echten Marken:** keine echten Ladennamen, Logos, Slogans oder exakten Markenfarben. Der Laden heißt KAUF NULL.
+- **Spieldaten nie in die exe einbetten** (kein `include_bytes!` für Modelle, Figuren, Schriften, Klänge). Sie liegen in `assets/`, gehören in `spiel.toml` in genau ein Paket und werden mit `mettgine::asset::data` beim Start geladen. Shader bleiben in der exe.
 - Original-Packs liegen in `assets_src/` (nicht im Projektarchiv). Konvertiert wird mit den Skripten in `tools/` (siehe README), gebaut wird aus `assets/`.
 - **Doku aktuell halten:** Ändert sich etwas Spürbares, werden `README.md`, `docs/game-design.md` und `packaging/LIESMICH.txt` im selben Eintrag angepasst.
 - **Tests:** Neue Spielregeln bekommen einen Test in `src/**/tests.rs`. Bestehende Tests werden nur geändert, wenn sich die Regel bewusst geändert hat.
@@ -127,11 +130,12 @@ Nach jeder Veröffentlichung auch lokal bauen und den Teilordner aktualisieren:
 
 ## 8. Launcher (Mett-Launcher)
 Spieler installieren KASSE 0 über den Mett-Launcher. Das Projektarchiv liegt unter `Mett-Gaming/kasse0`, der Eintrag des Spiels in `Mett-Gaming/launcher-catalog` (`games.json`, Bilder unter `covers/`). Damit der Launcher Veröffentlichungen findet, installiert und startet:
-- **Pro Veröffentlichung genau ein Zip** passend zu `KASSE0-v*.zip` (kein zusätzliches `KASSE0-v…-debug.zip`). Andere Dateien (`.sha256`, `.txt`) stören nicht.
-- **Aufbau bleibt `KASSE0/KASSE0.exe`.** Ändern sich exe-Name, Ort, Zip-Schema oder Archiv-Name, muss vorher `games.json` im Katalog angepasst werden.
+- **Pro Veröffentlichung genau ein Zip** passend zu `KASSE0-v*.zip` (kein zusätzliches `KASSE0-v…-debug.zip`), dazu die Dateiliste `KASSE0-v….dateien.json`. Mit ihr lädt der Launcher nur Geändertes. Andere Dateien (`.sha256`, `.txt`) stören nicht.
+- **Aufbau bleibt `KASSE0/KASSE0.exe`**, die Spieldaten liegen daneben in `KASSE0/daten/`. Ändern sich exe-Name, Ort, Zip-Schema oder Archiv-Name, muss vorher `games.json` im Katalog angepasst werden.
 - **Dateien nie nach dem Veröffentlichen hochladen oder ersetzen** (der Launcher prüft Größe und sha256). Fehlerhafte Veröffentlichungen mit neuer Patch-Version korrigieren, alte nicht löschen (sie bleiben im Launcher wählbar).
 - **Das Spiel schreibt nichts neben die exe.** Bei jeder Aktualisierung wird der Installordner ersetzt; Spielstände und Einstellungen gehören nach `%APPDATA%\.mettlauncher\kasse0`. Muss doch etwas im Installordner bleiben: Pfad unter `preserve` in `games.json` eintragen.
 - **`KASSE0.exe` läuft selbst, bis das Spiel endet** (kein Starter, der einen zweiten Prozess startet), braucht keine Adminrechte, hat **keine eigene Aktualisierung** und bleibt auch ohne Launcher direkt aus dem Zip startbar. Arbeitsverzeichnis ist der Installordner.
+- **Erfolge** stehen in `erfolge/erfolge.json`. Ids bleiben für immer gleich. Ein benutzter Cheat sperrt die Erfolge für den laufenden Einkauf (`src/achievements.rs`). Anleitung: `mettgine/docs/erfolge.md`.
 
 ## 9. Wenn etwas schiefgeht
 - Kaputter Bau auf `main`: Wer ihn bemerkt, repariert ihn zuerst (mit eigener Patch-Versionsmarke), bevor neue Funktionen dazukommen.
