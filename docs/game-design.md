@@ -307,3 +307,7 @@ Klang läuft über `mettgine::audio`. Geräusche mit Ort bewegen sich beim Umdre
 
 ## Was in der Luft liegt (v0.32)
 `src/air.rs`, nur fürs Auge: Staub im Lichtkegel brennender Lampen (höchstens 140 Körner), Rauchfahne an der Glut und Wolke beim Ausatmen als echte Partikel in der Welt (ersetzt den gezeichneten HUD-Rauch), Atemwolken alle 3,2 s an Kühlwand und Kühltruhen. Spiegel und Monitor zeigen sie nicht.
+
+## Controller und Tastenbelegung (v0.33)
+`src/controls.rs` (Aktionen, Belegung, Hinweise), `src/pad.rs` (Controller auswerten), `src/hud/keys.rs` (Bildschirm „Tasten belegen“). Linker Stick läuft stufenlos, rechter schaut. A benutzen, B ducken, X Wagen, Y springen, LT rennen, RT Ware herausnehmen, LB/RB Auswahl (wie Mausrad), Select Zettel, Start Pause, Kreuz links/oben/rechts = 1/2/3 (Antworten, Zigarette), Kreuz unten reklamieren. Kassenfenster: Stick bewegt den Zeiger, A greift, B schließt. Karte: Stick nach rechts. PIN: Kreuz wählt die Ziffer, A tippt. Vibration bei Schreck, Fangen, Schlägen und Herzschlag (abschaltbar).
+Umbelegen tauscht: Wer die Taste hatte, bekommt die alte; so bleibt jede Aktion erreichbar. Fest sind Esc, F1, F12, Ziffern, Start, LB/RB und Kreuz links/oben/rechts. Gespeichert in `tasten.txt`. Hinweise im Bild zeigen die Tasten des zuletzt benutzten Geräts (`controls::hint`). Ohne Fokus zählt der Controller nicht.

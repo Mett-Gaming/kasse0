@@ -6,6 +6,9 @@ use mettgine::settings::KeyValues;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
     pub sensitivity: f32,
+    /// Blick mit dem Controller
+    pub pad_sensitivity: f32,
+    pub rumble: bool,
     pub volume: f32,
     /// Musik, zusaetzlich zur Gesamtlautstaerke
     pub music: f32,
@@ -26,6 +29,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             sensitivity: 1.0,
+            pad_sensitivity: 1.0,
+            rumble: true,
             volume: 0.8,
             music: 1.0,
             vhs: 1.0,
@@ -51,6 +56,8 @@ impl Settings {
         let on = |key| kv.str(key) == Some("true");
         Self {
             sensitivity: kv.f32("sensitivity", d.sensitivity, 0.2, 3.0),
+            pad_sensitivity: kv.f32("pad_sensitivity", d.pad_sensitivity, 0.2, 3.0),
+            rumble: kv.bool("rumble", d.rumble),
             volume: kv.f32("volume", d.volume, 0.0, 1.0),
             music: kv.f32("music", d.music, 0.0, 1.0),
             vhs: kv.f32("vhs", d.vhs, 0.0, 1.5),
@@ -69,6 +76,8 @@ impl Settings {
     fn to_values(&self) -> KeyValues {
         let mut kv = KeyValues::default();
         kv.set("sensitivity", self.sensitivity);
+        kv.set("pad_sensitivity", self.pad_sensitivity);
+        kv.set("rumble", self.rumble);
         kv.set("volume", self.volume);
         kv.set("music", self.music);
         kv.set("vhs", self.vhs);
@@ -85,6 +94,7 @@ impl Settings {
     pub fn number(&self, row: Row) -> f32 {
         match row {
             Row::Sensitivity => self.sensitivity,
+            Row::PadSensitivity => self.pad_sensitivity,
             Row::Volume => self.volume,
             Row::Music => self.music,
             Row::Vhs => self.vhs,
@@ -102,6 +112,7 @@ impl Settings {
         let v = (v.clamp(min, max) * 100.0).round() / 100.0;
         match row {
             Row::Sensitivity => self.sensitivity = v,
+            Row::PadSensitivity => self.pad_sensitivity = v,
             Row::Volume => self.volume = v,
             Row::Music => self.music = v,
             Row::Vhs => self.vhs = v,
@@ -113,7 +124,12 @@ impl Settings {
     /// Wert einer Optionszeile verstellen; `dir` = +1/-1.
     pub fn change(&mut self, row: Row, dir: i32) {
         match row {
-            Row::Sensitivity | Row::Volume | Row::Music | Row::Vhs | Row::Fov => {
+            Row::Sensitivity
+            | Row::PadSensitivity
+            | Row::Volume
+            | Row::Music
+            | Row::Vhs
+            | Row::Fov => {
                 let step = match row {
                     Row::Vhs => 0.25,
                     Row::Fov => 5.0,
@@ -129,7 +145,8 @@ impl Settings {
                 self.fps_limit = FPS_LIMITS[next as usize];
             }
             Row::LowLatency => self.low_latency = !self.low_latency,
-            Row::Tabs | Row::Jumpscares | Row::Tutorial | Row::Back => {}
+            Row::Rumble => self.rumble = !self.rumble,
+            Row::Tabs | Row::Keys | Row::Jumpscares | Row::Tutorial | Row::Back => {}
         }
     }
 
@@ -181,6 +198,8 @@ mod tests {
     fn roundtrip_and_clamping() {
         let s = Settings {
             sensitivity: 1.5,
+            pad_sensitivity: 2.0,
+            rumble: false,
             volume: 0.3,
             music: 0.4,
             vhs: 0.5,

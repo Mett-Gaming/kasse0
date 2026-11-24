@@ -2,6 +2,7 @@
 //! Mitte das Band mit den Waren auf dem Weg zum Scanner, rechts Kassiererin und Bon.
 //! Die gezogene Ware haengt am Mauszeiger.
 
+use super::KeyHints;
 use crate::game::belt_window::{
     cart_tile, weight_text, DragSrc, Rect, BELT_PANEL, CART_PANEL, HAND_TILE, TILE_H, TILE_ROWS,
     TILE_W, TILL_PANEL, WINDOW,
@@ -15,7 +16,7 @@ const FRAME: [f32; 4] = [0.85, 0.85, 0.8, 0.5];
 fn panel(u: &mut Ui, r: Rect, title: &str, color: [f32; 4]) {
     u.rect(r.0, r.1, r.2, r.3, PANEL);
     u.rect(r.0, r.1, r.2, 1.0, FRAME);
-    u.text(r.0 + 4.0, r.1 + 3.0, title, color, 1.0);
+    u.hint(r.0 + 4.0, r.1 + 3.0, title, color, 1.0);
 }
 
 /// Eine Ware als Kachel: Farbstreifen in der Farbe der Ware, oben der Name, darunter das
@@ -45,8 +46,8 @@ fn tile(u: &mut Ui, r: Rect, item: &ItemData, lifted: bool) {
             .chars()
             .take(((right - tx) / 8.0) as usize)
             .collect();
-        u.text(tx, r.1 + 1.0, &short, ink, 1.0);
-        u.text(tx, r.1 + 10.0, &w, wc, 1.0);
+        u.hint(tx, r.1 + 1.0, &short, ink, 1.0);
+        u.hint(tx, r.1 + 10.0, &w, wc, 1.0);
         let (bx, bw) = (r.0 + 60.0, right - r.0 - 60.0);
         u.rect(bx, r.1 + 12.0, bw, 4.0, [0.0, 0.0, 0.0, 0.25]);
         u.rect(bx, r.1 + 12.0, bw * (kg / 3.0).clamp(0.04, 1.0), 4.0, wc);
@@ -56,8 +57,8 @@ fn tile(u: &mut Ui, r: Rect, item: &ItemData, lifted: bool) {
         let n = ((right - ww - 6.0 - tx) / 8.0) as usize;
         let short: String = item.name.chars().take(n).collect();
         let ty = r.1 + (r.3 - 8.0) * 0.5;
-        u.text(tx, ty, &short, ink, 1.0);
-        u.text(right - ww, ty, &w, wc, 1.0);
+        u.hint(tx, ty, &short, ink, 1.0);
+        u.hint(right - ww, ty, &w, wc, 1.0);
     }
 }
 
@@ -75,7 +76,7 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
     let (x, y, ww, hh) = WINDOW;
     u.rect(x - 1.0, y - 1.0, ww + 2.0, hh + 2.0, frame);
     u.rect(x, y, ww, hh, [0.02, 0.02, 0.03, 0.97]);
-    u.text_center(y + 4.0, "KASSE 0 - WARE AUFS BAND LEGEN", YELLOW, 1.0);
+    u.hint_center(y + 4.0, "KASSE 0 - WARE AUFS BAND LEGEN", YELLOW, 1.0);
 
     // Wagen
     panel(u, CART_PANEL, &format!("WAGEN ({})", g.cart.len()), WHITE);
@@ -93,11 +94,11 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
         let more = format!("+{} weitere", g.cart.len() - shown);
         let cp = CART_PANEL;
         let x = cp.0 + cp.2 - 4.0 - Ui::text_width(&more, 1.0);
-        u.text(x, cp.1 + 3.0, &more, DIM, 1.0);
+        u.hint(x, cp.1 + 3.0, &more, DIM, 1.0);
     }
     match &g.held {
         Some(item) if dragging != Some(DragSrc::Hand) => {
-            u.text(HAND_TILE.0, HAND_TILE.1 - 9.0, "IN DER HAND", DIM, 1.0);
+            u.hint(HAND_TILE.0, HAND_TILE.1 - 9.0, "IN DER HAND", DIM, 1.0);
             tile(u, HAND_TILE, item, false);
         }
         _ => {}
@@ -142,14 +143,14 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
     } else {
         "hierher ziehen"
     };
-    u.text(
+    u.hint(
         bp.0 + (bp.2 - Ui::text_width(hint, 1.0)) * 0.5,
         by + 40.0,
         hint,
         if dragging.is_some() { GREEN } else { DIM },
         1.0,
     );
-    u.text(bp.0 + 4.0, bp.1 + 16.0, "Ab 1 kg zuerst!", DIM, 1.0);
+    u.hint(bp.0 + 4.0, bp.1 + 16.0, "Ab 1 kg zuerst!", DIM, 1.0);
 
     // Kassiererin und Bon
     let tp = TILL_PANEL;
@@ -170,9 +171,9 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
         for (k, (name, cents)) in lines.iter().enumerate() {
             let ly = tp.1 + 26.0 + k as f32 * 10.0;
             let short: String = name.chars().take(6).collect();
-            u.text(tp.0 + 4.0, ly, &short, ink, 1.0);
+            u.hint(tp.0 + 4.0, ly, &short, ink, 1.0);
             let price = euro(*cents);
-            u.text(
+            u.hint(
                 tp.0 + tp.2 - 4.0 - Ui::text_width(&price, 1.0),
                 ly,
                 &price,
@@ -183,8 +184,8 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
         let sum = euro(g.scanned_value());
         let sy = tp.1 + tp.3 - 12.0;
         u.rect(tp.0 + 4.0, sy - 2.0, tp.2 - 8.0, 1.0, [0.5, 0.9, 0.55, 0.4]);
-        u.text(tp.0 + 4.0, sy, "SUMME", ink, 1.0);
-        u.text(
+        u.hint(tp.0 + 4.0, sy, "SUMME", ink, 1.0);
+        u.hint(
             tp.0 + tp.2 - 4.0 - Ui::text_width(&sum, 1.0),
             sy,
             &sum,
@@ -194,7 +195,7 @@ pub fn draw(u: &mut Ui, g: &Game, time: f32) {
     }
 
     // Steuerung
-    u.text_center(
+    u.hint_center(
         y + hh - 10.0,
         "Ziehen: Ware aufs Band   R: reklamieren   E/Esc: schließen",
         DIM,

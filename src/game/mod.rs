@@ -64,6 +64,8 @@ pub struct Input {
     pub left: bool,
     pub right: bool,
     pub run: bool,
+    /// linker Stick: rechts, vor (-1..1); ersetzt die vier Richtungen
+    pub stick: (f32, f32),
     /// Einkaufszettel wird gerade angezeigt (fuer das Tutorial)
     pub list_open: bool,
     /// Flanken (werden in update() verbraucht)
@@ -924,6 +926,12 @@ impl Game {
             return false;
         }
         self.world.line_of_sight(eye, target)
+    }
+
+    /// Blick um einen Winkel drehen (Controller), unabhaengig von der Mausempfindlichkeit.
+    pub fn turn(&mut self, yaw: f32, pitch: f32) {
+        let s = BASE_SENSITIVITY * self.sensitivity;
+        self.look(yaw / s, pitch / s);
     }
 
     pub fn look(&mut self, dx: f32, dy: f32) {
