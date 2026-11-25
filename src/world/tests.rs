@@ -469,9 +469,22 @@ fn sign_ids(w: &World) -> Vec<u32> {
 }
 
 #[test]
-fn side_wing_only_when_tipped_and_grows_with_the_tier() {
-    assert!(gen(5, false).wing.is_none(), "Trakt im normalen Markt");
-    assert!(gen(5, true).wing.is_none(), "Trakt ohne Stufe");
+fn side_wing_is_always_there_and_grows_with_the_tier() {
+    // die Pfandraeume gibt es auch im normalen Markt (bewusst geaendert): wie Stufe 1, an
+    // derselben Stelle wie nach dem Kippen, und alles bleibt erreichbar
+    for seed in [5u64, 9] {
+        let n = gen(seed, false);
+        let t = n.wing.as_ref().expect("kein Trakt im normalen Markt");
+        assert_eq!(t.rooms.len(), 2);
+        assert_eq!(t.doors.len(), 1);
+        assert!(n.all_reachable(), "{seed}: normaler Markt versperrt");
+        let tipped = with_wing(seed, 1);
+        assert_eq!(
+            tipped.wing.as_ref().unwrap().doors,
+            t.doors,
+            "{seed}: woanders"
+        );
+    }
     for seed in [3u64, 8, 13] {
         let mut last = 0;
         for (wing, rooms, doors) in [(1u8, 2usize, 1usize), (2, 3, 2), (3, 4, 2), (4, 4, 2)] {
@@ -522,6 +535,39 @@ fn side_wing_only_when_tipped_and_grows_with_the_tier() {
                     "{seed}/{wing}: ins Nichts"
                 );
             }
+        }
+    }
+}
+
+#[test]
+fn pfand_rooms_are_tidy_at_first_and_decay_with_the_tier() {
+    let a = crate::signs::atlas();
+    for seed in [3u64, 8, 13] {
+        for wing in 1u8..=4 {
+            let w = with_wing(seed, wing);
+            let t = w.wing.as_ref().unwrap();
+            // vor jedem Automaten ist Platz, man kommt hin (Kisten stehen nicht im Weg)
+            let seen = w.reachable_cells();
+            for m in &t.machines {
+                let f = m.front();
+                assert!(w.near_reachable(&seen, f, 0.7), "{seed}/{wing}: Automat");
+                assert!(w.collide(f, 0.3).distance(f) < 0.05, "{seed}/{wing}");
+            }
+            // Leuchten im Trakt: gepflegt ruhig, im Verfall flackernd
+            let lamps: Vec<_> = w
+                .instances
+                .iter()
+                .filter(|i| i.extra[0] == material::EMISSIVE && i.center[0] < -0.2)
+                .filter(|i| t.contains(vec3(i.center[0], 0.0, i.center[2])))
+                .collect();
+            assert!(lamps.len() >= 2 * t.rooms.len(), "{seed}/{wing}: Leuchten");
+            let calm = lamps.iter().all(|i| i.extra[3] == 0.0);
+            assert_eq!(calm, wing == 1, "{seed}/{wing}: Flackern");
+            // Schilder: gepflegt "Pfandrückgabe", im Verfall "Nichts kommt zurück"
+            let ids = sign_ids(&w);
+            let (good, bad) = (a.id(WING_TEXTS[0]), a.id(WING_TEXTS[2]));
+            assert_eq!(ids.contains(&good), wing <= 2, "{seed}/{wing}");
+            assert_eq!(ids.contains(&bad), wing >= 3, "{seed}/{wing}");
         }
     }
 }

@@ -578,6 +578,40 @@ impl App {
                 return Some(0.5);
             }
             95 => self.shot_request = Some(shot("44_kiosk_fenster")),
+            98 | 100 | 102 => {
+                // Pfandtrakt im normalen Markt: vom Markt auf die Tueroeffnung (98), im Raum auf
+                // den Automaten (100); 102 dasselbe im gekippten Markt
+                self.start_game(seed, false);
+                self.game.tutorial = None;
+                if step == 102 {
+                    self.game.tip();
+                }
+                self.game.customers.clear();
+                self.game.employees.clear();
+                self.game.message = None;
+                self.game.glitch = 0.0;
+                let Some(w) = self.game.world.wing.clone() else {
+                    return Some(0.5);
+                };
+                if step == 98 {
+                    let d = w.doors[0];
+                    self.game.player.pos = vec3(3.5, 0.0, d.z + 1.0);
+                    self.game.player.yaw = -std::f32::consts::FRAC_PI_2 - 0.25;
+                    self.game.player.pitch = -0.05;
+                } else {
+                    let m = w.machines[0];
+                    self.game.player.pos = m.front() + vec3(2.5, 0.0, 1.5);
+                    let to = m.pos + vec3(0.0, 1.4, 0.0) - self.game.eye();
+                    self.game.player.yaw = to.x.atan2(-to.z);
+                    self.game.player.pitch = -0.1;
+                }
+                self.game.trolley.pushing = false;
+                self.game.trolley.pos = self.game.world.corral;
+                return Some(1.2);
+            }
+            99 => self.shot_request = Some(shot("46_pfand_tuer")),
+            101 => self.shot_request = Some(shot("47_pfand_raum_innen")),
+            103 => self.shot_request = Some(shot("48_pfand_raum_gekippt")),
             _ => return None,
         }
         Some(0.6)

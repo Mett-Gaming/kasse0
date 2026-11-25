@@ -2173,12 +2173,11 @@ fn the_same_scene_appears_again_in_another_aisle_and_turns_around() {
 }
 
 #[test]
-fn the_side_wing_is_quiet_and_stalkers_find_the_way_in() {
+fn stalkers_find_the_way_into_the_side_wing() {
+    // Musik und Brummen sind im Trakt wie im Markt (keine Daempfung mehr, bewusst geaendert)
     let mut g = eerie_game(4, Tier::Uneasy);
-    assert_eq!(g.wing_muffle(), 0.0);
     g.debug_to_wing();
     assert!(g.world.in_wing(g.player.pos));
-    assert!(g.wing_muffle() > 0.5, "Musik nicht gedaempft");
     // Verfolger koennen hinein: Weg von der Tuer im Markt bis zum Spieler
     let field = npc::bfs(&g.world.nav, g.player.pos);
     let door = g.world.wing.as_ref().unwrap().doors[0] + vec3(1.2, 0.0, 0.0);

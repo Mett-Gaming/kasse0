@@ -76,7 +76,7 @@ impl Tracker {
             (g.trip != Trip::None, "nicht_dein_saft"),
             (!g.butts.is_empty(), "raucherpause"),
             (g.sign_falls.iter().any(Option::is_some), "frisch_gewischt"),
-            (g.world.in_wing(g.player.pos), "hinter_der_wand"),
+            (g.tipped && g.world.in_wing(g.player.pos), "hinter_der_wand"),
             (g.tier == Tier::Collapse, "grosseinkauf"),
             (g.paid, "gesicht_gezeigt"),
             (g.turned_back, "nicht_umdrehen"),

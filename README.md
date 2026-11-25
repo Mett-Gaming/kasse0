@@ -121,7 +121,7 @@ Je teurer dein Einkauf, desto mehr verändert sich der Markt:
 - Auf den hohen Stufen biegen sich die Gänge live: Regale schwanken, der Boden hebt und senkt sich (Steigung). Bereiche wandern beim Umbau: Kühlabschnitte tauschen die Plätze, die Tiefkühlreihe steht in einem anderen Gang, die Obst-Insel rückt.
 - Kunden flüstern miteinander, wenn sie sich begegnen.
 - Die gelben Schilder „VORSICHT – Frisch gewischt“ sagen später etwas anderes. Irgendwann liegt Blut darunter, und manche stehen nicht mehr so, wie man sie aufgestellt hat.
-- Hinter Türöffnungen in der linken Wand liegen leere, völlig gleiche Räume mit einer flackernden Röhre. Je schlimmer es wird, desto mehr Räume, irgendwann ein Durchgang ins Nichts und ein Flur, der zu lang ist.
+- Hinter Türöffnungen in der linken Wand liegen völlig gleiche Pfandräume (schon im normalen Markt, immer an derselben Stelle): gepflegt mit Fliesen, Kistenregal, Sammeltonnen, Bank und Anleitungstafel, im gekippten Markt verfallen sie mit dem Markt. Je schlimmer es wird, desto mehr Räume, irgendwann ein Durchgang ins Nichts und ein Flur, der zu lang ist.
 - Dinge wiederholen sich: Alle Gänge tragen plötzlich dieselbe Nummer, auf allen Plakaten klebt derselbe Satz, und eine Szene, die du schon gesehen hast, steht im nächsten Gang wieder vor dir.
 - Manchmal steht ganz hinten im Gang jemand und sieht dich an. Wenn du näher kommst oder wegsiehst, ist er weg.
 - Der Boden verfällt: erst fehlende und gesprungene Fliesen und Ameisenstraßen, dann Fliesenstapel, Löcher (Hindernisse, hineinfallen kann man nicht) und Ratten. In der Decke klaffen Löcher mit Kabeln, am Ende tropft Blut von der Decke und sammelt sich am Boden.

@@ -8,6 +8,8 @@ mod fixtures;
 mod kiosk;
 pub(super) mod sortiment;
 mod wing;
+mod wing_furniture;
+mod wing_look;
 
 pub use ads::HACKEPETER_TEXTS;
 pub use corridor::{
@@ -17,6 +19,8 @@ pub use corridor::{
 pub use kiosk::{Kiosk, CHUTE_HALF, CHUTE_Y, DISPLAY_NORMAL, DISPLAY_TIPPED, MACHINE_HALF};
 pub use sortiment::texts as sortiment_texts;
 pub use wing::Wing;
+pub use wing_furniture::FURNITURE_TEXTS;
+pub use wing_look::WING_TEXTS;
 
 use super::layout::{self, Layout};
 use super::material::*;

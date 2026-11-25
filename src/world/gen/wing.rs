@@ -106,8 +106,10 @@ impl Gen<'_> {
         aisle_z1: f32,
         wall_color: Vec3,
     ) -> Option<Wing> {
-        let want = rooms_for(self.params.wing);
-        if !self.params.tipped || want == 0 {
+        // die Pfandraeume gibt es immer: im normalen Markt wie auf der ersten Stufe (gepflegt)
+        let level = self.wing_level();
+        let want = rooms_for(level);
+        if want == 0 {
             return None;
         }
         let slots = door_slots(aisle_z0, aisle_z1);
@@ -115,19 +117,21 @@ impl Gen<'_> {
         if n == 0 {
             return None;
         }
-        // Startplatz fest je Markt (nicht je Umbau): der Trakt bleibt, wo er ist
-        let start = (self.params.seed as usize / 7) % (slots.len() - n + 1);
-        let zs: Vec<f32> = slots[start..start + n].to_vec();
+        // immer ab dem ersten Platz: der liegt im normalen und im (laengeren) gekippten Markt an
+        // derselben Stelle, der Trakt bleibt also beim Kippen, wo er ist
+        let zs: Vec<f32> = slots[..n].to_vec();
         let x_e = -WALL_T; // Innenkante Westwand des Markts (Wandmitte bei -WALL_T)
         let x_w = x_e - ROOM_W; // Innenkante der Trakt-Westwand
-        let wall_c = wall_color * vec3(1.05, 1.0, 0.82); // vergilbt
-        let floor_c = vec3(0.47, 0.45, 0.36);
-        let ceil_c = vec3(0.78, 0.76, 0.62);
+                                // gepflegt hell, mit dem Verfall vergilbt (wing_look.rs)
+        let decay = self.wing_decay();
+        let wall_c = self.wing_wall_color(wall_color);
+        let floor_c = vec3(0.33, 0.33, 0.32); // Fugen zwischen den Bodenfliesen
+        let ceil_c = vec3(0.88, 0.88, 0.86).lerp(vec3(0.78, 0.76, 0.62), decay);
         let tube_c = vec3(1.0, 0.94, 0.7);
         let mut rooms = Vec::new();
         let mut void = None;
-        let void_room = (self.params.wing >= 3 && n >= 3).then_some(1);
-        let hall_room = (self.params.wing >= 4).then_some(n - 1);
+        let void_room = (level >= 3 && n >= 3).then_some(1);
+        let hall_room = (level >= 4).then_some(n - 1);
         let mut machines = Vec::new();
         for (k, &zc) in zs.iter().enumerate() {
             let (z0, z1) = (zc - ROOM_D * 0.5, zc + ROOM_D * 0.5);
@@ -189,24 +193,34 @@ impl Gen<'_> {
                 let zn = z1 + WALL_T;
                 self.b.wall(x_w, zn, x_e, zn, 0.0, WING_H, wall_c);
             }
-            // eine Roehre, alle im Gleichtakt flackernd
-            self.b.add(
-                vec3(xc, WING_H - 0.03, zc),
-                vec3(0.09, 0.03, 0.9),
-                vec3(0.6, 0.6, 0.58),
-                PLAIN,
-            );
-            self.b.add_ex(
-                vec3(xc, WING_H - 0.065, zc),
-                vec3(0.06, 0.008, 0.87),
-                tube_c,
-                EMISSIVE,
-                TUBE_SEED,
-                1.6,
-                0.6,
-            );
-            self.b
-                .light(vec3(xc, WING_H - 0.4, zc), 6.0, tube_c, 0.5, TUBE_SEED, 0.6);
+            // zwei Deckenleuchten: gepflegt ruhig, mit dem Verfall flackernd (alle im Gleichtakt)
+            let flicker = 0.6 * decay;
+            for dz in [-1.6f32, 1.6] {
+                let p = vec3(xc, WING_H, zc + dz);
+                self.b.add(
+                    p - vec3(0.0, 0.03, 0.0),
+                    vec3(0.32, 0.03, 0.62),
+                    vec3(0.7, 0.7, 0.68),
+                    PLAIN,
+                );
+                self.b.add_ex(
+                    p - vec3(0.0, 0.065, 0.0),
+                    vec3(0.28, 0.008, 0.58),
+                    tube_c,
+                    EMISSIVE,
+                    TUBE_SEED,
+                    2.2 - 0.7 * decay,
+                    flicker,
+                );
+                self.b.light(
+                    p - vec3(0.0, 0.4, 0.0),
+                    6.5,
+                    tube_c,
+                    0.95 - 0.4 * decay,
+                    TUBE_SEED,
+                    flicker,
+                );
+            }
             // aufgemalte Tuer an der Westwand, die nirgends hinfuehrt
             if gap.is_none() {
                 self.fake_door(vec3(x_w + 0.012, 0.0, zc + 1.6), wall_c);
@@ -214,6 +228,29 @@ impl Gen<'_> {
             // der einsame Gegenstand, immer an derselben Stelle: ein Pfandautomat
             let spot = vec3(x_w + MACHINE_HALF.x + 0.02, 0.0, zc - 2.3);
             machines.push(self.deposit_machine(spot));
+            // Einrichtung (wing_look.rs): Fliesen, Schilder, Markierung, Kisten
+            let has_door = k == 0 || (level >= 2 && n >= 2 && k == n - 1);
+            let inner = (xc - INNER_HALF, xc + INNER_HALF);
+            let shape = super::wing_look::RoomShape {
+                x_w,
+                x_e,
+                z0,
+                z1,
+                gaps: [
+                    match gap {
+                        Some(g) => vec![(zc - g, zc + g)],
+                        None => vec![(zc + 1.6 - 0.5, zc + 1.6 + 0.5)], // aufgemalte Tuer
+                    },
+                    if has_door {
+                        vec![(zc - DOOR_HALF - 0.08, zc + DOOR_HALF + 0.08)]
+                    } else {
+                        vec![]
+                    },
+                    if k > 0 { vec![inner] } else { vec![] },
+                    if k + 1 < n { vec![inner] } else { vec![] },
+                ],
+            };
+            self.dress_wing_room(k, &shape, spot.z);
             if Some(k) == void_room {
                 // Durchgang ins Nichts: Rahmen, dahinter tiefes Schwarz; nicht begehbar
                 let c = vec3(xw - 0.6, DOOR_H * 0.5, zc);
@@ -303,7 +340,7 @@ impl Gen<'_> {
         }
         // Tueroeffnungen in die Westwand des Markts: erster und (ab 2) letzter Raum
         let mut doors = vec![vec3(0.0, 0.0, zs[0])];
-        if self.params.wing >= 2 && n >= 2 {
+        if level >= 2 && n >= 2 {
             doors.push(vec3(0.0, 0.0, zs[n - 1]));
         }
         for d in &doors {

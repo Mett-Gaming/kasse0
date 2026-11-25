@@ -100,6 +100,9 @@ fn all_texts() -> Vec<String> {
             .iter()
             .map(|s| s.to_string()),
     );
+    // Schilder in den Pfandraeumen (world/gen/wing_look.rs)
+    v.extend(crate::world::WING_TEXTS.iter().map(|s| s.to_string()));
+    v.extend(crate::world::FURNITURE_TEXTS.iter().map(|s| s.to_string()));
     // Anzeige der rostigen Maschine am Kiosk (world/gen/kiosk.rs)
     v.extend(
         crate::world::DISPLAY_NORMAL

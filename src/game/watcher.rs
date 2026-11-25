@@ -36,15 +36,6 @@ pub struct Watcher {
 }
 
 impl Game {
-    /// Wie gedaempft die Musik klingt (0..1): im Seitentrakt fast stumm, nach innen hin
-    /// staerker (ab 1 m hinter der Tuer voll), siehe `audio::Mood::muffle`.
-    pub fn wing_muffle(&self) -> f32 {
-        if !self.world.in_wing(self.player.pos) {
-            return 0.0;
-        }
-        (-self.player.pos.x / 1.0).clamp(0.0, 1.0)
-    }
-
     /// Liegt etwas zwischen dem Spieler und einem Geraeusch? (dann klingt es dumpf)
     pub fn sound_hidden(&self, at: Vec3) -> bool {
         let eye = self.eye();

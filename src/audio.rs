@@ -95,8 +95,6 @@ pub struct Mood {
     pub paused: bool,
     /// 0..1: Stille vor einem Schreck (Musik und Brummen weg)
     pub hush: f32,
-    /// 0..1: im Seitentrakt - Musik fast weg (wie hinter Waenden), Roehrenbrummen lauter
-    pub muffle: f32,
     /// 0..1: alles klingt dumpf (Rausch, Sterben)
     pub dull: f32,
     /// 0..1: Elektromotor des Mobility Scooters (0 = steht oder man sitzt nicht drauf)
@@ -749,10 +747,9 @@ impl Audio {
         };
         let pause = if m.paused { 0.35 } else { 1.0 };
         let quiet = 1.0 - m.hush.clamp(0.0, 1.0);
-        // im Seitentrakt: Musik nur noch ganz fern, das Brummen der Roehren ist nah
-        let muffle = m.muffle.clamp(0.0, 1.0);
-        let music = music_vol.max(0.1) * pause * quiet * (1.0 - 0.88 * muffle);
-        let hum = (hum_vol + 0.35 * muffle) * pause * quiet;
+        // ueberall gleich, auch im Pfandtrakt
+        let music = music_vol.max(0.1) * pause * quiet;
+        let hum = hum_vol * pause * quiet;
         if let Some(t) = self.music {
             let gain = music * self.music_volume;
             self.out.set_track(t, gain, speed.max(0.5));

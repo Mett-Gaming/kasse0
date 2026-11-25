@@ -148,8 +148,14 @@ impl App {
             fade: 1.0,
             fixed_seed,
             tutorial_mode: false,
-            autoshot: std::env::var_os("KASSE0_AUTOSHOT")
-                .map(|d| (std::path::PathBuf::from(d), 0.0, 0)),
+            // KASSE0_AUTOSHOT_FROM=<Schritt>: Durchlauf ab diesem Schritt (z. B. 84 = Pfand)
+            autoshot: std::env::var_os("KASSE0_AUTOSHOT").map(|d| {
+                let from = std::env::var("KASSE0_AUTOSHOT_FROM")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0);
+                (std::path::PathBuf::from(d), 1.5, from)
+            }),
             shot_request: None,
             menu_scare: 0.0,
             perf: (std::env::var_os("KASSE0_PERF").is_some()
@@ -654,7 +660,6 @@ impl App {
                         }
                 ),
                 hush: self.game.hush(),
-                muffle: self.game.wing_muffle(),
                 dull: (self.game.trip_level() * 0.7).max(self.game.dying_progress().unwrap_or(0.0)),
                 scooter: if hud::on_title(self.screen) {
                     0.0

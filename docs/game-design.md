@@ -104,9 +104,11 @@ Vorher sprang die Welt in einem Bild um und es wirkte wie ein Teleport. Kommt w�
 Angelehnt an die Stimmung liminaler Räume, ohne etwas daraus zu übernehmen. Alles aus Boxen und vorhandenen Modellen.
 
 **Seitentrakt** (`world/gen/wing.rs`, `WorldParams::wing` = `Tier::wing()`):
-- Hinter 1–2 Türöffnungen in der Westwand (2 m breit, mittig zwischen den Plakaten) liegt eine Kette **identischer** leerer Räume (6 × 7 m, Decke 2,6 m, vergilbte Wände).
-- Jeder Raum hat eine Röhre (alle flackern im Gleichtakt), eine aufgemalte Tür, die nirgends hinführt, und an derselben Stelle einen Pfandautomaten (siehe **Pfand**).
-- Keine Waren, keine Schilder. Die Musik ist dort fast weg, das Brummen nah (`audio::Mood::muffle`).
+- Hinter 1–2 Türöffnungen in der Westwand (2 m breit, mittig zwischen den Plakaten) liegt eine Kette **identischer** Pfandräume (6 × 7 m, Decke 2,6 m). Die Räume gibt es **immer**, auch im normalen Markt (dort wie Stufe 1: zwei Räume, eine Tür, gepflegt). Sie beginnen immer am ersten Platz an der Westwand, der im normalen und im längeren gekippten Markt an derselben Stelle liegt; beim Kippen bleiben sie also, wo sie sind (nur weitere Räume kommen dazu). Flaschen und damit Pfand gibt es weiter nur im gekippten Markt.
+- Jeder Raum hat eine aufgemalte Tür, die nirgends hinführt, und an derselben Stelle einen Pfandautomaten (siehe **Pfand**, die Automaten sind unverändert).
+- **Aussehen** (`world/gen/wing_look.rs`): ein gepflegter Rückgaberaum. Helles Schachbrett aus Bodenfliesen (0,6 m), Wandfliesen bis 1,2 m mit blauer Zierleiste, Fugen und Sockel (Türen und Durchgänge bleiben frei), saubere helle Wände und Decke, zwei Deckenleuchten, ein blaues Schild „Pfandrückgabe“ über dem Automaten, „Danke fürs Zurückbringen“ an der Südwand, ein gelber Rahmen „hier stehen“ vor dem Automaten und zwei Stapel Getränkekisten (mit Flaschenhälsen) in den Ecken. Dazu (`wing_furniture.rs`): ein Metallregal voller Getränkekisten an der Nordwand, drei Sammeltonnen „Glas“, „Plastik“, „Dosen“, eine Holzbank unter dem Dankesschild, eine Anleitungstafel „So geht's“ (1 Flasche drehen, 2 Bei Grün einlegen, 3 Bon drucken), eine Wanduhr, ein Mülleimer neben dem Automaten, eine Fußmatte an der Tür zum Markt und ein Lüftungsgitter. Im Verfall fehlen Kisten im Regal, die mittlere Tonne liegt um, die Uhr steht auf kurz vor zwölf.
+- **Verfall** mit der Stufe (`wing_decay`, Stufe 1 = 0 bis Kollaps = 1): Bodenfliesen fehlen oder sind fleckig, Wandfliesen herausgebrochen, Wasserflecken, Wände und Decke vergilben. Auf Stufe 1 leuchten die Lampen ruhig, danach flackern sie im Gleichtakt, immer stärker. Ab „falsch“ steht auf den Schildern „Nichts kommt zurück“ und „Du bringst immer wieder“ (flackernd), und je Raum liegt ein Kistenstapel umgekippt.
+- Keine Waren. Musik und Brummen klingen wie im Markt (früher gedämpft, bewusst geändert).
 
 | Stufe | Räume | Türen in den Markt | Extra |
 |---|---|---|---|
