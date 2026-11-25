@@ -15,6 +15,9 @@ Spiel, Engine, Code, Shader und alle Sounds (synthetisiert): eigenes Projekt.
 | Kasse ("POS Machine") | [poly.pizza/m/ju1CrAV1UY](https://poly.pizza/m/ju1CrAV1UY) | J-Toastie | **CC-BY 3.0** |
 | Stuhl der Kassiererin ("Desk Chair") | [poly.pizza/m/CKSz6PB1vO](https://poly.pizza/m/CKSz6PB1vO) | Kenney | CC0 1.0 |
 | Warnschild ("Wet Floor Sign 01"), im Spiel mit Aufschrift und Warndreieck versehen | [polyhaven.com/a/WetFloorSign_01](https://polyhaven.com/a/WetFloorSign_01) | Poly Haven | CC0 1.0 |
+| Rostige Maschine am Kiosk ("Old Military Compressor"), im Spiel rostbraun gefärbt | [polyhaven.com/a/old_military_compressor](https://polyhaven.com/a/old_military_compressor) | Brian Speight (Poly Haven) | CC0 1.0 |
+| Pfandtüte am Wagen ("Trash Bag"), im Spiel hell gefärbt, bläht sich je Flasche auf | [poly.pizza/m/jYrMKg2Q7C](https://poly.pizza/m/jYrMKg2Q7C) | Quaternius | CC0 1.0 |
+| Menschliches Skelett neben der Maschine ("LowPoly Rigged skeleton (With IK)"), mit `tools/pose_skeleton.py` auf den Rücken gelegt | [opengameart.org/content/lowpoly-rigged-skeleton-with-ik-blend](https://opengameart.org/content/lowpoly-rigged-skeleton-with-ik-blend) | zisongbr (Hinweis auf der Seite: AstroDev; Fernando Ferreira) | CC0 1.0 |
 | Konservendose ("Russian Food Cans 01") | [polyhaven.com/a/russian_food_cans_01](https://polyhaven.com/a/russian_food_cans_01) | Poly Haven | CC0 1.0 |
 
 ### Waren-Packs (der Grossteil der rund 125 Waren im Katalog `tools/catalog.json`)

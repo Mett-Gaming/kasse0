@@ -64,6 +64,23 @@ JOBS = [
     dict(name="can", src=os.path.join(DL, "russian_food_cans_01", "russian_food_cans_01_1k.gltf"),
          mesh="russian_food_cans_01_can_cond", height=0.11, tris=200,
          colors={"russian_food_cans_01": (0.62, 0.07, 0.05)}),
+    # Rostige Maschine statt Kiosk: Old Military Compressor (Brian Speight, Poly Haven, CC0,
+    # polyhaven.com/a/old_military_compressor, glTF 1k in old_military_compressor/)
+    dict(name="machine", src=os.path.join(DL, "old_military_compressor",
+                                          "old_military_compressor_1k.gltf"),
+         height=1.45, tris=3000,
+         colors={"old_military_compressor": (0.45, 0.24, 0.12),
+                 "old_military_compressor_glass": (0.32, 0.36, 0.3)}),
+    # Pfandtuete am Wagen: "Trash Bag" (Quaternius, CC0, poly.pizza/m/jYrMKg2Q7C, Datei
+    # static.poly.pizza/9cc89089-5f9a-4d6b-a7a1-57e2f78e3976.glb als quaternius_trash_bag/trash_bag.glb),
+    # hell gefaerbt; das Spiel blaeht sie je Flasche auf
+    dict(name="pfand_bag", src=os.path.join(DL, "quaternius_trash_bag", "trash_bag.glb"),
+         height=0.36, tris=1200, colors={"Atlas.030": (0.86, 0.86, 0.8)}),
+    # Skelett neben der Maschine: "LowPoly Rigged skeleton (With IK)" (zisongbr, CC0,
+    # opengameart.org/content/lowpoly-rigged-skeleton-with-ik-blend), vorher mit
+    # tools/pose_skeleton.py hingelegt; Kopf zeigt nach -x, 1,75 m lang
+    dict(name="skeleton", src=os.path.join(DL, "ogs_skeleton", "skeleton_lying.glb"),
+         size=1.75, tris=2500, colors={"Skel_mat": (0.82, 0.78, 0.66)}),
 ]
 
 # Waren: siehe tools/prepare_products.py und tools/catalog.json

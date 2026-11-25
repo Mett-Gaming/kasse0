@@ -100,6 +100,13 @@ fn all_texts() -> Vec<String> {
             .iter()
             .map(|s| s.to_string()),
     );
+    // Anzeige der rostigen Maschine am Kiosk (world/gen/kiosk.rs)
+    v.extend(
+        crate::world::DISPLAY_NORMAL
+            .iter()
+            .chain(crate::world::DISPLAY_TIPPED.iter())
+            .map(|s| s.to_string()),
+    );
     for (a, b) in SLOGANS {
         v.push(a.into());
         v.push(b.into());

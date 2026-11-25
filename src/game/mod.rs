@@ -20,7 +20,7 @@ mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
-pub use cheats::{cheat_groups, CHEATS, PFAND_CHEATS, TUTORIAL_CHEAT};
+pub use cheats::{cheat_groups, CHEATS, PFAND_CHEATS, STAMINA_CHEAT, TUTORIAL_CHEAT};
 pub mod closures;
 pub mod dejavu;
 pub mod dialog;
@@ -245,6 +245,8 @@ pub enum Focus {
     Machine(usize),
     /// Kiosk (pfand/kiosk.rs)
     Kiosk,
+    /// Ablage der Kiosk-Maschine, in der Gekauftes liegt (pfand/kiosk.rs)
+    Tray,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -283,6 +285,8 @@ pub struct Game {
     pub cheated: bool,
     /// Cheat: Kunden koennen einen nicht erwischen
     pub god: bool,
+    /// Cheat: Ausdauer geht nie aus
+    pub endless_stamina: bool,
     /// Schonfrist nach einem Gespraech
     pub grace: f32,
     /// Wie oft man schon erwischt wurde (Vignette), laufende Todesanimation
@@ -547,6 +551,7 @@ impl Game {
             suspicion: 0.0,
             cheated: false,
             god: false,
+            endless_stamina: false,
             grace: 0.0,
             deaths: 0,
             dying: None,

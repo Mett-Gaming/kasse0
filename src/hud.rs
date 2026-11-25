@@ -88,7 +88,7 @@ pub fn menu_layout(screen: Screen) -> (f32, f32) {
         Screen::Title => (150.0, 18.0),
         Screen::Paused => (66.0, 16.0),
         Screen::End => (205.0, 16.0),
-        Screen::Cheats { group: None } => (62.0, 22.0),
+        Screen::Cheats { group: None } => (62.0, 18.0),
         Screen::Cheats { group: Some(_) } => (56.0, 15.0),
         Screen::AskTutorial => (150.0, 18.0),
         Screen::Champ | Screen::TutorialDone => (158.0, 18.0),
@@ -338,6 +338,10 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
         stamina_meter(u, g.player.stamina, g.player.exhausted);
     }
 
+    // Dauerhaft Wirkendes vom Kiosk
+    if let Some(s) = kept_line(g) {
+        u.hint_s(ui::W - 12.0 - Ui::text_width(&s, 1.0), 226.0, &s, DIM, 1.0);
+    }
     // Tasche: was G benutzen wuerde
     if let Some(i) = g.pfand.owned.selected() {
         let n = g.pfand.owned.pocket.len();
@@ -398,6 +402,11 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                 if let Some(b) = g.pfand.bottles.get(i) {
                     let s = format!("[E] {}   Pfand {}", b.kind.name(), euro(b.kind.cents()));
                     u.hint_center(y, &s, WHITE, 1.0);
+                }
+            }
+            Some(Focus::Tray) => {
+                if let Some(i) = g.pfand.tray {
+                    u.hint_center(y, &format!("[E] {} nehmen", i.name()), YELLOW, 1.0);
                 }
             }
             Some(Focus::Kiosk) => {
@@ -781,6 +790,9 @@ pub fn draw_cheats(u: &mut Ui, sel: usize, time: f32, g: &Game, group: Option<us
                 .map(|&i| {
                     if i == 0 {
                         format!("Unverwundbar: {}", if g.god { "AN" } else { "AUS" })
+                    } else if i == crate::game::STAMINA_CHEAT {
+                        let on = if g.endless_stamina { "AN" } else { "AUS" };
+                        format!("Unendlich Ausdauer: {on}")
                     } else {
                         crate::game::CHEATS[i].to_string()
                     }
@@ -1061,6 +1073,16 @@ fn meter(u: &mut Ui, label: &str, s: f32, time: f32) {
 }
 
 /// Ausdauer: schmaler Balken ueber der Auffaelligkeit, nur sichtbar, wenn sie nicht voll ist.
+/// "Dabei: Öl, Lampe" - was vom Kiosk dauerhaft wirkt (Mettbroetchen gegessen zaehlt mit).
+pub(crate) fn kept_line(g: &Game) -> Option<String> {
+    let o = &g.pfand.owned;
+    let mut names: Vec<&str> = o.kept.iter().map(|i| i.short()).collect();
+    if o.mett {
+        names.push("Mett-Puste");
+    }
+    (!names.is_empty()).then(|| format!("Dabei: {}", names.join(", ")))
+}
+
 fn stamina_meter(u: &mut Ui, s: f32, exhausted: bool) {
     let (x, y, w, h) = (12.0, 226.0, 72.0, 4.0);
     let color = if exhausted {

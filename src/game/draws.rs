@@ -22,6 +22,8 @@ impl Game {
         self.collect_pfand_draws(out);
         self.collect_barrier_draws(out);
         self.collect_closure_draws(out);
+        // rostige Maschine am Kiosk, im gekippten Markt mit Skelett (pfand/kiosk.rs)
+        self.collect_kiosk_draws(out);
         // Tutorial-Modus: Pfeile am Boden, benoetigte Waren leuchten
         self.collect_guide_draws(out);
         // Fluchtkorridor: Tueren, Regale, Wagen, Decke, Waende (game/corridor/)
@@ -245,23 +247,6 @@ impl Game {
                 Vec4::new(1.0, 1.0, 1.0, glow),
             );
             if looking {
-                d.look_at = Some(eye);
-                d.fx.look_limit = STAFF_LOOK_LIMIT;
-            }
-            out.push(d);
-        }
-
-        // Verkaeufer am Kiosk; ab "unruhig" folgt der Kopf
-        if let Some((variant, pos, yaw)) = self.kiosk_seller() {
-            let mut d = person(
-                variant,
-                Clip::Idle,
-                t * 0.8,
-                pos,
-                yaw,
-                Vec4::new(1.0, 1.0, 1.0, 0.1),
-            );
-            if self.tier >= Tier::Uneasy && pos.distance(eye) < 8.0 {
                 d.look_at = Some(eye);
                 d.fx.look_limit = STAFF_LOOK_LIMIT;
             }

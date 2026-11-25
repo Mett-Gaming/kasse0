@@ -6,7 +6,10 @@
 use super::super::belt_window::{inside, Rect};
 use super::super::*;
 use super::items::Item;
+use crate::world::Aabb;
 
+/// Ausgabe: so lange rutscht der Gegenstand aus dem Schacht in die Ablage (s)
+pub const DISPENSE_SLIDE: f32 = 0.5;
 /// Schonfrist nach dem Kauf, wie nach einem Gespraech (s)
 const GRACE: f32 = 2.5;
 pub const WINDOW: Rect = (40.0, 26.0, 400.0, 196.0);
@@ -33,7 +36,18 @@ pub struct KioskWindow {
     pub text: String,
     pub mouse: (f32, f32),
     prev: (bool, bool, bool, bool),
+    /// Zettel des Erbauers liegt obenauf (beim ersten Oeffnen je Run, siehe `NOTE`)
+    pub note: bool,
 }
+
+/// Der Zettel an der Maschine (beim ersten Oeffnen in jedem Run zu lesen), Zeilen fuers Fenster.
+pub const NOTE: [&str; 5] = [
+    "Tag 5032.",
+    "Ich schaffe es nicht lebendig hier raus.",
+    "Aber ich habe diese Maschine geschaffen,",
+    "die Gegenstände erzeugt, die anderen",
+    "verlorenen Seelen helfen können.",
+];
 
 /// Erste sichtbare Zeile der Bons.
 pub fn first_bon(sel: usize) -> usize {
@@ -76,17 +90,19 @@ impl Game {
 
     pub(in crate::game) fn open_kiosk(&mut self) {
         if !self.kiosk_has_open() {
-            self.hint("Gleich geöffnet.");
+            self.hint("Die Maschine rührt sich nicht.");
             return;
         }
         self.player.vel = Vec3::ZERO;
         // hoechster Bon zuerst
         self.pfand.bons.sort_unstable_by(|a, b| b.cmp(a));
         let text = if self.pfand.bons.is_empty() {
-            "Ohne Pfandbon gibt es nichts."
+            "Ohne Pfandbon erzeugt sie nichts."
         } else {
             kiosk_line(self.tier, self.pfand.bons.len())
         };
+        // beim ersten Oeffnen in diesem Run liegt der Zettel des Erbauers obenauf
+        let note = !self.pfand.note_read;
         self.pfand.kiosk = Some(KioskWindow {
             column: Column::Bons,
             bon: 0,
@@ -95,6 +111,7 @@ impl Game {
             text: text.into(),
             mouse: (0.0, 0.0),
             prev: (true, true, true, true),
+            note,
         });
         self.play(Sfx::Blip, 0.4);
     }
@@ -114,6 +131,16 @@ impl Game {
         };
         w.mouse = input.ui_mouse;
         let held = (input.left, input.right, input.forward, input.back);
+        // Zettel lesen: E, Klick oder Q legt ihn weg, erst dann geht es zur Maschine
+        if w.note {
+            w.prev = held;
+            if input.interact || input.ui_pressed || input.cart_toggle {
+                w.note = false;
+                self.pfand.note_read = true;
+                self.play(Sfx::Click, 0.3);
+            }
+            return;
+        }
         let edge = |now: bool, before: bool| now && !before;
         let side = edge(held.0, w.prev.0) || edge(held.1, w.prev.1);
         let step = edge(held.3, w.prev.3) as i32 - edge(held.2, w.prev.2) as i32 - input.wheel;
@@ -177,6 +204,12 @@ impl Game {
             return;
         }
         let item = Item::ALL[w.item.min(Item::ALL.len() - 1)];
+        if self.pfand.tray.is_some() {
+            w.text = "Erst die Ablage leeren.".into();
+            w.confirm = false;
+            self.play(Sfx::Error, 0.4);
+            return;
+        }
         let Some(&bon) = self.pfand.bons.get(w.bon) else {
             w.text = "Ohne Pfandbon gibt es nichts.".into();
             self.play(Sfx::Error, 0.4);
@@ -210,14 +243,65 @@ impl Game {
         }
         // genau dieser eine Bon ist weg, auch wenn er mehr wert war
         let k = w.bon;
-        w.confirm = false;
-        w.text = format!("{}. Bitte sehr.", item.name());
-        w.bon = 0;
         self.pfand.bons.remove(k);
         self.pfand.bought = true;
+        // die Maschine rumpelt und spuckt es in die Ablage (collect_kiosk_draws); das Fenster
+        // geht zu, damit man es herausrutschen sieht und mit E nehmen kann
+        self.pfand.tray = Some(item);
+        self.pfand.dispensed = Some(self.time);
+        self.close_kiosk();
+        self.play(Sfx::Rattle, 0.6);
+        self.play(Sfx::Thud, 0.35);
+        self.say(
+            &format!(
+                "Die Maschine spuckt es aus: {}. Nimm es aus der Ablage.",
+                item.name()
+            ),
+            3.5,
+        );
+    }
+
+    /// Ablage vor dem Schacht: wo das Gekaufte liegt (zum Anschauen etwas grosszuegiger).
+    pub(in crate::game) fn tray_box(&self) -> Option<Aabb> {
+        let k = self.world.kiosk.as_ref()?;
+        let front = k.counter.x + world::MACHINE_HALF.x + 2.0 * world::CHUTE_HALF.x;
+        let c = vec3(
+            front + 0.08,
+            world::CHUTE_Y - world::CHUTE_HALF.y + 0.08,
+            k.counter.z,
+        );
+        let h = vec3(0.14, 0.12, 0.22);
+        Some(Aabb {
+            min: c - h,
+            max: c + h,
+        })
+    }
+
+    /// Ablage, auf die man schaut, solange etwas darin liegt.
+    pub(in crate::game) fn tray_hit(&self, eye: Vec3, dir: Vec3, max: f32) -> Option<f32> {
+        self.pfand.tray?;
+        self.tray_box()?.ray(eye, dir, max)
+    }
+
+    /// E an der Ablage: Gekauftes nehmen.
+    pub(in crate::game) fn take_from_tray(&mut self) {
+        let Some(item) = self.pfand.tray else {
+            return;
+        };
+        if let Some(why) = self.item_refused(item) {
+            self.hint(why);
+            self.play(Sfx::Error, 0.3);
+            return;
+        }
+        self.pfand.tray = None;
         self.receive_item(item);
-        self.play(Sfx::Beep, 0.5);
-        self.play(Sfx::Pickup, 0.4);
+        self.play(Sfx::Pickup, 0.5);
+        let how = if item.consumable() {
+            "In der Tasche, G benutzt es."
+        } else {
+            "Wirkt ab jetzt."
+        };
+        self.say(&format!("{} genommen. {how}", item.name()), 3.0);
     }
 
     /// Kiosk, auf den man schaut.
@@ -226,27 +310,74 @@ impl Game {
         k.body().ray(eye, dir, max)
     }
 
-    /// Verkaeufer hinter dem Tresen.
-    pub(in crate::game) fn kiosk_seller(&self) -> Option<(usize, Vec3, f32)> {
-        if !self.kiosk_has_open() {
-            return None;
+    /// Rostige Maschine (immer) und daneben das Skelett ihres Erbauers (nur gekippt).
+    /// Die Maschine schaut mit der Vorderseite in den Markt (+x); laeuft sie, glimmt sie.
+    pub(in crate::game) fn collect_kiosk_draws(&self, out: &mut Vec<MeshDraw>) {
+        let Some(k) = self.world.kiosk.as_ref() else {
+            return;
+        };
+        let dim = if self.tipped { 0.8 } else { 1.0 };
+        let lift = |p: Vec3| p + vec3(0.0, self.sway_at(p).y, 0.0);
+        let running = self.kiosk_has_open();
+        out.push(MeshDraw {
+            mesh: MeshId::Machine as usize,
+            model: Mat4::from_translation(lift(k.counter)),
+            tint: Vec4::new(dim, dim * 0.95, dim * 0.9, if running { 0.06 } else { 0.0 }),
+            blink: if running { 0.15 } else { 0.0 },
+            ..Default::default()
+        });
+        // Ausgabe: nach dem Kauf rutscht das Gekaufte aus dem Schacht und liegt in der Ablage,
+        // bis man es nimmt (leuchtet, wenn man es anschaut)
+        if let Some(item) = self.pfand.tray {
+            let age = self
+                .pfand
+                .dispensed
+                .map_or(DISPENSE_SLIDE, |at| self.time - at);
+            let front = k.counter.x + world::MACHINE_HALF.x + 2.0 * world::CHUTE_HALF.x;
+            let s = (age / DISPENSE_SLIDE).clamp(0.0, 1.0);
+            let from = vec3(front - 0.08, world::CHUTE_Y + 0.02, k.counter.z);
+            let to = vec3(
+                front + 0.07,
+                world::CHUTE_Y - world::CHUTE_HALF.y + 0.04,
+                k.counter.z,
+            );
+            let p = from.lerp(to, s * s);
+            let glow = if self.focus == Some(Focus::Tray) {
+                0.45 + 0.3 * (0.5 + 0.5 * (self.time * 5.0).sin())
+            } else {
+                0.25
+            };
+            out.push(MeshDraw {
+                mesh: MeshId::Can as usize,
+                model: Mat4::from_rotation_translation(
+                    Quat::from_rotation_z(-std::f32::consts::FRAC_PI_2 * s),
+                    lift(p),
+                ),
+                tint: item.tint().extend(glow),
+                ..Default::default()
+            });
         }
-        let k = self.world.kiosk.as_ref()?;
-        let staff = crate::people::people_of(true);
-        let v = staff[(self.seed as usize / 5 + 1) % staff.len()];
-        Some((v, k.seller, FRAC_PI_2))
+        if self.tipped {
+            out.push(MeshDraw {
+                mesh: MeshId::Skeleton as usize,
+                model: Mat4::from_rotation_translation(
+                    Quat::from_rotation_y(k.skeleton_yaw),
+                    lift(k.skeleton),
+                ),
+                tint: Vec4::new(0.9, 0.88, 0.8, 0.0),
+                ..Default::default()
+            });
+        }
     }
 }
 
-use std::f32::consts::FRAC_PI_2;
-
-/// Begruessung, je Stufe.
+/// Was die Maschine anzeigt, je Stufe.
 fn kiosk_line(tier: Tier, n: usize) -> &'static str {
     match tier {
-        Tier::Calm => "Guten Tag. Pfandbon oder gehen Sie.",
-        Tier::Uneasy if n > 1 => "So viele Bons. Was haben Sie getan?",
-        Tier::Uneasy => "Sie waren schon hier.",
-        Tier::Wrong => "Ich habe keinen Feierabend.",
-        Tier::Collapse => "Nehmen Sie mich mit.",
+        Tier::Calm => "Die Maschine brummt. Pfandbon einlegen.",
+        Tier::Uneasy if n > 1 => "Sie zählt deine Bons. Es sind zu viele.",
+        Tier::Uneasy => "Die Maschine kennt dich schon.",
+        Tier::Wrong => "Etwas in der Maschine atmet.",
+        Tier::Collapse => "Sie flüstert: Nimm mich mit.",
     }
 }

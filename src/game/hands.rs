@@ -73,7 +73,8 @@ impl Game {
             wish = forward * sy + right * sx;
         }
         // im Fluchtkorridor: Ausdauer unendlich; dort auch Tempo-Grenzen (Stolpern, Engstellen)
-        let endless = self.corridor_endless_stamina() || self.energized();
+        let endless = self.corridor_endless_stamina() || self.energized() || self.endless_stamina;
+        let run_time = STAMINA_RUN * self.stamina_factor();
         let (slow, cap) = self.corridor_speed();
         let pushing = self.trolley.pushing;
         // Ducken (weich) und Springen (nur am Boden, nicht geduckt)
@@ -106,7 +107,7 @@ impl Game {
         // Ausdauer: Rennen kostet, Gehen und Stehen erholen (geduckt rennt man nicht)
         p.running = input.run && !p.exhausted && wish.length_squared() > 0.0 && p.crouch < 0.5;
         if p.running && !endless {
-            p.stamina -= dt / STAMINA_RUN;
+            p.stamina -= dt / run_time;
             if p.stamina <= 0.0 {
                 p.stamina = 0.0;
                 p.exhausted = true;
@@ -474,6 +475,14 @@ impl Game {
             self.aim_cart = false;
             self.pfand.aim_bag = false;
         }
+        // Gekauftes in der Ablage vor der Maschine (auch mit etwas in der Hand; hat Vorrang vor
+        // dem Wagen, den man meist davor geschoben hat)
+        if let Some(t) = self.tray_hit(eye, dir, REACH) {
+            best = t;
+            self.focus = Some(Focus::Tray);
+            self.aim_cart = false;
+            self.pfand.aim_bag = false;
+        }
         // Beim Schieben reicht ein Blick nach unten in den Korb
         if self.trolley.pushing && self.player.pitch < -0.35 {
             self.aim_cart = true;
@@ -580,6 +589,7 @@ impl Game {
             Some(Focus::Door(i)) => return self.push_door(i),
             Some(Focus::Machine(i)) => return self.open_machine(i),
             Some(Focus::Kiosk) => return self.open_kiosk(),
+            Some(Focus::Tray) => return self.take_from_tray(),
             _ => {}
         }
         if self.held.is_some() {

@@ -208,6 +208,7 @@ impl Game {
             self.held = None;
             Some((k, false))
         } else if self.bag_reachable() {
+            self.pfand.bag_changed = self.time;
             self.pfand.bag.pop().map(|k| (k, true))
         } else {
             None

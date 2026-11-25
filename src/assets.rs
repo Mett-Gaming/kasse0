@@ -25,10 +25,16 @@ pub enum MeshId {
     Rat,
     /// einzelne Zigarette (smoke.rs): 8,5 cm laengs z, Filter bei -z, Glutspitze bei +z
     Cigarette,
+    /// rostige Maschine am Kiosk (Poly Haven, CC0): 0,74 x 1,45 x 2,08 m, lang in z
+    Machine,
+    /// liegendes Menschen-Skelett neben der Maschine (OpenGameArt, CC0): 1,75 m lang in x, Kopf bei -x
+    Skeleton,
+    /// Pfandtuete am Wagen (Quaternius Trash Bag, CC0): 0,32 x 0,36 x 0,32 m, Boden bei y = 0
+    PfandBag,
 }
 
 /// Anzahl fester Modelle (danach folgen die Waren aus dem Katalog)
-pub const FIXED_COUNT: usize = MeshId::Cigarette as usize + 1;
+pub const FIXED_COUNT: usize = MeshId::PfandBag as usize + 1;
 
 mod gen {
     include!(concat!(env!("OUT_DIR"), "/products_gen.rs"));
@@ -50,6 +56,9 @@ const SOURCES: [&str; FIXED_COUNT - 1] = [
     "cigarettes.k0m",
     "rat.k0m",
     "cigarette.k0m",
+    "machine.k0m",
+    "skeleton.k0m",
+    "pfand_bag.k0m",
 ];
 
 /// Alle Modelle: feste (Index = MeshId) gefolgt von den Waren (Index = FIXED_COUNT + Katalog-Mesh).

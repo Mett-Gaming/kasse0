@@ -4,7 +4,7 @@
 use super::*;
 
 #[derive(Default)]
-pub(super) struct Builder {
+pub(in crate::world) struct Builder {
     pub(super) instances: Vec<GpuInstance>,
     pub(super) lights: Vec<GpuLight>,
     pub(super) solids: Vec<Aabb>,

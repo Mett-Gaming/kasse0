@@ -16,6 +16,8 @@ pub const SOLES: f32 = 0.5;
 pub const BELL_RANGE: f32 = 6.0;
 /// Sekunden zwischen zwei Klingeln
 const BELL_EVERY: f32 = 1.4;
+/// Mettbroetchen: Ausdauer reicht so viel mal laenger
+pub const METT_STAMINA: f32 = 2.0;
 /// Taschenlampe: Licht an der Kamera mal so viel
 pub const TORCH: f32 = 2.0;
 
@@ -68,7 +70,7 @@ impl Item {
             Item::Sparkler => 50,
             Item::Tea => 75,
             Item::Oil => 100,
-            Item::Mett => 100,
+            Item::Mett => 120,
             Item::Soles => 125,
             Item::Bell => 150,
             Item::Torch => 250,
@@ -82,10 +84,37 @@ impl Item {
             Item::Sparkler => "Funkelt 15 Sekunden. Völlig nutzlos.",
             Item::Tea => "Halbiert deine Auffälligkeit.",
             Item::Oil => "Der Wagen quietscht nicht mehr.",
-            Item::Mett => "Ein Mettbrötchen. Man kann es essen.",
+            Item::Mett => "Doppelte Ausdauer bis Einkaufsende.",
             Item::Soles => "Schritte nur halb so weit hörbar.",
             Item::Bell => "Klingelt, wenn hinter dir einer kommt.",
             Item::Torch => "Doppelt so hell im dunklen Markt.",
+        }
+    }
+
+    /// Farbe der Dose, in der es aus der Maschine kommt (kiosk.rs)
+    pub fn tint(self) -> Vec3 {
+        match self {
+            Item::Sticker => vec3(0.95, 0.85, 0.2),
+            Item::Energy => vec3(0.3, 0.9, 0.35),
+            Item::Sparkler => vec3(0.95, 0.6, 0.2),
+            Item::Tea => vec3(0.7, 0.85, 0.6),
+            Item::Oil => vec3(0.55, 0.45, 0.2),
+            Item::Mett => vec3(0.9, 0.45, 0.4),
+            Item::Soles => vec3(0.5, 0.45, 0.55),
+            Item::Bell => vec3(0.95, 0.8, 0.35),
+            Item::Torch => vec3(0.85, 0.85, 0.95),
+        }
+    }
+
+    /// Kurzer Name fuer die Anzeige, was man dabei hat (hud.rs)
+    pub fn short(self) -> &'static str {
+        match self {
+            Item::Sticker => "Sticker",
+            Item::Oil => "Öl",
+            Item::Soles => "Sohlen",
+            Item::Bell => "Glöckchen",
+            Item::Torch => "Lampe",
+            other => other.name(),
         }
     }
 
@@ -105,6 +134,8 @@ pub struct Owned {
     /// Restzeiten (s)
     pub energy: f32,
     pub sparkle: f32,
+    /// Mettbroetchen gegessen: Ausdauer reicht doppelt so lange (bis Einkaufsende)
+    pub mett: bool,
     bell: f32,
 }
 
@@ -170,8 +201,15 @@ impl Game {
                 self.say("Kamille. Du wirkst wieder wie ein Kunde.", 3.0);
             }
             Item::Mett => {
+                // wirkt einmal: ein zweites Broetchen macht nicht noch ausdauernder
+                let again = o.mett;
+                o.mett = true;
                 self.play(Sfx::Munch, 0.7);
-                self.say("Mett. Mit Zwiebeln. Besser wird es heute nicht.", 3.5);
+                if again {
+                    self.say("Noch mehr Mett. Satter wirst du nicht.", 3.0);
+                } else {
+                    self.say("Mett mit Zwiebeln. Du hast doppelt so lange Puste.", 3.5);
+                }
             }
             _ => {}
         }
@@ -214,6 +252,15 @@ impl Game {
     /// Laeuft der Energy-Drink noch?
     pub(in crate::game) fn energized(&self) -> bool {
         self.pfand.owned.energy > 0.0
+    }
+
+    /// So viel mal laenger reicht die Ausdauer beim Rennen (Mettbroetchen).
+    pub(in crate::game) fn stamina_factor(&self) -> f32 {
+        if self.pfand.owned.mett {
+            METT_STAMINA
+        } else {
+            1.0
+        }
     }
 
     /// Licht an der Kamera im dunklen Markt (1 = ueblich).

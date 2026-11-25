@@ -841,3 +841,54 @@ fn every_poster_text_is_in_the_sign_atlas() {
         );
     }
 }
+
+#[test]
+fn sign_labels_never_cross_each_other() {
+    // Schriftzug als waagrechte Strecke (Mitte +- halbe Breite entlang der lokalen x-Achse)
+    // plus Hoehenbereich; zwei Strecken, die sich echt schneiden, sehen aus wie ein Knoten
+    struct L {
+        a: Vec3,
+        b: Vec3,
+        y0: f32,
+        y1: f32,
+    }
+    let labels = |w: &World| -> Vec<L> {
+        w.instances
+            .iter()
+            .filter(|i| i.extra[0] == material::SIGN)
+            .map(|i| {
+                let c = Vec3::new(i.center[0], i.center[1], i.center[2]);
+                let yaw = i.center[3];
+                let x = Vec3::new(yaw.cos(), 0.0, -yaw.sin()) * i.half[0];
+                L {
+                    a: c - x,
+                    b: c + x,
+                    y0: c.y - i.half[1],
+                    y1: c.y + i.half[1],
+                }
+            })
+            .collect()
+    };
+    let cross = |p: &L, q: &L| {
+        let d = |a: Vec3, b: Vec3, c: Vec3| (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+        let (d1, d2) = (d(p.a, p.b, q.a), d(p.a, p.b, q.b));
+        let (d3, d4) = (d(q.a, q.b, p.a), d(q.a, q.b, p.b));
+        let eps = 1e-4;
+        d1 * d2 < -eps && d3 * d4 < -eps && p.y0 < q.y1 && q.y0 < p.y1
+    };
+    for seed in [1u64, 4, 9, 16] {
+        for w in [gen(seed, false), gen(seed, true)] {
+            let l = labels(&w);
+            for (i, p) in l.iter().enumerate() {
+                for q in &l[i + 1..] {
+                    assert!(
+                        !cross(p, q),
+                        "{seed}: Schriftzuege kreuzen sich bei {} / {}",
+                        (p.a + p.b) * 0.5,
+                        (q.a + q.b) * 0.5
+                    );
+                }
+            }
+        }
+    }
+}

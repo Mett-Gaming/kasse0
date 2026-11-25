@@ -14,7 +14,7 @@ pub use corridor::{
     corridor_len_for, side_of, Corridor, Station, StationKind, CORRIDOR_H, CORRIDOR_HALF_W,
     CORRIDOR_LEN_MAX, EXIT_FROM, EXIT_TO, POSTER_TEXTS,
 };
-pub use kiosk::Kiosk;
+pub use kiosk::{Kiosk, CHUTE_HALF, CHUTE_Y, DISPLAY_NORMAL, DISPLAY_TIPPED, MACHINE_HALF};
 pub use sortiment::texts as sortiment_texts;
 pub use wing::Wing;
 

@@ -367,6 +367,8 @@ fn at_kiosk(seed: u64, bons: &[i64]) -> Game {
     let mut g = market(seed);
     g.pfand_cheat(3);
     g.pfand.bons = bons.to_vec();
+    // der Zettel des Erbauers ist in diesem Run schon gelesen (eigener Test unten)
+    g.pfand.note_read = true;
     step(&mut g, Input::default());
     assert_eq!(g.focus, Some(Focus::Kiosk));
     step(&mut g, press(|i| i.interact = true));
@@ -402,7 +404,11 @@ fn the_kiosk_is_reachable_everywhere_and_blocks_nothing() {
             );
             let cells = g.world.reachable_centers();
             assert!(cells.iter().any(|c| c.distance(f) < 0.7), "{seed}/{tier:?}");
-            assert!(g.kiosk_seller().is_some());
+            // statt des Verkaeufers: die rostige Maschine, gekippt mit Skelett daneben
+            let mut d = Vec::new();
+            g.collect_kiosk_draws(&mut d);
+            assert!(d.iter().any(|m| m.mesh == MeshId::Machine as usize));
+            assert!(d.iter().any(|m| m.mesh == MeshId::Skeleton as usize));
         }
     }
 }
@@ -417,10 +423,82 @@ fn one_receipt_per_purchase_and_the_rest_is_lost() {
     assert!(g.pfand.kiosk.as_ref().unwrap().text.contains("verfällt"));
     assert_eq!(g.pfand.bons.len(), 2);
     step(&mut g, press(|i| i.interact = true));
-    // der Bon ueber 2,00 ist ganz weg, der andere unberuehrt
+    // der Bon ueber 2,00 ist ganz weg, der andere unberuehrt; das Item liegt in der Ablage
     assert_eq!(g.pfand.bons, vec![90]);
-    assert_eq!(g.pfand.owned.pocket, vec![Item::Energy]);
+    assert_eq!(g.pfand.tray, Some(Item::Energy));
+    assert!(
+        g.pfand.owned.pocket.is_empty(),
+        "ohne Nehmen schon in der Tasche"
+    );
     assert!(g.pfand.bought);
+    g.take_from_tray();
+    assert_eq!(g.pfand.owned.pocket, vec![Item::Energy]);
+    assert_eq!(g.pfand.tray, None);
+}
+
+/// Blick auf die Ablage vor der Maschine richten (Neigung durchprobieren).
+fn look_at_tray(g: &mut Game) -> bool {
+    for k in 0..60 {
+        g.player.pitch = -0.1 - k as f32 * 0.02;
+        g.update_focus();
+        if g.focus == Some(Focus::Tray) {
+            return true;
+        }
+    }
+    false
+}
+
+#[test]
+fn what_you_buy_lies_in_the_tray_until_you_take_it() {
+    let cans = |g: &Game| {
+        let mut d = Vec::new();
+        g.collect_kiosk_draws(&mut d);
+        d.into_iter()
+            .filter(|m| m.mesh == MeshId::Can as usize)
+            .map(|m| m.model.w_axis.truncate())
+            .collect::<Vec<_>>()
+    };
+    let mut g = at_kiosk(22, &[200, 200]);
+    assert!(cans(&g).is_empty(), "Ablage schon vor dem Kauf voll");
+    choose(&mut g, Item::Bell);
+    step(&mut g, press(|i| i.interact = true));
+    step(&mut g, press(|i| i.interact = true));
+    // Fenster zu, die Maschine spuckt es aus
+    assert!(!g.kiosk_open(), "Fenster bleibt nach dem Kauf offen");
+    assert!(g.pfand.dispensed.is_some());
+    assert!(!g.pfand.owned.has(Item::Bell));
+    // nach dem Rutschen liegt es in der Ablage vor dem Schacht und bleibt dort
+    wait(&mut g, 10.0);
+    let k = g.world.kiosk.unwrap();
+    let lying = cans(&g);
+    assert_eq!(lying.len(), 1);
+    let p = lying[0];
+    let front = k.counter.x + crate::world::MACHINE_HALF.x + 2.0 * crate::world::CHUTE_HALF.x;
+    assert!(p.x > front && p.x < front + 0.2, "nicht in der Ablage: {p}");
+    assert!((p.z - k.counter.z).abs() < 0.2);
+    assert!(p.y < crate::world::CHUTE_Y, "schwebt: {p}");
+    // solange etwas darin liegt, verkauft die Maschine nichts
+    step(&mut g, Input::default());
+    g.open_kiosk();
+    choose(&mut g, Item::Sticker);
+    step(&mut g, press(|i| i.interact = true));
+    step(&mut g, press(|i| i.interact = true));
+    assert_eq!(g.pfand.bons.len(), 1, "zweiter Kauf trotz voller Ablage");
+    assert!(g.pfand.kiosk.as_ref().unwrap().text.contains("Ablage"));
+    g.close_kiosk();
+    // hinschauen und E: genommen, Ablage leer
+    assert!(look_at_tray(&mut g), "Ablage nicht anschaubar");
+    step(&mut g, Input::default());
+    assert!(look_at_tray(&mut g));
+    g.interact();
+    assert!(g.pfand.owned.has(Item::Bell), "nicht bekommen");
+    assert_eq!(g.pfand.tray, None);
+    assert!(cans(&g).is_empty());
+    // was man dabei hat, steht im Bild
+    assert_eq!(
+        crate::hud::kept_line(&g).as_deref(),
+        Some("Dabei: Glöckchen")
+    );
 }
 
 #[test]
@@ -476,8 +554,13 @@ fn mouse_and_keys_operate_the_kiosk() {
     assert!(g.pfand.kiosk.as_ref().unwrap().confirm);
     step(&mut g, click(s.0 + 20.0, s.1 + 14.0 + kiosk::ROW * 1.5));
     assert_eq!(g.pfand.bons, vec![150]);
+    assert_eq!(g.pfand.tray, Some(Item::Energy));
+    g.take_from_tray();
     assert_eq!(g.pfand.owned.pocket, vec![Item::Energy]);
-    // Tasten: Spalte wechseln, Zeile weiter
+    // wieder auf (in der Spalte der Items); Tasten: Spalte wechseln, Zeile weiter
+    g.open_kiosk();
+    g.pfand.kiosk.as_mut().unwrap().column = Column::Items;
+    step(&mut g, Input::default());
     let item = g.pfand.kiosk.as_ref().unwrap().item;
     step(&mut g, press(|i| i.back = true));
     assert_eq!(g.pfand.kiosk.as_ref().unwrap().item, item + 1);
@@ -566,6 +649,76 @@ fn energy_keeps_stamina_full() {
 }
 
 #[test]
+fn mett_doubles_stamina_for_the_rest_of_the_run() {
+    let run = |eat: bool, secs: f32| {
+        let mut g = market(28);
+        g.trolley.pushing = false;
+        g.trolley.pos = g.world.corral;
+        if eat {
+            g.receive_item(Item::Mett);
+            g.use_item();
+            assert!(g.pfand.owned.mett && g.pfand.owned.pocket.is_empty());
+        }
+        for _ in 0..(secs / DT) as usize {
+            step(
+                &mut g,
+                press(|i| {
+                    i.forward = true;
+                    i.run = true;
+                }),
+            );
+        }
+        g.player.stamina
+    };
+    // nach 2 s Rennen: ohne Mett 60 % Ausdauer uebrig, mit Mett 80 %
+    let (plain, mett) = (run(false, 2.0), run(true, 2.0));
+    assert!(
+        (1.0 - mett) * 2.0 - (1.0 - plain) < 0.05,
+        "{plain} / {mett}"
+    );
+    assert!(mett > plain + 0.1);
+    assert_eq!(Item::Mett.cents(), 120);
+    // Auslage bleibt nach Preis geordnet
+    assert!(Item::ALL.windows(2).all(|w| w[0].cents() <= w[1].cents()));
+}
+
+#[test]
+fn bottles_vanish_into_the_bag_and_it_swells() {
+    let mut g = market(29);
+    let draws = |g: &Game| {
+        let mut d = Vec::new();
+        g.collect_pfand_draws(&mut d);
+        d
+    };
+    let bag = |d: &[MeshDraw]| {
+        d.iter()
+            .find(|m| m.mesh == MeshId::PfandBag as usize)
+            .expect("keine Tuete am Wagen")
+            .model
+            .to_scale_rotation_translation()
+            .0
+    };
+    let bottle_meshes: Vec<usize> = Empty::ALL.iter().map(|k| k.item().mesh).collect();
+    g.pfand.bottles.clear();
+    let empty = bag(&draws(&g));
+    let mut last = empty;
+    for k in 0..BAG_MAX {
+        g.pfand.bag.push(Empty::ALL[k % 4]);
+        g.pfand.bag_changed = -10.0;
+        let d = draws(&g);
+        let now = bag(&d);
+        assert!(now.x > last.x + 0.05, "Tuete waechst nicht ({k})");
+        assert!(
+            !d.iter().any(|m| bottle_meshes.contains(&m.mesh)),
+            "Flasche schaut aus der Tuete"
+        );
+        last = now;
+    }
+    assert!((last.x - 1.0).abs() < 1e-3, "voll nicht in voller Groesse");
+    assert!((empty.x - super::BAG_EMPTY).abs() < 1e-3);
+}
+
+#[test]
 fn oil_and_soles_make_you_quieter() {
     let loudest = |items: &[Item], push: bool| {
         let mut g = market(27);
@@ -633,7 +786,7 @@ fn one_can_find_the_kiosk() {
                 g.force_tier(tier);
                 g.finish_umbau();
             }
-            // Leuchtschild und Wegweiser, ohne Flackern, unter der Decke
+            // Wegweiser, ohne Flackern, unter der Decke
             let signs: Vec<_> = g
                 .world
                 .instances
@@ -642,7 +795,8 @@ fn one_can_find_the_kiosk() {
                 .filter(|b| b.extra[0] == 5.0 && b.extra[3] == 0.0)
                 .filter(|b| b.extra[2] > 1.0 && b.center[1] < 3.3)
                 .collect();
-            assert!(signs.len() >= 9, "{seed}/{tier:?}: {}", signs.len());
+            // je Wegweiser "< Kiosk" / "Kiosk >" (das Leuchtschild ueber der Maschine ist weg)
+            assert!(signs.len() >= 4, "{seed}/{tier:?}: {}", signs.len());
             // vom Eingangsbereich aus sieht man einen Wegweiser
             let eye = g.world.spawn + vec3(0.0, 1.6, -5.0);
             let seen = signs.iter().any(|b| {
@@ -656,4 +810,44 @@ fn one_can_find_the_kiosk() {
     insert_right(&mut g);
     g.print_bon();
     assert!(g.message.as_ref().unwrap().0.contains("Kiosk"));
+}
+
+#[test]
+fn the_machine_shows_its_builders_note_once_per_run() {
+    use super::kiosk::NOTE;
+    // normaler Markt: nur die Maschine, kein Skelett; sie laeuft noch nicht
+    let mut n = Game::new(31);
+    let mut d = Vec::new();
+    n.collect_kiosk_draws(&mut d);
+    assert!(d.iter().any(|m| m.mesh == MeshId::Machine as usize));
+    assert!(
+        !d.iter().any(|m| m.mesh == MeshId::Skeleton as usize),
+        "Skelett im normalen Markt"
+    );
+    // gekippt, erstes Oeffnen: Zettel liegt obenauf, E kauft nichts, sondern legt ihn weg
+    let mut g = market(31);
+    g.pfand_cheat(3);
+    g.pfand.bons = vec![500];
+    step(&mut g, Input::default());
+    step(&mut g, press(|i| i.interact = true));
+    let w = g.pfand.kiosk.as_ref().expect("Maschine geht nicht auf");
+    assert!(w.note, "kein Zettel beim ersten Oeffnen");
+    assert!(NOTE[0].starts_with("Tag 5032"));
+    assert!(NOTE.join(" ").contains("verlorenen Seelen"));
+    step(&mut g, press(|i| i.interact = true));
+    assert!(
+        !g.pfand.kiosk.as_ref().unwrap().note,
+        "Zettel bleibt liegen"
+    );
+    assert_eq!(g.pfand.bons, vec![500], "durch den Zettel gekauft");
+    // zu und wieder auf: in diesem Run kein Zettel mehr
+    g.close_kiosk();
+    step(&mut g, Input::default());
+    step(&mut g, press(|i| i.interact = true));
+    assert!(
+        !g.pfand.kiosk.as_ref().unwrap().note,
+        "Zettel zweimal im selben Run"
+    );
+    // neuer Run: wieder da
+    assert!(!Game::new(32).pfand.note_read);
 }

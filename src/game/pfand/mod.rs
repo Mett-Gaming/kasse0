@@ -107,6 +107,14 @@ pub struct Pfand {
     pub shift: usize,
     /// schon einmal einen Bon gedruckt (Tutorial)
     pub printed: bool,
+    /// Spielzeit des letzten Kaufs: dann rutscht ein Gegenstand aus dem Schacht (kiosk.rs)
+    pub dispensed: Option<f32>,
+    /// Gekauftes, das in der Ablage der Maschine liegt, bis man es mit E nimmt (kiosk.rs)
+    pub tray: Option<items::Item>,
+    /// Zettel an der Maschine in diesem Run schon gelesen (kiosk.rs)
+    pub note_read: bool,
+    /// Spielzeit, zu der zuletzt eine Flasche in die Tuete kam oder heraus (Nachwippen)
+    pub bag_changed: f32,
     /// eigener Zufall, damit sich sonst nichts verschiebt
     pub(super) rng: Pcg64,
     hinted: bool,
@@ -126,6 +134,10 @@ impl Pfand {
             aim_bag: false,
             shift: 0,
             printed: false,
+            note_read: false,
+            bag_changed: -10.0,
+            dispensed: None,
+            tray: None,
             rng: Pcg64::seed_from_u64(seed ^ 0x9FA2_D000),
             hinted: false,
         }
@@ -246,12 +258,14 @@ impl Game {
         }
         self.held = None;
         self.pfand.bag.push(kind);
+        self.pfand.bag_changed = self.time;
         self.play(Sfx::Clink, 0.45);
     }
 
     /// Letzte Flasche wieder aus der Tuete nehmen.
     pub(super) fn take_from_bag(&mut self) {
         if let Some(k) = self.pfand.bag.pop() {
+            self.pfand.bag_changed = self.time;
             self.held = Some(k.item());
             self.play(Sfx::Clink, 0.35);
         }
@@ -367,7 +381,22 @@ impl Game {
         self.collect_item_draws(out);
     }
 
-    /// Tuete aus Boxen, Flaschenhaelse schauen heraus.
+    /// Groesse der Tuete (1 = voll): leer haengt sie schlaff, jede Flasche blaeht sie auf.
+    /// Kurz nach dem Hineinlegen wippt sie nach (`bag_changed`).
+    pub(super) fn bag_size(&self) -> Vec3 {
+        let fill = self.pfand.bag.len() as f32 / BAG_MAX as f32;
+        let wide = BAG_EMPTY + (1.0 - BAG_EMPTY) * fill;
+        let tall = 0.75 + 0.25 * fill;
+        let age = self.time - self.pfand.bag_changed;
+        let wobble = if (0.0..0.6).contains(&age) {
+            0.08 * (1.0 - age / 0.6) * (age * 30.0).sin()
+        } else {
+            0.0
+        };
+        vec3(wide + wobble, tall - wobble * 0.5, wide + wobble)
+    }
+
+    /// Pfandtuete am Wagen (Modell, haengt am Haken); die Flaschen sind darin verschwunden.
     fn collect_bag_draws(&self, out: &mut Vec<MeshDraw>) {
         let base = self.trolley.pos
             + vec3(
@@ -376,50 +405,42 @@ impl Game {
                 0.0,
             );
         let m = Mat4::from_rotation_translation(Quat::from_rotation_y(-self.trolley.yaw), base);
-        let mut cube = |c: Vec3, h: Vec3, tint: Vec3, glow: f32| {
-            out.push(MeshDraw {
-                mesh: MeshId::Cube as usize,
-                model: m * Mat4::from_scale_rotation_translation(h * 2.0, Quat::IDENTITY, c),
-                tint: tint.extend(glow),
-                ..Default::default()
-            });
-        };
-        let n = self.pfand.bag.len();
-        // leer haengt sie schlaff
-        let full = 0.45 + 0.55 * n as f32 / BAG_MAX as f32;
         let glow = if self.pfand.aim_bag { 0.25 } else { 0.0 };
-        let body = vec3(0.035 + 0.05 * full, 0.14, 0.1);
-        cube(BAG_AT, body, vec3(0.86, 0.84, 0.74), glow);
-        cube(
-            BAG_AT + vec3(0.0, 0.0, 0.0),
-            vec3(body.x + 0.002, 0.03, body.z + 0.002),
-            vec3(0.2, 0.35, 0.6),
-            glow,
+        let s = self.bag_size();
+        // haengt am Knoten: oben fest, waechst nach unten und nach aussen (weg vom Korb)
+        let top = BAG_AT.y + BAG_HANG;
+        let foot = vec3(
+            BAG_AT.x + (BAG_HALF_W * s.x - BAG_HALF_W * BAG_EMPTY).max(0.0),
+            top - BAG_HEIGHT * s.y,
+            BAG_AT.z,
         );
-        for s in [-1.0f32, 1.0] {
-            cube(
-                BAG_AT + vec3(0.0, 0.19, s * 0.05),
-                vec3(0.008, 0.06, 0.008),
-                vec3(0.8, 0.78, 0.7),
-                0.0,
-            );
-        }
-        for (i, k) in self.pfand.bag.iter().enumerate() {
-            let item = k.item();
-            let z = (i as f32 - 2.0) * 0.034;
-            let x = if i % 2 == 0 { -0.02 } else { 0.025 };
-            let lean = Quat::from_rotation_x(z * 2.5) * Quat::from_rotation_z(x * 4.0);
-            let up = if item.half().y < 0.1 { 0.06 } else { -0.06 };
-            out.push(MeshDraw {
-                mesh: item.mesh,
-                model: m * Mat4::from_rotation_translation(lean, BAG_AT + vec3(x, up, z)),
-                tint: item.tint.extend(0.0),
-                ..Default::default()
-            });
-        }
+        out.push(MeshDraw {
+            mesh: MeshId::PfandBag as usize,
+            model: m * Mat4::from_scale_rotation_translation(s, Quat::IDENTITY, foot),
+            tint: Vec4::new(0.95, 0.95, 0.92, glow),
+            ..Default::default()
+        });
+        // Henkel vom Knoten zum Griff
+        out.push(MeshDraw {
+            mesh: MeshId::Cube as usize,
+            model: m * Mat4::from_scale_rotation_translation(
+                vec3(0.012, 0.08, 0.012),
+                Quat::IDENTITY,
+                vec3(foot.x, top + 0.03, BAG_AT.z),
+            ),
+            tint: Vec4::new(0.8, 0.78, 0.7, 0.0),
+            ..Default::default()
+        });
     }
 }
 
 /// Aufhaengung der Tuete in Wagen-Koordinaten (rechts neben dem Korb, hinten am Griff)
 const BAG_AT: Vec3 = Vec3::new(0.34, 0.6, 0.2);
+/// Modell der Tuete (assets.rs `PfandBag`): Hoehe und halbe Breite in voller Groesse (m)
+const BAG_HEIGHT: f32 = 0.36;
+const BAG_HALF_W: f32 = 0.16;
+/// Knoten der Tuete so weit ueber `BAG_AT` (m)
+const BAG_HANG: f32 = 0.16;
+/// Breite der leeren Tuete (Anteil der vollen)
+pub const BAG_EMPTY: f32 = 0.5;
 use std::f32::consts::FRAC_PI_2;

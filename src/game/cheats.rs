@@ -1,5 +1,6 @@
 //! Cheats zum Testen (Menue mit F1).
 
+use super::pfand::items::Item;
 use super::*;
 
 /// Kurze Namen: das Menue hat zwei Spalten (je hoechstens 26 Zeichen).
@@ -58,26 +59,67 @@ pub const CHEATS: &[&str] = &[
     "Pfand: Tüte füllen",
     "Pfandbon 2,50 €",
     "Zum Kiosk",
+    "Unendlich Ausdauer",
+    "Pfandbon 0,50 €",
+    "Pfandbon 1,00 €",
+    "Pfandbon 5,00 €",
+    "Pfandbon 10,00 €",
+    "Item: Sticker Kunde 0",
+    "Item: Energy-Drink",
+    "Item: Wunderkerze",
+    "Item: Beruhigungstee",
+    "Item: Öl",
+    "Item: Mettbrötchen",
+    "Item: Filzsohlen",
+    "Item: Glöckchen",
+    "Item: Taschenlampe",
 ];
 
+/// Stelle eines Cheats in `CHEATS` (zur Uebersetzungszeit, fehlt er: Fehler beim Bauen)
+const fn cheat_index(name: &str) -> usize {
+    let mut i = 0;
+    while i < CHEATS.len() {
+        let (a, b) = (CHEATS[i].as_bytes(), name.as_bytes());
+        if a.len() == b.len() {
+            let mut k = 0;
+            while k < a.len() && a[k] == b[k] {
+                k += 1;
+            }
+            if k == a.len() {
+                return i;
+            }
+        }
+        i += 1;
+    }
+    panic!("Cheat fehlt")
+}
+
+/// Ausdauer geht nie aus (an/aus)
+pub const STAMINA_CHEAT: usize = cheat_index("Unendlich Ausdauer");
+/// Pfandbons in verschiedenen Werten (Cent), in dieser Reihenfolge ab `BON_CHEATS`
+pub const BON_CHEATS: usize = cheat_index("Pfandbon 0,50 €");
+pub const BON_VALUES: [i64; 4] = [50, 100, 500, 1000];
+/// Je ein Item vom Kiosk, in der Reihenfolge von `Item::ALL`
+pub const ITEM_CHEATS: usize = cheat_index("Item: Sticker Kunde 0");
+
 /// Neuen Einkauf im Tutorial-Modus starten (main.rs holt die Anfrage ab)
-pub const TUTORIAL_CHEAT: usize = CHEATS.len() - 12;
+pub const TUTORIAL_CHEAT: usize = cheat_index("Tutorial starten");
 /// Direkt in den laengsten Fluchtkorridor (140 m)
-pub const LONG_CORRIDOR_CHEAT: usize = CHEATS.len() - 11;
+pub const LONG_CORRIDOR_CHEAT: usize = cheat_index("Flucht: langer Korridor");
 /// Run sofort verloren (Schreck, Endbildschirm) - zum Testen der Todes-Schriftzuege
-pub const DIE_CHEAT: usize = CHEATS.len() - 10;
+pub const DIE_CHEAT: usize = cheat_index("Sofort sterben");
 /// Abgelaufenen Tomatensaft trinken: 30 s Rausch, dann kotzen (trip.rs)
-pub const TRIP_CHEAT: usize = CHEATS.len() - 9;
+pub const TRIP_CHEAT: usize = cheat_index("Tomatensaft trinken");
 /// In den ersten Raum des Seitentrakts (kippt den Markt vorher, world/gen/wing.rs)
-pub const WING_CHEAT: usize = CHEATS.len() - 8;
+pub const WING_CHEAT: usize = cheat_index("Seitentrakt: hinein");
 /// Gestalt in der Ferne aufstellen (watcher.rs)
-pub const WATCHER_CHEAT: usize = CHEATS.len() - 7;
+pub const WATCHER_CHEAT: usize = cheat_index("Gestalt in der Ferne");
 /// Deja-vu-Szene vor einen stellen (dejavu.rs)
-pub const DEJAVU_CHEAT: usize = CHEATS.len() - 6;
+pub const DEJAVU_CHEAT: usize = cheat_index("Déjà-vu-Szene");
 /// Ein Mettarbeiter sperrt sofort einen Gang (closures.rs)
-pub const CLOSURE_CHEAT: usize = CHEATS.len() - 5;
+pub const CLOSURE_CHEAT: usize = cheat_index("Gang sperren lassen");
 /// Vor einen laufenden Pfandautomaten, Tuete voll, Bon
-pub const PFAND_CHEATS: usize = CHEATS.len() - 4;
+pub const PFAND_CHEATS: usize = cheat_index("Zum Pfandautomaten");
 
 /// Index des ersten NPC-Cheats in `CHEATS` (nach den Schrecken)
 pub const FIRST_NPC_CHEAT: usize = FIRST_SCARE_CHEAT + 18;
@@ -88,8 +130,18 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
     vec![
         (
             "Spieler",
-            "Unverwundbar, Leben, Tutorial, Auffälligkeit, Rausch",
-            vec![0, 14, TUTORIAL_CHEAT, 15, 4, 5, DIE_CHEAT, TRIP_CHEAT],
+            "Unverwundbar, Ausdauer, Leben, Tutorial, Rausch",
+            vec![
+                0,
+                STAMINA_CHEAT,
+                14,
+                TUTORIAL_CHEAT,
+                15,
+                4,
+                5,
+                DIE_CHEAT,
+                TRIP_CHEAT,
+            ],
         ),
         (
             "Markt & Einkauf",
@@ -98,11 +150,28 @@ pub fn cheat_groups() -> Vec<(&'static str, &'static str, Vec<usize>)> {
         ),
         (
             "Kasse & Flucht",
-            "Kasse, Bezahlen, Korridor, Pfand",
-            [6, 12, 13, 16, LONG_CORRIDOR_CHEAT]
-                .into_iter()
-                .chain(PFAND_CHEATS..CHEATS.len())
-                .collect(),
+            "Kasse, Bezahlen, Korridor",
+            vec![6, 12, 13, 16, LONG_CORRIDOR_CHEAT],
+        ),
+        (
+            "Pfand",
+            "Automat, Tüte, Kiosk, Pfandbons in jedem Wert",
+            // Bons nach Wert geordnet: 0,50 / 1,00 / 2,50 / 5,00 / 10,00
+            vec![
+                PFAND_CHEATS,
+                PFAND_CHEATS + 1,
+                PFAND_CHEATS + 3,
+                BON_CHEATS,
+                BON_CHEATS + 1,
+                PFAND_CHEATS + 2,
+                BON_CHEATS + 2,
+                BON_CHEATS + 3,
+            ],
+        ),
+        (
+            "Items",
+            "Jedes Item vom Kiosk sofort bekommen",
+            (ITEM_CHEATS..ITEM_CHEATS + Item::ALL.len()).collect(),
         ),
         (
             "Leute",
@@ -143,6 +212,23 @@ impl Game {
         self.catcher_variant = Some(pool[self.seed as usize % pool.len()]);
         let f = self.view_dir();
         self.catcher = Some(self.player.pos + vec3(f.x, 0.0, f.z).normalize_or_zero() * 0.6);
+    }
+
+    /// Cheat: Pfandbon ueber `cents` in die Tasche (kippt den Markt, sonst gibt es keinen Kiosk).
+    fn bon_cheat(&mut self, cents: i64) -> String {
+        self.tip();
+        self.pfand.bons.push(cents);
+        self.pfand.printed = true;
+        format!("Bon über {}.", crate::ui::euro(cents))
+    }
+
+    /// Cheat: ein Item vom Kiosk geschenkt, wie gekauft (volle Taschen bleiben voll).
+    fn item_cheat(&mut self, item: Item) -> String {
+        if let Some(why) = self.item_refused(item) {
+            return why.into();
+        }
+        self.receive_item(item);
+        format!("{} bekommen.", item.name())
     }
 
     /// Cheat ausloesen. Danach zaehlt dieser Einkauf nicht mehr fuer Erfolge.
@@ -271,6 +357,15 @@ impl Game {
             }
             WING_CHEAT => self.debug_to_wing(),
             CLOSURE_CHEAT => self.debug_closure(),
+            STAMINA_CHEAT => {
+                self.endless_stamina = !self.endless_stamina;
+                format!(
+                    "Unendlich Ausdauer: {}",
+                    if self.endless_stamina { "AN" } else { "AUS" }
+                )
+            }
+            i if i >= ITEM_CHEATS => self.item_cheat(Item::ALL[i - ITEM_CHEATS]),
+            i if i >= BON_CHEATS => self.bon_cheat(BON_VALUES[i - BON_CHEATS]),
             i if i >= PFAND_CHEATS => self.pfand_cheat(i - PFAND_CHEATS),
             WATCHER_CHEAT => {
                 self.tip();
@@ -543,6 +638,63 @@ mod tests {
         assert!(behind, "kein Verfolger hinter dir");
         g.cheat(FIRST_NPC_CHEAT + 4);
         assert!(g.npc_debug && !g.npc_debug_labels().is_empty());
+    }
+
+    #[test]
+    fn stamina_pfand_and_item_cheats_work() {
+        // unendlich Ausdauer: 30 s rennen, nie erschoepft; wieder aus: Ausdauer sinkt
+        let mut g = Game::new(61);
+        g.cheat(STAMINA_CHEAT);
+        assert!(g.endless_stamina);
+        let run = || Input {
+            forward: true,
+            run: true,
+            ..Default::default()
+        };
+        for _ in 0..60 * 30 {
+            g.update(1.0 / 60.0, &mut run());
+        }
+        assert!(!g.player.exhausted && g.player.stamina > 0.99);
+        g.cheat(STAMINA_CHEAT);
+        assert!(!g.endless_stamina);
+        for _ in 0..60 {
+            g.update(1.0 / 60.0, &mut run());
+        }
+        assert!(
+            g.player.stamina < 0.95,
+            "Ausdauer sinkt nach dem Ausschalten nicht"
+        );
+        // Pfandbons in jedem Wert
+        let mut g = Game::new(62);
+        for (k, &v) in BON_VALUES.iter().enumerate() {
+            g.cheat(BON_CHEATS + k);
+            assert_eq!(*g.pfand.bons.last().unwrap(), v);
+        }
+        assert!(g.tipped && g.pfand.printed);
+        assert_eq!(CHEATS[BON_CHEATS], "Pfandbon 0,50 €");
+        // jedes Item, mit seinem Namen; Verbrauchbares bis die Taschen voll sind
+        for (k, item) in Item::ALL.iter().enumerate() {
+            assert_eq!(CHEATS[ITEM_CHEATS + k], format!("Item: {}", item.name()));
+            let mut g = Game::new(63);
+            g.cheat(ITEM_CHEATS + k);
+            let o = &g.pfand.owned;
+            assert!(o.pocket.contains(item) || o.has(*item), "{item:?} fehlt");
+        }
+        let mut g = Game::new(64);
+        let mett = ITEM_CHEATS + Item::ALL.iter().position(|i| *i == Item::Mett).unwrap();
+        for _ in 0..10 {
+            g.cheat(mett);
+        }
+        assert_eq!(
+            g.pfand.owned.pocket.len(),
+            super::super::pfand::items::POCKET_MAX
+        );
+        // eigene Kategorien "Pfand" und "Items"
+        let groups = cheat_groups();
+        let names: Vec<_> = groups.iter().map(|c| c.0).collect();
+        assert!(names.contains(&"Pfand") && names.contains(&"Items"));
+        let items = &groups.iter().find(|c| c.0 == "Items").unwrap().2;
+        assert_eq!(items.len(), Item::ALL.len());
     }
 
     #[test]

@@ -6,7 +6,7 @@ use crate::game::belt_window::{inside, Rect};
 use crate::game::escalation::Tier;
 use crate::game::pfand::items::Item;
 use crate::game::pfand::kiosk::{
-    first_bon, Column, KioskWindow, BONS, BON_ROWS, BUY, ROW, SHELF, WINDOW,
+    first_bon, Column, KioskWindow, BONS, BON_ROWS, BUY, NOTE, ROW, SHELF, WINDOW,
 };
 use crate::game::Game;
 use crate::ui::{self, euro, Ui, DIM, GREEN, WHITE, YELLOW};
@@ -103,9 +103,51 @@ pub fn draw(u: &mut Ui, g: &Game, w: &KioskWindow, time: f32) {
         DIM,
         1.0,
     );
+    if w.note {
+        draw_note(u, time);
+        return;
+    }
     let (mx, my) = w.mouse;
     u.rect(mx - 3.0, my, 7.0, 1.0, WHITE);
     u.rect(mx, my - 3.0, 1.0, 7.0, WHITE);
+}
+
+/// Zettel des Erbauers: vergilbtes Papier mit dunkler Schrift, leicht zitternd.
+pub const NOTE_RECT: Rect = (90.0, 60.0, 300.0, 130.0);
+
+fn draw_note(u: &mut Ui, time: f32) {
+    let (x, y, w, h) = NOTE_RECT;
+    u.rect(0.0, 0.0, ui::W, ui::H, [0.0, 0.0, 0.0, 0.55]);
+    u.rect(x + 3.0, y + 3.0, w, h, [0.0, 0.0, 0.0, 0.6]);
+    u.rect(x, y, w, h, [0.78, 0.72, 0.56, 1.0]);
+    // Flecken und eine eingerissene Ecke
+    u.rect(x + w - 36.0, y + 8.0, 22.0, 14.0, [0.6, 0.5, 0.36, 0.6]);
+    u.rect(x + 14.0, y + h - 30.0, 30.0, 10.0, [0.5, 0.2, 0.15, 0.35]);
+    u.rect(
+        x + w - 10.0,
+        y + h - 10.0,
+        10.0,
+        10.0,
+        [0.0, 0.0, 0.0, 0.55],
+    );
+    let ink = [0.16, 0.1, 0.06, 1.0];
+    for (k, line) in NOTE.iter().enumerate() {
+        let jitter = ((time * 7.0 + k as f32 * 1.9).sin() * 0.5).round();
+        u.text(
+            x + 14.0 + jitter,
+            y + 16.0 + k as f32 * 16.0,
+            line,
+            ink,
+            1.0,
+        );
+    }
+    u.hint(
+        x + 14.0,
+        y + h - 14.0,
+        "E / Klick: weglegen",
+        [0.3, 0.24, 0.16, 1.0],
+        1.0,
+    );
 }
 
 #[cfg(test)]

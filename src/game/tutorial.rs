@@ -170,10 +170,11 @@ impl Phase {
                     "Was übrig ist, verfällt.",
                 ],
                 &[
-                    "Verbrauchbares benutzt du mit G,",
-                    "das Mausrad wählt aus. Bons und",
-                    "Items gelten nur diesen Einkauf.",
-                    "Keine Lust? Geh gleich zur Kasse.",
+                    "Gekauftes rutscht in die Ablage:",
+                    "Schau hin, E nimmt es. Mit G",
+                    "benutzt du Verbrauchbares, das",
+                    "Mausrad wählt aus. Alles gilt nur",
+                    "diesen Einkauf. Keine Lust? Kasse.",
                 ],
             ],
             Phase::ToTill => &[&[
