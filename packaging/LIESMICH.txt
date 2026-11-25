@@ -112,7 +112,8 @@ G benutzt ein Item aus der Tasche. Das Mettbrötchen lässt dich bis zum Ende
 des Einkaufs doppelt so lange rennen.
 Für 10 € (alle Bons zusammen) gibt es den Mobility Scooter: Er ersetzt den
 Wagen, Q steigt auf und ab, er fährt schnell und fällt nicht auf, geduckt passt
-du unter Hindernissen durch. Dazu 2 Leben mehr und ein Scheinwerfer.
+du unter Hindernissen durch. Dazu 2 Leben mehr und ein Scheinwerfer. Mit ihm
+bist du dick und zu Fuß 30 % langsamer.
 
 Controller werden unterstützt (A springen, B ducken, X benutzen, Y Wagen, LT rennen);
 alle Tasten lassen sich unter Optionen - Steuerung umbelegen.

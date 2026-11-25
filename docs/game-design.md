@@ -401,3 +401,12 @@ Option „Schatten“ (Aus, Niedrig, Hoch; Vorgabe Hoch). Niedrig: 4 Lampen, 384
 - **Sitzen und Ducken:** Auge und Kopf 0,35 m tiefer. Geduckt liegt der Kopf bei 0,77 m, also unter jeder Duck-Hürde im Fluchtkorridor (Unterkante ab 1,05 m); ohne Ducken (1,4 m) bleibt man hängen. In den Fluchtkorridor fährt man mit, der Wagen dagegen bleibt im Markt.
 - **Dazu:** 2 Leben mehr (`EXTRA_LIVES`) und ein Scheinwerfer, so hell wie die Taschenlampe.
 - **Gefühl beim Fahren:** Schaut man auf Korb oder Sitz, steht da „[E/Q] Mobility Scooter fahren“ (beim Fahren „… absteigen“). Ein synthetisierter Elektromotor (`audio::scooter_motor`, Schleife) wird mit dem Tempo lauter und höher, im Stand und abgestiegen ist er still. Kein Kopfwippen und keine Schritte im Sitz. Der Lenker ist ein eigenes Teil (`scooter_bar`) und schlägt mit der Drehgeschwindigkeit ein (höchstens 0,5 rad, weich), rechts herum kommt der rechte Griff zum Fahrer.
+
+## Eigener Körper
+`src/game/body.rs`, Kopf ausblenden in `people::hide_head`. Der Spieler ist der Mann im Hoodie (`people_of(false)[0]`), überall dieselbe Figur:
+- **Ich-Sicht:** Schaut man runter, sieht man Brust, Arme und Beine. Clip je Zustand: stehen `Idle`, gehen `Walk`, rennen `Run`, geduckt `CrouchIdle`/`CrouchWalk`, mit Wagen `Push` (auch im Stand), auf dem Scooter `Sit` (auf dem Sitz). Die Animationszeit hängt an der Strecke (`people::Gait`), die Füße rutschen nicht.
+- **Hände** (`hand_targets`, Zwei-Knochen-IK der Engine `anim::Pose::two_bone_ik`): mit Wagen beide auf der Griffstange, auf dem Scooter beide an den Lenkergriffen; sie lenken mit. Die rechte Hand hält, was man gerade hat: gegriffene Ware, die Zigarette (auch beim Ziehen zum Mund) und die Dose beim Trinken.
+- **Mit Scooter dick** (`people::fatten`): Bauch, Brust, Hüfte und Oberschenkel 1,4-mal so breit (`FAT`), Arme und Hände bleiben. Zu Fuß ist man dann 30 % langsamer (`FAT_WALK`), der Scooter fährt gleich schnell.
+- Kopf und Hals werden in der Ich-Sicht in einen Punkt im Kragen gefaltet (sonst sähe man sie von innen). Stehend steht der Körper 0,1 m hinter dem Auge (`STAND_BACK`), geduckt 0,38 m (`CROUCH_BACK`, sonst schaut man in die vorgebeugte Schulter), sitzend 0,15 m (`BODY_BACK`).
+- Er wirft Schatten. Beim Sterben und nach dem Ende des Runs gibt es keinen Körper.
+- **Monitor und Spiegel** zeigen dieselbe Figur mit Kopf und demselben Clip (schieben, ducken, sitzen).

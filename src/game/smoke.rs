@@ -147,7 +147,7 @@ impl Game {
     }
 
     /// Lage der Zigarette in der Welt: Filterende, Richtung zur Glut, Laenge (0..1).
-    fn cigarette_pose(&self) -> Option<(Vec3, Vec3, f32)> {
+    pub(super) fn cigarette_pose(&self) -> Option<(Vec3, Vec3, f32)> {
         let (f, r, u) = self.view_axes();
         let eye = self.eye();
         // Ruhelage: unten rechts, Glut zeigt schraeg nach vorn links

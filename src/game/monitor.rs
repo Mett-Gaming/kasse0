@@ -96,20 +96,12 @@ impl Game {
         let flat = vec3(fwd.x, 0.0, fwd.z).normalize_or_zero();
         let flat = if flat == Vec3::ZERO { Vec3::Z } else { flat };
         let pos = self.player.pos;
-        let speed = vec3(self.player.vel.x, 0.0, self.player.vel.z).length();
-        let me = crate::people::people_of(false)[0];
-        out.push(PersonDraw {
-            variant: me,
-            clip: if speed > 0.3 { Clip::Walk } else { Clip::Idle },
-            time: self.time,
-            pos,
-            yaw: npc::yaw_towards(pos, pos + flat),
-            tint: Vec4::new(0.8, 0.8, 0.8, 0.0),
-            ghost: false,
-            flip: false,
-            look_at: None,
-            fx: Default::default(),
-        });
+        // man selbst, immer als erster Eintrag: derselbe Koerper wie in der Ich-Sicht (body.rs),
+        // hier mit Kopf; main.rs zeichnet ihn mit den Haenden an Stange und Lenker
+        if let Some(mut me) = self.player_person(false) {
+            me.tint = Vec4::new(0.8, 0.8, 0.8, 0.0);
+            out.push(me);
+        }
         if let Some(t) = self.monitor_ghost {
             let k = (t / GHOST_STRIKE).min(1.0);
             let dist = if t >= GHOST_STRIKE {

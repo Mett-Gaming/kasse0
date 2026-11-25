@@ -612,6 +612,81 @@ impl App {
             99 => self.shot_request = Some(shot("46_pfand_tuer")),
             101 => self.shot_request = Some(shot("47_pfand_raum_innen")),
             103 => self.shot_request = Some(shot("48_pfand_raum_gekippt")),
+            104 | 106 | 108 => {
+                // eigener Koerper (game/body.rs): runterschauen ohne Wagen (104), mit Wagen
+                // (106), auf dem Scooter (108)
+                self.start_game(seed, false);
+                self.game.tutorial = None;
+                self.game.customers.clear();
+                self.game.employees.clear();
+                self.game.message = None;
+                let spawn = self.game.world.spawn;
+                self.game.player.pos = spawn;
+                self.game.player.yaw = 0.0;
+                self.game.trolley.yaw = 0.0;
+                self.game.trolley.pos = spawn + vec3(0.0, 0.0, -0.85);
+                self.game.trolley.pushing = step == 106;
+                if step == 104 {
+                    self.game.trolley.pos = self.game.world.corral;
+                }
+                if step == 108 {
+                    self.game.cheat(game::ITEM_CHEATS + 9);
+                    self.game.trolley.pos = spawn + vec3(0.0, 0.0, -0.85);
+                    self.game.trolley.yaw = 0.0;
+                    self.game.player.pos = spawn;
+                    self.game.trolley.pushing = true;
+                }
+                self.game.player.pitch = if step == 104 { -1.35 } else { -0.75 };
+                self.game.message = None;
+                return Some(1.0);
+            }
+            110 | 112 | 114 => {
+                // eigener Koerper: geduckt (110), Ware in der Hand (112), Scooter mit
+                // eingeschlagenem Lenker (114)
+                self.start_game(seed, false);
+                self.game.tutorial = None;
+                self.game.customers.clear();
+                self.game.employees.clear();
+                let spawn = self.game.world.spawn;
+                self.game.player.pos = spawn;
+                self.game.player.yaw = 0.0;
+                self.game.trolley.yaw = 0.0;
+                self.game.trolley.pos = spawn + vec3(0.0, 0.0, -0.85);
+                self.game.trolley.pushing = false;
+                self.input.crouch = false;
+                self.game.player.pitch = -0.45;
+                match step {
+                    110 => {
+                        self.game.trolley.pos = self.game.world.corral;
+                        self.input.crouch = true;
+                    }
+                    112 => {
+                        self.game.trolley.pos = self.game.world.corral;
+                        self.game.fill_list_cheap();
+                        self.game.held = self.game.cart.pop();
+                        self.game.player.pitch = -0.25;
+                    }
+                    _ => {
+                        self.game.cheat(game::ITEM_CHEATS + 9);
+                        self.game.trolley.pos = spawn + vec3(0.0, 0.0, -0.85);
+                        self.game.trolley.yaw = 0.0;
+                        self.game.player.pos = spawn;
+                        self.game.trolley.pushing = true;
+                        self.game.steer = 0.45;
+                    }
+                }
+                self.game.message = None;
+                return Some(1.0);
+            }
+            111 => self.shot_request = Some(shot("52_koerper_geduckt")),
+            113 => self.shot_request = Some(shot("53_koerper_ware")),
+            115 => {
+                self.game.steer = 0.45;
+                self.shot_request = Some(shot("54_koerper_lenken"));
+            }
+            105 => self.shot_request = Some(shot("49_koerper_unten")),
+            107 => self.shot_request = Some(shot("50_koerper_wagen")),
+            109 => self.shot_request = Some(shot("51_koerper_scooter")),
             _ => return None,
         }
         Some(0.6)

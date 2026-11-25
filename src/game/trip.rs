@@ -221,26 +221,33 @@ impl Game {
             .extend(tint.w.max(0.6 * l))
     }
 
+    /// Dose beim Trinken: (Boden, Achse nach oben, rechts). Hoch zum Mund, kippt dabei.
+    pub(super) fn drink_can(&self) -> Option<(Vec3, Vec3, Vec3)> {
+        let Trip::Drinking { t } = self.trip else {
+            return None;
+        };
+        let f = self.view_dir();
+        let r = f.cross(Vec3::Y).normalize_or_zero();
+        let u = r.cross(f);
+        let eye = self.eye();
+        let h = crate::assets::half_extent(MeshId::Can).y * 2.0;
+        let raise = (t / 0.35).clamp(0.0, 1.0);
+        let lower = ((t - (DRINK_TIME - 0.3)) / 0.3).clamp(0.0, 1.0);
+        let k = raise * (1.0 - lower);
+        // Neigung: von aufrecht ueber schraeg bis fast waagerecht (letzte Schlucke)
+        let tilt = k * (0.9 + 0.8 * ((t - 0.35) / (DRINK_TIME - 0.65)).clamp(0.0, 1.0));
+        let up = (u * tilt.cos() - f * tilt.sin()).normalize();
+        let rest = eye + f * 0.32 + r * 0.14 - u * 0.3;
+        let mouth = eye + f * 0.07 - u * 0.03;
+        let top = rest.lerp(mouth, k);
+        Some((top - up * h, up, r))
+    }
+
     /// Dose am Mund, schwebende Wuerfel im Rausch, Pfuetzen am Boden.
     pub(super) fn collect_trip_draws(&self, out: &mut Vec<MeshDraw>) {
         let cube = MeshId::Cube as usize;
         // Dose: hoch zum Mund, kippt beim Trinken
-        if let Trip::Drinking { t } = self.trip {
-            let f = self.view_dir();
-            let r = f.cross(Vec3::Y).normalize_or_zero();
-            let u = r.cross(f);
-            let eye = self.eye();
-            let h = crate::assets::half_extent(MeshId::Can).y * 2.0;
-            let raise = (t / 0.35).clamp(0.0, 1.0);
-            let lower = ((t - (DRINK_TIME - 0.3)) / 0.3).clamp(0.0, 1.0);
-            let k = raise * (1.0 - lower);
-            // Neigung: von aufrecht ueber schraeg bis fast waagerecht (letzte Schlucke)
-            let tilt = k * (0.9 + 0.8 * ((t - 0.35) / (DRINK_TIME - 0.65)).clamp(0.0, 1.0));
-            let up = (u * tilt.cos() - f * tilt.sin()).normalize();
-            let rest = eye + f * 0.32 + r * 0.14 - u * 0.3;
-            let mouth = eye + f * 0.07 - u * 0.03;
-            let top = rest.lerp(mouth, k);
-            let base = top - up * h;
+        if let Some((base, up, r)) = self.drink_can() {
             let z = r.cross(up).normalize_or_zero();
             out.push(MeshDraw {
                 mesh: MeshId::Can as usize,

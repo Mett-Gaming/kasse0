@@ -79,6 +79,11 @@ impl Game {
         let pushing = self.trolley.pushing;
         // auf dem Scooter (scooter.rs): schnell, ohne Ausdauer, kein Rennen im Sinne der Regeln
         let riding = self.riding();
+        let fat_slow = if self.has_scooter() {
+            super::body::FAT_WALK
+        } else {
+            1.0
+        };
         // Ducken (weich) und Springen (nur am Boden, nicht geduckt)
         let p = &mut self.player;
         let want = if input.crouch && p.jump_y <= 0.0 {
@@ -130,7 +135,8 @@ impl Game {
                 // geduckt faehrt der Scooter genauso schnell
                 super::scooter::SCOOTER_SPEED * slow
             } else {
-                (base + (RUN_SPEED * CROUCH_SPEED - base) * crouch) * slow
+                // mit Scooter ist man dick: zu Fuss langsamer (body.rs)
+                (base + (RUN_SPEED * CROUCH_SPEED - base) * crouch) * slow * fat_slow
             };
             let push = if push > 0.0 { push.max(0.25) } else { 1.0 };
             wish = wish.normalize() * v.min(cap) * push;
@@ -904,6 +910,16 @@ impl Game {
         }
     }
 
+    /// Mitte der Ware in der Hand (vor der Kamera, unten rechts).
+    pub(super) fn held_item_pos(&self) -> Option<Vec3> {
+        let item = self.held.as_ref()?;
+        let fwd = self.view_dir();
+        let right = vec3(self.player.yaw.cos(), 0.0, self.player.yaw.sin());
+        let up = right.cross(fwd);
+        let h = item.half();
+        Some(self.eye() + fwd * 0.5 + right * 0.2 - up * (0.2 + h.y))
+    }
+
     /// Wagen, Wageninhalt, Hand und fallen gelassene Waren zeichnen.
     pub(super) fn collect_hand_draws(&self, out: &mut Vec<MeshDraw>) {
         let white = Vec4::new(1.0, 1.0, 1.0, 0.0);
@@ -967,13 +983,8 @@ impl Game {
             });
         }
 
-        // Ware in der Hand (vor der Kamera, unten rechts)
-        if let Some(item) = &self.held {
-            let fwd = self.view_dir();
-            let right = vec3(self.player.yaw.cos(), 0.0, self.player.yaw.sin());
-            let up = right.cross(fwd);
-            let h = item.half();
-            let pos = self.eye() + fwd * 0.5 + right * 0.2 - up * (0.2 + h.y);
+        // Ware in der Hand (vor der Kamera, unten rechts; die rechte Hand greift sie, body.rs)
+        if let (Some(item), Some(pos)) = (&self.held, self.held_item_pos()) {
             let model = Mat4::from_rotation_translation(
                 rot(-self.player.yaw) * Quat::from_rotation_x(self.player.pitch * 0.5),
                 pos,

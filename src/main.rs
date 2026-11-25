@@ -783,10 +783,43 @@ impl App {
         self.skins.clear();
         self.bones.clear();
         add_skins(&self.people, &mut self.skins, &mut self.bones);
+        // der eigene Koerper (game/body.rs): Haende an Stange, Lenker und Gehaltenem; in der
+        // Ich-Sicht ohne Kopf, sonst saehe man ihn von innen
+        if !hud::on_title(self.screen) {
+            if let Some(me) = self.game.player_person(true) {
+                let first = self.bones.len();
+                let model = self.game.player_bones(&me, &mut self.bones);
+                people::hide_head(me.variant, &mut self.bones[first..]);
+                self.skins.push(render::SkinDraw {
+                    skin: me.variant,
+                    model,
+                    tint: me.tint,
+                    first_bone: first as u32,
+                    ..Default::default()
+                });
+            }
+        }
         self.people.clear();
         self.game.collect_monitor_people(&mut self.people);
         self.monitor_skins.clear();
-        add_skins(&self.people, &mut self.monitor_skins, &mut self.bones);
+        // erster Eintrag ist man selbst (falls zu sehen): mit Haenden an Stange und Lenker
+        let me_first = !self.people.is_empty() && self.game.player_person(false).is_some();
+        let others = if me_first {
+            let me = self.people[0];
+            let first = self.bones.len();
+            let model = self.game.player_bones(&me, &mut self.bones);
+            self.monitor_skins.push(render::SkinDraw {
+                skin: me.variant,
+                model,
+                tint: me.tint,
+                first_bone: first as u32,
+                ..Default::default()
+            });
+            &self.people[1..]
+        } else {
+            &self.people[..]
+        };
+        add_skins(others, &mut self.monitor_skins, &mut self.bones);
         let g = &self.game;
         let troll = (self.menu_scare > 0.0).then(|| hud::MENU_SCARE_TIME - self.menu_scare);
         let mut view_proj = g.view_proj(aspect);

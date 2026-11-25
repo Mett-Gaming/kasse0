@@ -1,6 +1,7 @@
 //! Ein Run: Einkaufen, Kippen, Kunden, Mitarbeiter, Kasse, Ausgang.
 
 pub mod belt_window;
+mod body;
 mod brain;
 mod cheats;
 mod checkout;
@@ -21,7 +22,7 @@ mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
 mod tension;
-pub use cheats::{cheat_groups, CHEATS, PFAND_CHEATS, STAMINA_CHEAT, TUTORIAL_CHEAT};
+pub use cheats::{cheat_groups, CHEATS, ITEM_CHEATS, PFAND_CHEATS, STAMINA_CHEAT, TUTORIAL_CHEAT};
 pub mod closures;
 pub mod dejavu;
 pub mod dialog;
@@ -288,6 +289,8 @@ pub struct Game {
     pub god: bool,
     /// Cheat: Ausdauer geht nie aus
     pub endless_stamina: bool,
+    /// Gangart des eigenen Koerpers (body.rs): Animationszeit an die Strecke gekoppelt
+    pub player_gait: crate::people::Gait,
     /// Lenkeinschlag des Scooters (Bogenmass, + = rechts; scooter.rs)
     pub steer: f32,
     /// Schonfrist nach einem Gespraech
@@ -555,6 +558,7 @@ impl Game {
             cheated: false,
             god: false,
             endless_stamina: false,
+            player_gait: Default::default(),
             steer: 0.0,
             grace: 0.0,
             deaths: 0,
@@ -1098,6 +1102,7 @@ impl Game {
             self.update_till_pay(dt, input);
         } else {
             self.update_movement(dt, input);
+            self.update_body(dt);
             self.update_focus();
             if input.interact {
                 self.interact();

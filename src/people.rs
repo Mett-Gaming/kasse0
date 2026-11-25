@@ -43,6 +43,87 @@ pub fn anims(female: bool) -> &'static AnimSet {
     }
 }
 
+/// Was in der Ich-Sicht ausgeblendet wird: Kopf und Hals (sonst schaut man in Hals und Kapuze)
+const HIDDEN_BONES: [&str; 2] = ["Head", "Neck"];
+/// So weit unter der Halsmitte liegt der Punkt, in den Kopf und Hals gefaltet werden (m)
+const COLLAR_DROP: f32 = 0.12;
+
+/// Kopf und Hals einer Figur ausblenden (eigener Koerper in der Ich-Sicht): Die Matrix jedes
+/// dieser Bones faltet seine Punkte in einen Punkt in seiner Mitte; so sieht die Kamera nichts
+/// von innen. `bones`: die Skinning-Matrizen genau dieser Figur (wie `AnimSet::pose` sie liefert).
+pub fn hide_head(variant: usize, bones: &mut [glam::Mat4]) {
+    let v = variant % PEOPLE.len();
+    let a = anims(PEOPLE[v].1);
+    // alles in einen Punkt im Kragen (unter der Halsmitte): Punkte, die nur teilweise am Hals
+    // haengen, bleiben so im Kragen und ragen nicht als Zipfel zur Kamera hoch
+    let Some(neck) = a.bone(HIDDEN_BONES[1]).and_then(|b| bones.get(b)) else {
+        return;
+    };
+    let neck_center = a
+        .bone(HIDDEN_BONES[1])
+        .map_or(glam::Vec3::ZERO, |b| bone_centers(v)[b]);
+    let p = neck.transform_point3(neck_center) - glam::Vec3::new(0.0, COLLAR_DROP, 0.0);
+    let fold = glam::Mat4::from_translation(p) * glam::Mat4::from_scale(glam::Vec3::ZERO);
+    for name in HIDDEN_BONES {
+        if let Some(m) = a.bone(name).and_then(|b| bones.get_mut(b)) {
+            *m = fold;
+        }
+    }
+}
+
+/// Mitte jedes Bones einer Figur in der Ruhehaltung (Index = Bone): Mittel der Punkte, die
+/// ueberwiegend an ihm haengen (ohne solche Punkte: Nullpunkt).
+pub fn bone_centers(variant: usize) -> &'static [glam::Vec3] {
+    static CENTERS: OnceLock<Vec<OnceLock<Vec<glam::Vec3>>>> = OnceLock::new();
+    let all = CENTERS.get_or_init(|| (0..PEOPLE.len()).map(|_| OnceLock::new()).collect());
+    let v = variant % PEOPLE.len();
+    all[v].get_or_init(|| {
+        let n = anims(PEOPLE[v].1).bones();
+        let mut sum = vec![glam::Vec3::ZERO; n];
+        let mut count = vec![0.0f32; n];
+        for vx in &raw_skin(v).vertices {
+            for j in 0..4 {
+                let b = vx.joints[j] as usize;
+                if vx.weights[j] > 0.5 && b < n {
+                    sum[b] += glam::Vec3::from(vx.pos);
+                    count[b] += 1.0;
+                }
+            }
+        }
+        sum.iter()
+            .zip(&count)
+            .map(|(s, &c)| if c > 0.0 { *s / c } else { glam::Vec3::ZERO })
+            .collect()
+    })
+}
+
+/// Bauch, Brust, Huefte und Oberschenkel breiter machen (dicker Koerper): die Skinning-Matrix
+/// dieser Bones wird um ihre Mitte in x und z (Figuren-Koordinaten) um `fat` gestreckt.
+/// Arme, Haende und Kopf bleiben, wie sie sind.
+pub fn fatten(variant: usize, bones: &mut [glam::Mat4], fat: f32) {
+    const BELLY: [&str; 7] = [
+        "Hips",
+        "Abdomen",
+        "Torso",
+        "Chest",
+        "UpperLeg.L",
+        "UpperLeg.R",
+        "Body",
+    ];
+    let v = variant % PEOPLE.len();
+    let a = anims(PEOPLE[v].1);
+    let centers = bone_centers(v);
+    for name in BELLY {
+        let Some(b) = a.bone(name) else { continue };
+        let Some(m) = bones.get_mut(b) else { continue };
+        let c = m.transform_point3(centers[b]);
+        *m = glam::Mat4::from_translation(c)
+            * glam::Mat4::from_scale(glam::Vec3::new(fat, 1.0, fat))
+            * glam::Mat4::from_translation(-c)
+            * *m;
+    }
+}
+
 /// Figur ohne Schriftzug.
 fn raw_skin(variant: usize) -> SkinData {
     data::load(&format!("people/{}.k0s", PEOPLE[variant].0))
