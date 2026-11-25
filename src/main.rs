@@ -656,6 +656,11 @@ impl App {
                 hush: self.game.hush(),
                 muffle: self.game.wing_muffle(),
                 dull: (self.game.trip_level() * 0.7).max(self.game.dying_progress().unwrap_or(0.0)),
+                scooter: if hud::on_title(self.screen) {
+                    0.0
+                } else {
+                    self.game.scooter_motor()
+                },
             },
             listener,
             dt,

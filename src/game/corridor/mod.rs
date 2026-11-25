@@ -204,9 +204,11 @@ impl Game {
         self.employees.clear();
         self.shoppers.clear();
         self.dialog = None;
-        // der Wagen bleibt im Markt (hinter der zugeknallten Tuer)
+        // der Wagen bleibt im Markt (hinter der zugeknallten Tuer); auf dem Scooter faehrt man
+        // mit hinein (ducken, springen wie sonst)
+        let riding = self.riding();
         if let Some(c) = &self.world.corridor {
-            if self.trolley.pushing || c.contains(self.trolley.pos) {
+            if !riding && (self.trolley.pushing || c.contains(self.trolley.pos)) {
                 self.trolley.pushing = false;
                 self.trolley.pos = c.door_center - vec3(0.0, 0.0, 1.6);
             }

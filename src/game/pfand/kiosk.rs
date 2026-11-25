@@ -15,7 +15,7 @@ const GRACE: f32 = 2.5;
 pub const WINDOW: Rect = (40.0, 26.0, 400.0, 196.0);
 pub const BONS: Rect = (50.0, 56.0, 110.0, 124.0);
 pub const SHELF: Rect = (170.0, 56.0, 260.0, 124.0);
-pub const ROW: f32 = 12.0;
+pub const ROW: f32 = 11.0;
 pub const BUY: Rect = (330.0, 198.0, 100.0, 16.0);
 /// So viele Bons sind zu sehen (die Auswahl blaettert mit)
 pub const BON_ROWS: usize = 8;
@@ -204,23 +204,35 @@ impl Game {
             return;
         }
         let item = Item::ALL[w.item.min(Item::ALL.len() - 1)];
-        if self.pfand.tray.is_some() {
+        // der Scooter kommt nicht in die Ablage, er steht neben der Maschine
+        if self.pfand.tray.is_some() && item != Item::Scooter {
             w.text = "Erst die Ablage leeren.".into();
             w.confirm = false;
             self.play(Sfx::Error, 0.4);
             return;
         }
-        let Some(&bon) = self.pfand.bons.get(w.bon) else {
+        if self.pfand.bons.get(w.bon).is_none() {
             w.text = "Ohne Pfandbon gibt es nichts.".into();
             self.play(Sfx::Error, 0.4);
             return;
-        };
-        if bon < item.cents() {
-            w.text = "Der Bon reicht nicht.".into();
+        }
+        let sel = w.bon;
+        let pay = self.bons_for(item, sel);
+        let w = self.pfand.kiosk.as_mut().expect("Fenster offen");
+        let Some((used, rest)) = pay else {
+            w.text = if item == Item::Scooter {
+                let all: i64 = self.pfand.bons.iter().sum();
+                format!(
+                    "Alle Bons zusammen: {}. Reicht nicht.",
+                    crate::ui::euro(all)
+                )
+            } else {
+                "Der Bon reicht nicht.".into()
+            };
             w.confirm = false;
             self.play(Sfx::Error, 0.4);
             return;
-        }
+        };
         if let Some(why) = self.item_refused(item) {
             if let Some(w) = &mut self.pfand.kiosk {
                 w.text = why.into();
@@ -231,27 +243,42 @@ impl Game {
         }
         let w = self.pfand.kiosk.as_mut().expect("Fenster offen");
         if !w.confirm {
-            let rest = bon - item.cents();
             w.confirm = true;
-            w.text = if rest > 0 {
-                format!("Rest verfällt: {}. Noch mal E.", crate::ui::euro(rest))
+            let several = if used.len() > 1 {
+                format!("{} Bons zusammen. ", used.len())
             } else {
-                "Passt genau. Noch mal E.".into()
+                String::new()
+            };
+            w.text = if rest > 0 {
+                format!(
+                    "{several}Rest verfällt: {}. Noch mal E.",
+                    crate::ui::euro(rest)
+                )
+            } else {
+                format!("{several}Passt genau. Noch mal E.")
             };
             self.play(Sfx::Blip, 0.4);
             return;
         }
-        // genau dieser eine Bon ist weg, auch wenn er mehr wert war
-        let k = w.bon;
-        self.pfand.bons.remove(k);
+        // genau diese Bons sind weg, auch wenn sie mehr wert waren (von hinten entfernen)
+        let mut used = used;
+        used.sort_unstable_by(|a, b| b.cmp(a));
+        for k in used {
+            self.pfand.bons.remove(k);
+        }
         self.pfand.bought = true;
+        self.close_kiosk();
+        self.play(Sfx::Rattle, 0.6);
+        self.play(Sfx::Thud, 0.35);
+        if item == Item::Scooter {
+            // steht sofort neben der Maschine (scooter.rs)
+            self.receive_item(item);
+            return;
+        }
         // die Maschine rumpelt und spuckt es in die Ablage (collect_kiosk_draws); das Fenster
         // geht zu, damit man es herausrutschen sieht und mit E nehmen kann
         self.pfand.tray = Some(item);
         self.pfand.dispensed = Some(self.time);
-        self.close_kiosk();
-        self.play(Sfx::Rattle, 0.6);
-        self.play(Sfx::Thud, 0.35);
         self.say(
             &format!(
                 "Die Maschine spuckt es aus: {}. Nimm es aus der Ablage.",
@@ -259,6 +286,29 @@ impl Game {
             ),
             3.5,
         );
+    }
+
+    /// Mit welchen Bons `item` bezahlt wird (Index in `pfand.bons`) und wie viel dabei
+    /// verfaellt. Sonst ein Bon pro Kauf (der gewaehlte); nur fuer den Scooter (10 €) zaehlen
+    /// alle Bons zusammen, die groessten zuerst. None: reicht nicht.
+    pub fn bons_for(&self, item: Item, sel: usize) -> Option<(Vec<usize>, i64)> {
+        let bons = &self.pfand.bons;
+        if item != Item::Scooter {
+            let &bon = bons.get(sel)?;
+            return (bon >= item.cents()).then(|| (vec![sel], bon - item.cents()));
+        }
+        let mut order: Vec<usize> = (0..bons.len()).collect();
+        order.sort_by(|&a, &b| bons[b].cmp(&bons[a]));
+        let mut sum = 0;
+        let mut used = Vec::new();
+        for k in order {
+            if sum >= item.cents() {
+                break;
+            }
+            sum += bons[k];
+            used.push(k);
+        }
+        (sum >= item.cents()).then(|| (used, sum - item.cents()))
     }
 
     /// Ablage vor dem Schacht: wo das Gekaufte liegt (zum Anschauen etwas grosszuegiger).

@@ -32,11 +32,13 @@ pub enum Item {
     Soles,
     Bell,
     Torch,
+    /// Mobility-Scooter (scooter.rs): ersetzt den Wagen, schneller, 2 Leben mehr, Licht
+    Scooter,
 }
 
 impl Item {
     /// Nach Preis geordnet
-    pub const ALL: [Item; 9] = [
+    pub const ALL: [Item; 10] = [
         Item::Sticker,
         Item::Energy,
         Item::Sparkler,
@@ -46,6 +48,7 @@ impl Item {
         Item::Soles,
         Item::Bell,
         Item::Torch,
+        Item::Scooter,
     ];
 
     pub fn name(self) -> &'static str {
@@ -59,6 +62,7 @@ impl Item {
             Item::Soles => "Filzsohlen",
             Item::Bell => "Glöckchen",
             Item::Torch => "Taschenlampe",
+            Item::Scooter => "Mobility Scooter",
         }
     }
 
@@ -74,6 +78,7 @@ impl Item {
             Item::Soles => 125,
             Item::Bell => 150,
             Item::Torch => 250,
+            Item::Scooter => 1000,
         }
     }
 
@@ -88,6 +93,7 @@ impl Item {
             Item::Soles => "Schritte nur halb so weit hörbar.",
             Item::Bell => "Klingelt, wenn hinter dir einer kommt.",
             Item::Torch => "Doppelt so hell im dunklen Markt.",
+            Item::Scooter => "Du bist jetzt fett.",
         }
     }
 
@@ -103,6 +109,7 @@ impl Item {
             Item::Soles => vec3(0.5, 0.45, 0.55),
             Item::Bell => vec3(0.95, 0.8, 0.35),
             Item::Torch => vec3(0.85, 0.85, 0.95),
+            Item::Scooter => vec3(0.62, 0.12, 0.12),
         }
     }
 
@@ -114,6 +121,7 @@ impl Item {
             Item::Soles => "Sohlen",
             Item::Bell => "Glöckchen",
             Item::Torch => "Lampe",
+            Item::Scooter => "Scooter",
             other => other.name(),
         }
     }
@@ -171,6 +179,10 @@ impl Game {
         } else {
             o.kept.push(i);
         }
+        // der Scooter kommt nicht aus dem Schacht, er steht neben der Maschine (scooter.rs)
+        if i == Item::Scooter {
+            self.spawn_scooter();
+        }
     }
 
     /// G: gewaehltes Item benutzen.
@@ -226,6 +238,13 @@ impl Game {
 
     /// Zeiten ablaufen lassen, Gloeckchen.
     pub(in crate::game) fn update_items(&mut self, dt: f32) {
+        // nachkommende Flaschen (eine je REFILL_EVERY, nie in der Naehe des Spielers)
+        self.pfand.refill -= dt;
+        if self.pfand.refill <= 0.0 {
+            self.pfand.refill = super::REFILL_EVERY;
+            let n = self.pfand.bottles.len();
+            self.scatter_bottles_upto(n + 1);
+        }
         let o = &mut self.pfand.owned;
         o.energy = (o.energy - dt).max(0.0);
         o.sparkle = (o.sparkle - dt).max(0.0);
@@ -265,7 +284,8 @@ impl Game {
 
     /// Licht an der Kamera im dunklen Markt (1 = ueblich).
     pub fn camera_light(&self) -> f32 {
-        if self.pfand.owned.has(Item::Torch) {
+        // der Scooter hat einen Scheinwerfer: so hell wie die Taschenlampe
+        if self.pfand.owned.has(Item::Torch) || self.pfand.owned.has(Item::Scooter) {
             TORCH
         } else {
             1.0

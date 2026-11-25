@@ -494,10 +494,11 @@ pub fn draw_hud(u: &mut Ui, g: &Game, show_list: bool, time: f32) {
                 u.hint_center(y, "[E] \"Hey, das ist mein Wagen!\"", YELLOW, 1.0);
             }
             Some(Focus::Cart) => {
-                let s = if g.trolley.pushing {
-                    "[E/Q] Wagen stehen lassen"
-                } else {
-                    "[E/Q] Wagen schieben"
+                let s = match (g.has_scooter(), g.trolley.pushing) {
+                    (true, true) => "[E/Q] Vom Mobility Scooter absteigen",
+                    (true, false) => "[E/Q] Mobility Scooter fahren",
+                    (false, true) => "[E/Q] Wagen stehen lassen",
+                    (false, false) => "[E/Q] Wagen schieben",
                 };
                 u.hint_center(y, s, WHITE, 1.0);
                 let n = g.pfand.bag.len();

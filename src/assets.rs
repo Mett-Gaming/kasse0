@@ -31,10 +31,16 @@ pub enum MeshId {
     Skeleton,
     /// Pfandtuete am Wagen (Quaternius Trash Bag, CC0): 0,32 x 0,36 x 0,32 m, Boden bei y = 0
     PfandBag,
+    /// Mobility-Scooter "Leon Mobility INC" (eigenes Modell): Ursprung = Wagenposition, Korb wie
+    /// der Wagenkorb, Sitz bei +z (Fahrer), 0,70 x 1,03 x 1,89 m
+    Scooter,
+    /// Lenker des Scooters (Saeule, Lenkstange, Armaturenbrett), gleiche Lage wie `Scooter`;
+    /// dreht sich um die Lenksaeule (scooter.rs STEER_FOOT/STEER_TOP)
+    ScooterBar,
 }
 
 /// Anzahl fester Modelle (danach folgen die Waren aus dem Katalog)
-pub const FIXED_COUNT: usize = MeshId::PfandBag as usize + 1;
+pub const FIXED_COUNT: usize = MeshId::ScooterBar as usize + 1;
 
 mod gen {
     include!(concat!(env!("OUT_DIR"), "/products_gen.rs"));
@@ -59,6 +65,8 @@ const SOURCES: [&str; FIXED_COUNT - 1] = [
     "machine.k0m",
     "skeleton.k0m",
     "pfand_bag.k0m",
+    "scooter.k0m",
+    "scooter_bar.k0m",
 ];
 
 /// Alle Modelle: feste (Index = MeshId) gefolgt von den Waren (Index = FIXED_COUNT + Katalog-Mesh).
@@ -328,7 +336,8 @@ mod tests {
         for (i, m) in meshes.iter().enumerate() {
             assert!(!m.vertices.is_empty(), "Mesh {i} leer");
             assert_eq!(m.vertices.len() % 3, 0);
-            if i > 0 {
+            // der Lenker des Scooters sitzt auf dem Scooter, nicht auf dem Boden
+            if i > 0 && i != MeshId::ScooterBar as usize {
                 assert!(
                     m.min.y.abs() < 1e-3,
                     "Mesh {i} steht nicht auf dem Boden: {}",

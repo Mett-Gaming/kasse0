@@ -73,6 +73,7 @@ pub const CHEATS: &[&str] = &[
     "Item: Filzsohlen",
     "Item: Glöckchen",
     "Item: Taschenlampe",
+    "Item: Mobility Scooter",
 ];
 
 /// Stelle eines Cheats in `CHEATS` (zur Uebersetzungszeit, fehlt er: Fehler beim Bauen)

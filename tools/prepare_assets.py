@@ -34,6 +34,11 @@ MANN_F = os.path.join(QUAT, "universal-animation-library-2", "Universal Animatio
                       "Female Mannequin", "Unreal-Godot", "Mannequin_F.glb")
 
 # Jobs: name, Quelle(n), Optionen
+# Farben des Scooters (Materialnamen aus tools/models/scooter.py)
+SCOOTER_COLORS = {"Lack": (0.62, 0.12, 0.12), "Creme": (0.93, 0.9, 0.8), "Chrom": (0.72, 0.72, 0.75),
+                  "Gummi": (0.08, 0.08, 0.09), "Polster": (0.2, 0.17, 0.17),
+                  "Schrift": (0.97, 0.9, 0.62), "Ruecklicht": (0.85, 0.1, 0.1)}
+
 JOBS = [
     # Kunden und Personal: siehe tools/prepare_people.py (animiert)
     # Kassierer:in: sitzend, Haende vorn am Scanner
@@ -71,6 +76,13 @@ JOBS = [
          height=1.45, tris=3000,
          colors={"old_military_compressor": (0.45, 0.24, 0.12),
                  "old_military_compressor_glass": (0.32, 0.36, 0.3)}),
+    # Mobility-Scooter "Leon Mobility INC": eigenes Modell (tools/models/scooter.py), schon in
+    # Metern, Ursprung = Wagenposition, Korb genau wie der Wagenkorb
+    dict(name="scooter", src=os.path.join(MODELS, "scooter.glb"), keep=True,
+         colors=SCOOTER_COLORS),
+    # Lenker des Scooters (dreht sich beim Lenken um die Lenksaeule), gleiche Lage wie oben
+    dict(name="scooter_bar", src=os.path.join(MODELS, "scooter_bar.glb"), keep=True,
+         colors=SCOOTER_COLORS),
     # Pfandtuete am Wagen: "Trash Bag" (Quaternius, CC0, poly.pizza/m/jYrMKg2Q7C, Datei
     # static.poly.pizza/9cc89089-5f9a-4d6b-a7a1-57e2f78e3976.glb als quaternius_trash_bag/trash_bag.glb),
     # hell gefaerbt; das Spiel blaeht sie je Flasche auf

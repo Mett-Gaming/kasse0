@@ -66,7 +66,7 @@ pub(super) fn door_box(st: &crate::world::Station) -> Aabb {
 impl Game {
     /// Oberkante des Kopfs (geduckt tiefer, im Sprung hoeher).
     pub fn head_top(&self) -> f32 {
-        HEAD * (1.0 - 0.45 * self.player.crouch) + self.player.jump_y
+        (HEAD - self.seat_drop()) * (1.0 - 0.45 * self.player.crouch) + self.player.jump_y
     }
 
     /// Alle Kaesten im Gang, die den Spieler aufhalten koennen.

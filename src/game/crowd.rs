@@ -344,7 +344,8 @@ impl Game {
     pub(super) fn update_customers(&mut self, dt: f32) {
         let player = self.player.pos;
         let base = self.tier.customer_speed();
-        let running = self.player.vel.length() > WALK_SPEED * 1.3;
+        // Scooter-Fahren faellt nicht auf (scooter.rs)
+        let running = self.player.vel.length() > WALK_SPEED * 1.3 && !self.riding();
         let noticed = self.suspicion >= 1.0;
         let chase = self.chasing();
         let tutorial = self.tutorial_run;
@@ -776,8 +777,7 @@ impl Game {
         let eye = self.eye();
         let sprinting = self.player.vel.length() > 2.2;
         // Ein unbeaufsichtigter Wagen im gekippten Markt wird "aufgeraeumt"
-        let unattended =
-            self.tipped && !self.paid && !self.trolley.pushing && self.cart_distance() > 6.0;
+        let unattended = self.cart_unattended_for_staff();
         for i in 0..self.employees.len() {
             let head = self.employees[i].pos + vec3(0.0, 1.7, 0.0);
             let los = self.world.line_of_sight(head, eye);

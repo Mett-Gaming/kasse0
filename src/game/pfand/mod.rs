@@ -18,6 +18,9 @@ pub use machine::MachineWindow;
 pub const BAG_MAX: usize = 5;
 /// So viele Flaschen liegen im Markt (nach jedem Umbau wieder aufgefuellt)
 pub const BOTTLES: usize = 14;
+/// So oft (s) kommt eine neue Flasche dazu, solange weniger als `BOTTLES` herumliegen
+/// (damit sich ueber den Einkauf genug fuer den Scooter, 10 €, sammeln laesst)
+pub const REFILL_EVERY: f32 = 15.0;
 /// davon hoechstens so viele im Seitentrakt
 const IN_WING: usize = 3;
 /// Mindestabstand zweier Flaschen (m)
@@ -111,6 +114,8 @@ pub struct Pfand {
     pub dispensed: Option<f32>,
     /// Gekauftes, das in der Ablage der Maschine liegt, bis man es mit E nimmt (kiosk.rs)
     pub tray: Option<items::Item>,
+    /// Zeit bis zur naechsten nachkommenden Flasche (s)
+    pub refill: f32,
     /// Zettel an der Maschine in diesem Run schon gelesen (kiosk.rs)
     pub note_read: bool,
     /// Spielzeit, zu der zuletzt eine Flasche in die Tuete kam oder heraus (Nachwippen)
@@ -138,6 +143,7 @@ impl Pfand {
             bag_changed: -10.0,
             dispensed: None,
             tray: None,
+            refill: REFILL_EVERY,
             rng: Pcg64::seed_from_u64(seed ^ 0x9FA2_D000),
             hinted: false,
         }
@@ -151,6 +157,12 @@ impl Pfand {
 impl Game {
     /// Flaschen bis zur vollen Zahl im Markt verteilen (erreichbare Zellen).
     pub(super) fn scatter_bottles(&mut self) {
+        self.scatter_bottles_upto(BOTTLES);
+    }
+
+    /// Flaschen verteilen, bis `target` im Markt liegen (hoechstens `BOTTLES`).
+    pub(super) fn scatter_bottles_upto(&mut self, target: usize) {
+        let target = target.min(BOTTLES);
         if !self.tipped || self.paid {
             return;
         }
@@ -180,7 +192,7 @@ impl Game {
             }
         }
         let mut tries = 0;
-        while self.pfand.bottles.len() < BOTTLES && tries < 600 {
+        while self.pfand.bottles.len() < target && tries < 600 {
             tries += 1;
             let p = cells[self.pfand.rng.gen_range(0..cells.len())];
             let in_wing = |q: Vec3| self.world.in_wing(q);

@@ -60,7 +60,13 @@ pub fn draw(u: &mut Ui, g: &Game, w: &KioskWindow, time: f32) {
         if on {
             mark(u, SHELF, k, time);
         }
-        let c = match (bon >= item.cents(), on) {
+        // der Scooter zaehlt alle Bons zusammen (bons_for)
+        let affordable = if *item == Item::Scooter {
+            g.bons_for(*item, w.bon).is_some()
+        } else {
+            bon >= item.cents()
+        };
+        let c = match (affordable, on) {
             (true, true) => YELLOW,
             (true, false) => WHITE,
             _ => DIM,
@@ -89,13 +95,12 @@ pub fn draw(u: &mut Ui, g: &Game, w: &KioskWindow, time: f32) {
     let lx = BUY.0 + (BUY.2 - Ui::text_width(label, 1.0)) * 0.5;
     let c = if w.confirm { GREEN } else { WHITE };
     u.text(lx, BUY.1 + 4.0, label, c, 1.0);
-    u.hint(
-        x + 10.0,
-        y + hh - 22.0,
-        "Ein Bon pro Kauf, Rest verfällt",
-        DIM,
-        1.0,
-    );
+    let rule = if item == Item::Scooter {
+        "Scooter: alle Bons zählen zusammen"
+    } else {
+        "Ein Bon pro Kauf, Rest verfällt"
+    };
+    u.hint(x + 10.0, y + hh - 22.0, rule, DIM, 1.0);
     u.hint(
         x + 10.0,
         y + hh - 11.0,

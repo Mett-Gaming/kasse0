@@ -28,7 +28,7 @@ impl Game {
         }
         self.catcher_variant = Some(variant);
         // Bei der Flucht zum Ausgang gibt es kein Aufwachen mehr
-        if self.deaths >= SURVIVABLE_HITS || self.chase.is_some() {
+        if self.deaths >= self.survivable_hits() || self.chase.is_some() {
             self.outcome = Outcome::Caught;
             self.outcome_timer = 0.0;
             self.catcher = Some(catcher);

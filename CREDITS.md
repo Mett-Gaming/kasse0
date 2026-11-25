@@ -53,6 +53,7 @@ Der Einkaufswagen steht unter CC-BY 3.0 und muss beim Weitergeben des Spiels gen
 - Zigaretten-Rollo: `rollershutter_window_01`, Zigaretten: `cigarette_pack`
 - Ueberwachungskamera: `security_camera_01`
 - Kartenterminal: eigenes Modell (`tools/models/kartenterminal.blend`), nicht von Poly Haven
+- Mobility Scooter „Leon Mobility INC“: eigenes Modell (`tools/models/scooter.py`, daraus `scooter.blend`/`scooter.glb`), in Blender aus einfachen Körpern gebaut, Schrift in Archivo Black (OFL). Ausnahme von der Regel „keine selbst gebauten Modelle“ auf ausdrücklichen Wunsch; „Leon Mobility“ ist eine erfundene Marke.
 - Kasse und Stuhl: siehe Tabelle oben (POS Machine, Desk Chair). Der Theken-Scanner ist Einrichtung aus Boxen.
 
 ## Schrift

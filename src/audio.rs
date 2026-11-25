@@ -99,12 +99,16 @@ pub struct Mood {
     pub muffle: f32,
     /// 0..1: alles klingt dumpf (Rausch, Sterben)
     pub dull: f32,
+    /// 0..1: Elektromotor des Mobility Scooters (0 = steht oder man sitzt nicht drauf)
+    pub scooter: f32,
 }
 
 pub struct Audio {
     out: Output,
     music: Option<TrackId>,
     hum: Option<TrackId>,
+    /// Motor des Mobility Scooters (Schleife, Lautstaerke und Tonhoehe nach Tempo)
+    motor: Option<TrackId>,
     sounds: Vec<(Sfx, Sound)>,
     music_volume: f32,
     /// 0..1: alles klingt dumpf (Rausch, Sterben)
@@ -197,6 +201,24 @@ pub fn hum() -> Vec<f32> {
                 + 0.15 * (TAU * 200.0 * t).sin()
                 + 0.06 * (TAU * 300.0 * t).sin()
                 + 0.03 * rng.next()
+        })
+        .collect()
+}
+
+/// Elektromotor des Mobility Scooters: tiefes Surren, heller Getriebeton, leises Rauschen
+/// (nahtlose Schleife: ganze Perioden in 2 s).
+pub fn scooter_motor() -> Vec<f32> {
+    let mut rng = Rng(0x5C00_7E12);
+    (0..secs(2.0))
+        .map(|i| {
+            let t = i as f32 / RATE as f32;
+            let saw = |f: f32| 2.0 * (t * f).fract() - 1.0;
+            let wobble = 1.0 + 0.15 * (TAU * 3.0 * t).sin();
+            0.22 * saw(110.0) * wobble
+                + 0.12 * (TAU * 220.0 * t).sin()
+                + 0.07 * (TAU * 880.0 * t).sin() * wobble
+                + 0.03 * (TAU * 1320.0 * t).sin()
+                + 0.04 * rng.next()
         })
         .collect()
 }
@@ -626,6 +648,7 @@ impl Audio {
         };
         let music = out.start_track(&Sound::new(muzak()), silent);
         let hum = out.start_track(&Sound::new(hum()), silent);
+        let motor = out.start_track(&Sound::new(scooter_motor()), silent);
         let sounds = [
             Sfx::Beep,
             Sfx::Chime,
@@ -672,6 +695,7 @@ impl Audio {
             out,
             music,
             hum,
+            motor,
             sounds,
             music_volume,
             dull: 0.0,
@@ -735,6 +759,11 @@ impl Audio {
         }
         if let Some(t) = self.hum {
             self.out.set_track(t, hum, 1.0);
+        }
+        // Scooter: lauter und hoeher, je schneller er faehrt
+        if let Some(t) = self.motor {
+            let s = m.scooter.clamp(0.0, 1.0);
+            self.out.set_track(t, 0.32 * s * pause, 0.75 + 0.45 * s);
         }
         self.out.update_tracks(dt);
     }

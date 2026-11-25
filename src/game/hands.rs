@@ -77,6 +77,8 @@ impl Game {
         let run_time = STAMINA_RUN * self.stamina_factor();
         let (slow, cap) = self.corridor_speed();
         let pushing = self.trolley.pushing;
+        // auf dem Scooter (scooter.rs): schnell, ohne Ausdauer, kein Rennen im Sinne der Regeln
+        let riding = self.riding();
         // Ducken (weich) und Springen (nur am Boden, nicht geduckt)
         let p = &mut self.player;
         let want = if input.crouch && p.jump_y <= 0.0 {
@@ -105,7 +107,8 @@ impl Game {
             p.exhausted = false;
         }
         // Ausdauer: Rennen kostet, Gehen und Stehen erholen (geduckt rennt man nicht)
-        p.running = input.run && !p.exhausted && wish.length_squared() > 0.0 && p.crouch < 0.5;
+        p.running =
+            input.run && !riding && !p.exhausted && wish.length_squared() > 0.0 && p.crouch < 0.5;
         if p.running && !endless {
             p.stamina -= dt / run_time;
             if p.stamina <= 0.0 {
@@ -123,7 +126,12 @@ impl Game {
         let crouch = p.crouch;
         if wish.length_squared() > 0.0 {
             let base = if running { RUN_SPEED } else { WALK_SPEED };
-            let v = (base + (RUN_SPEED * CROUCH_SPEED - base) * crouch) * slow;
+            let v = if riding {
+                // geduckt faehrt der Scooter genauso schnell
+                super::scooter::SCOOTER_SPEED * slow
+            } else {
+                (base + (RUN_SPEED * CROUCH_SPEED - base) * crouch) * slow
+            };
             let push = if push > 0.0 { push.max(0.25) } else { 1.0 };
             wish = wish.normalize() * v.min(cap) * push;
         }
@@ -145,14 +153,22 @@ impl Game {
         if self.trolley.pushing {
             // Der geschobene Wagen ist breiter als ein Mensch: schmale Durchgaenge gehen nicht
             let cart = pos + forward * CART_OFFSET;
-            let fixed = self.world.collide(cart, CART_PUSH_RADIUS);
+            let radius = if riding {
+                super::scooter::SCOOTER_RADIUS
+            } else {
+                CART_PUSH_RADIUS
+            };
+            let fixed = self.world.collide(cart, radius);
             pos = self.world.collide(pos + (fixed - cart), PLAYER_RADIUS);
             let want = pos + forward * CART_OFFSET;
             let t = &mut self.trolley;
             t.pos = t.pos.lerp(want, (dt * 12.0).min(1.0));
             let old_yaw = t.yaw;
             t.yaw = lerp_angle(t.yaw, self.player.yaw, (dt * 12.0).min(1.0));
-            let turned = lerp_angle(0.0, t.yaw - old_yaw, 1.0).abs();
+            let signed = lerp_angle(0.0, t.yaw - old_yaw, 1.0);
+            let turned = signed.abs();
+            // Lenker des Scooters schlaegt mit der Drehung ein (scooter.rs)
+            self.update_steer(dt, signed / dt.max(1e-4));
 
             // Feststecken erkennen
             let moved = (pos - old).length();
@@ -184,7 +200,8 @@ impl Game {
                 self.cart_turn = 0.0;
                 self.squeak_next = self.rng.gen_range(lo..hi);
                 // geoelt (Kiosk): nur die Flaschen sind noch zu hoeren
-                let oiled = self.pfand.owned.has(super::pfand::items::Item::Oil);
+                // der Scooter faehrt elektrisch: kein Quietschen
+                let oiled = self.pfand.owned.has(super::pfand::items::Item::Oil) || riding;
                 if !oiled {
                     self.sfx.push((sfx, vol));
                 }
@@ -205,6 +222,9 @@ impl Game {
                     }
                 }
             }
+        } else if self.has_scooter() {
+            self.update_steer(dt, 0.0);
+            pos = self.parked_scooter_push(pos);
         } else {
             // Abgestellter Wagen ist ein Hindernis
             let d = vec3(pos.x - self.trolley.pos.x, 0.0, pos.z - self.trolley.pos.z);
@@ -226,6 +246,10 @@ impl Game {
         p.pos = pos;
         p.bob_phase += moved * 5.5;
         p.step_acc += moved;
+        // im Sitz macht man keine Schritte
+        if riding {
+            p.step_acc = 0.0;
+        }
         if p.step_acc > 0.7 {
             p.step_acc = 0.0;
             // Filzsohlen (Kiosk): leiser und nicht so weit
@@ -250,6 +274,14 @@ impl Game {
     }
 
     fn cart_box(&self) -> world::Aabb {
+        // Scooter: Korb und Sitz zusammen (scooter.rs), damit der Blick auf den Sitz auch zaehlt
+        if self.has_scooter() {
+            let (s, c) = self.trolley.yaw.sin_cos();
+            let back = -vec3(s, 0.0, -c) * super::scooter::SEAT_BACK;
+            let mid = self.trolley.pos + back * 0.5;
+            let half = vec3(back.x.abs() * 0.5 + 0.38, 0.5, back.z.abs() * 0.5 + 0.38);
+            return world::Aabb::from_center(mid + vec3(0.0, 0.5, 0.0), half);
+        }
         world::Aabb::from_center(
             self.trolley.pos + vec3(0.0, 0.45, 0.0),
             vec3(0.45, 0.45, 0.45),
@@ -625,9 +657,18 @@ impl Game {
             self.play(Sfx::Click, 0.4);
         } else if self.cart_distance() < CART_REACH {
             self.trolley.pushing = true;
+            // auf den Scooter steigt man auf: auf den Sitz hinter dem Korb
+            if self.has_scooter() {
+                self.mount_scooter();
+            }
             self.play(Sfx::Click, 0.4);
         } else {
-            self.hint("Dein Wagen ist zu weit weg.");
+            let what = if self.has_scooter() {
+                "Dein Scooter ist zu weit weg."
+            } else {
+                "Dein Wagen ist zu weit weg."
+            };
+            self.hint(what);
             return;
         }
         if let Some(t) = &mut self.tutorial {
@@ -887,12 +928,28 @@ impl Game {
                 0.0,
             );
         let m = Mat4::from_rotation_translation(rot(-self.trolley.yaw), cart_pos);
+        // mit Scooter ist der Wagen weg: der Korb des Scooters liegt an seiner Stelle
+        let mesh = if self.has_scooter() {
+            MeshId::Scooter
+        } else {
+            MeshId::Cart
+        };
         out.push(MeshDraw {
-            mesh: MeshId::Cart as usize,
+            mesh: mesh as usize,
             model: m,
             tint: white,
             ..Default::default()
         });
+        // Lenker des Scooters: dreht sich um die Lenksaeule (rechts lenken: rechter Griff
+        // kommt zum Fahrer)
+        if self.has_scooter() {
+            out.push(MeshDraw {
+                mesh: MeshId::ScooterBar as usize,
+                model: m * self.steer_local(),
+                tint: white,
+                ..Default::default()
+            });
+        }
         let selected = self.cart_selected();
         for (i, item) in self.cart.iter().enumerate() {
             let mut model = self.cart_item_model(i);

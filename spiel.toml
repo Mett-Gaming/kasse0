@@ -11,7 +11,7 @@ waren = ["products/*"]
 modelle = [
     "cart.k0m", "register.k0m", "wet_floor_sign.k0m", "can.k0m", "cashier.k0m", "chair.k0m",
     "shutter.k0m", "camera.k0m", "terminal.k0m", "cigarettes.k0m", "rat.k0m", "cigarette.k0m",
-    "machine.k0m", "skeleton.k0m", "pfand_bag.k0m",
+    "machine.k0m", "skeleton.k0m", "pfand_bag.k0m", "scooter.k0m", "scooter_bar.k0m",
 ]
 schriften = ["fonts/*.ttf"]
 

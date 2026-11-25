@@ -16,6 +16,7 @@ pub mod pfand;
 mod scare_cheats;
 pub mod scare_kinds;
 mod scares;
+pub mod scooter;
 mod senses;
 pub use scare_cheats::FIRST_SCARE_CHEAT;
 pub mod smoke;
@@ -287,6 +288,8 @@ pub struct Game {
     pub god: bool,
     /// Cheat: Ausdauer geht nie aus
     pub endless_stamina: bool,
+    /// Lenkeinschlag des Scooters (Bogenmass, + = rechts; scooter.rs)
+    pub steer: f32,
     /// Schonfrist nach einem Gespraech
     pub grace: f32,
     /// Wie oft man schon erwischt wurde (Vignette), laufende Todesanimation
@@ -552,6 +555,7 @@ impl Game {
             cheated: false,
             god: false,
             endless_stamina: false,
+            steer: 0.0,
             grace: 0.0,
             deaths: 0,
             dying: None,
@@ -893,13 +897,18 @@ impl Game {
 
     pub fn eye(&self) -> Vec3 {
         let p = &self.player;
-        let bob = p.bob_phase.sin() * 0.025 * (p.vel.length() / WALK_SPEED).min(1.0);
+        // Kopfwippen beim Gehen; auf dem Scooter sitzt man ruhig (scooter.rs)
+        let bob = if self.riding() {
+            0.0
+        } else {
+            p.bob_phase.sin() * 0.025 * (p.vel.length() / WALK_SPEED).min(1.0)
+        };
         // Todesanimation: man sackt zusammen
         let fall = self
             .dying_progress()
             .map_or(0.0, |k| ((k - 0.3) / 0.4).clamp(0.0, 1.0));
         // geduckt tiefer, im Sprung hoeher
-        let h = EYE_HEIGHT * (1.0 - 0.45 * p.crouch) + p.jump_y;
+        let h = (EYE_HEIGHT - self.seat_drop()) * (1.0 - 0.45 * p.crouch) + p.jump_y;
         p.pos
             + vec3(
                 0.0,
